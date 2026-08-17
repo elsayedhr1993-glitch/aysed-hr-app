@@ -1,0 +1,1 @@
+sed -i 's/department: found.departmentName || prev?.department || '\'''\''/departmentId: found.departmentId || prev?.departmentId || undefined, department: found.departmentName || prev?.department || '\'''\''/' src/apps/EmployeesApp.tsx

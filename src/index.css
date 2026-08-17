@@ -1,0 +1,373 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Cairo:wght@400;700&family=Amiri&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* ألوان أودو الأساسية */
+  --odoo-purple: #714B67;    /* لون الشريط العلوي */
+  --odoo-purple-dark: #5a3c52;
+  --odoo-teal: #00A09D;      /* لون الأزرار الرئيسية */
+  --odoo-teal-dark: #008582;
+
+  /* ألوان الخلفيات */
+  --odoo-bg-light: #f8fafc;  /* خلفية الصفحات (Odoo Enterprise Style) */
+  --odoo-border-color: #DEE2E6; /* لون الخطوط الفاصلة */
+
+  /* ألوان الحالات (Status) */
+  --odoo-status-draft: #6c757d;  /* رمادي - مسودة */
+  --odoo-status-confirm: #EE9B00; /* برتقالي - في انتظار الموافقة */
+  --odoo-status-validate: #28a745; /* أخضر - معتمد */
+  --odoo-status-refuse: #dc3545;   /* أحمر - مرفوض */
+
+  /* الخطوط */
+  --odoo-font: 'Inter', 'Cairo', sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--odoo-font);
+    background-color: var(--odoo-bg-light);
+    color: #1e293b;
+    overflow-x: hidden;
+  }
+}
+
+.official-document {
+  font-family: 'Amiri', serif;
+}
+
+.dashboard-container {
+  max-width: 100vw;
+  max-height: calc(100vh - 3.5rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+}
+
+.fluid-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (min-width: 768px) {
+  .fluid-apps-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .fluid-apps-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+/* تنسيق جدول البيانات المحوري */
+.pivot-table-container {
+    background-color: white;
+    border: 1px solid var(--odoo-border-color);
+    border-radius: 4px;
+    font-family: var(--odoo-font);
+}
+
+.pivot-table-header {
+    background-color: var(--odoo-bg-light);
+    font-weight: bold;
+    color: #495057;
+    border-bottom: 2px solid var(--odoo-border-color);
+    text-align: center;
+}
+
+.pivot-cell {
+    border: 1px solid var(--odoo-border-color);
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+/* تمييز الصف عند مرر الماوس مثل أودو */
+.pivot-row:hover {
+    background-color: #f2f3f7;
+}
+
+/* تنسيق المجموع الكلي (Total) */
+.pivot-total {
+    background-color: #fcfcfc;
+    font-weight: bold;
+    color: var(--odoo-purple);
+}
+
+/* الزر الأساسي (مثل زر حفظ أو اعتماد) */
+.btn-odoo-primary {
+    background-color: var(--odoo-teal);
+    color: white;
+    border-radius: 4px;
+    padding: 6px 12px;
+    border: 1px solid var(--odoo-teal);
+    transition: 0.3s;
+    font-family: var(--odoo-font);
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-odoo-primary:hover {
+    background-color: var(--odoo-teal-dark);
+}
+
+/* الزر الثانوي (مثل زر إلغاء) */
+.btn-odoo-secondary {
+    background-color: white;
+    color: #495057;
+    border: 1px solid var(--odoo-border-color);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-family: var(--odoo-font);
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.btn-odoo-secondary:hover {
+    background-color: #f8f9fa;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* شاشة النموذج والأزرار الذكية والتبويبات لأودو */
+.odoo-form-view {
+  background: white;
+  padding: 20px;
+  font-family: var(--odoo-font);
+}
+
+.smart-button-box {
+  display: flex;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--odoo-border-color);
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+.smart-button {
+  border: 1px solid var(--odoo-border-color);
+  background: white;
+  padding: 6px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #444;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.smart-button:hover {
+  background: #f8f9fa;
+}
+
+.odoo-tabs {
+  border-bottom: 1px solid var(--odoo-purple);
+  margin-top: 30px;
+  display: flex;
+  gap: 5px;
+}
+
+.odoo-tabs button {
+  background: none;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: var(--odoo-font);
+  font-size: 14px;
+  color: #495057;
+}
+
+.odoo-tabs button.active {
+  border-bottom: 3px solid var(--odoo-purple);
+  color: var(--odoo-purple);
+  font-weight: bold;
+}
+
+/* حاوية الكارت الرئيسية (Odoo Kanban) */
+.o_kanban_record {
+    width: 300px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    display: flex;
+    padding: 8px;
+    margin: 10px auto;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    position: relative;
+    text-align: right;
+}
+
+.o_kanban_record:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    border-color: var(--odoo-purple); /* لون أودو عند المرور */
+}
+
+/* الصورة الشخصية */
+.o_kanban_image_fill {
+    width: 64px;
+    height: 64px;
+    position: relative;
+    margin-left: 12px; /* مسافة لليمين في العربي */
+    flex-shrink: 0;
+}
+
+.o_kanban_image_fill img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.o_kanban_image_fill .fallback-avatar {
+    width: 100%;
+    height: 100%;
+    background-color: #e2e8f0;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* مؤشر الحالة (النقطة) */
+.status_dot {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid white;
+    border-radius: 50%;
+    background-color: #cbd5e1; /* Default offline */
+}
+.status_dot.online { background-color: #28a745; }
+
+/* تفاصيل الموظف */
+.oe_kanban_details {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.o_kanban_record_title {
+    color: var(--odoo-purple);
+    font-size: 16px;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.o_kanban_record_subtitle {
+    color: #666;
+    font-size: 13px;
+    display: block;
+}
+
+.contact_info {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.contact_info svg {
+    width: 14px;
+    color: var(--odoo-purple);
+}
+
+/* الأوسمة والأسفل */
+.badge {
+    background-color: #eff1f5;
+    color: #495057;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-top: 8px;
+    display: inline-block;
+}
+
+.o_kanban_record_bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.oe_kanban_bottom_right {
+    display: flex;
+    gap: 8px;
+    color: #94a3b8;
+}
+
+.oe_kanban_bottom_right svg {
+    cursor: pointer;
+}
+.oe_kanban_bottom_right svg:hover {
+    color: var(--odoo-purple);
+}
+
+/* =========================================================================
+   قواعد الطباعة الرسمية (Print Styles)
+   ========================================================================= */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-family: 'Cairo', 'Amiri', sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* إخفاء عناصر التحكم والأزرار غير المخصصة للطباعة */
+  .print\:hidden,
+  header,
+  nav,
+  aside,
+  button,
+  input[type="button"],
+  input[type="submit"] {
+    display: none !important;
+  }
+
+  #leave-settlement-print-area,
+  #leave-statement-print-area,
+  .printable-content {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}
+

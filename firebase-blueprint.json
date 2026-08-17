@@ -1,0 +1,36 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "fields": {
+        "email": "string",
+        "role": "string",
+        "createdAt": "timestamp"
+      }
+    },
+    {
+      "name": "companies",
+      "fields": {
+        "nameAr": "string",
+        "nameEn": "string",
+        "isPrimary": "boolean"
+      }
+    },
+    {
+      "name": "employees",
+      "fields": {
+        "companyId": "string",
+        "fullNameAr": "string",
+        "civilId": "string"
+      }
+    },
+    {
+      "name": "contracts",
+      "fields": {
+        "employeeId": "string",
+        "companyId": "string",
+        "basicSalary": "number"
+      }
+    }
+  ]
+}

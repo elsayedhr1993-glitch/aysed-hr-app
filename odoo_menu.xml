@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- المستوى الأول: الأب الأكبر (يظهر كأيقونة في شاشة أودو الرئيسية) -->
+    <menuitem id="hr_system_root"
+              name="نظام السيد HR"
+              web_icon="aysed_hr,static/description/icon.png"
+              sequence="1"/>
+
+    <!-- المستوى الثاني: تجميعات عائلية (تظهر لتنظيم اللوحة الجانبية) -->
+    <menuitem id="menu_core_hr_category"
+              name="شؤون الموظفين"
+              parent="hr_system_root"
+              sequence="10"/>
+
+    <menuitem id="menu_operations_category"
+              name="العمليات اليومية والدوام"
+              parent="hr_system_root"
+              sequence="20"/>
+
+    <menuitem id="menu_finance_category"
+              name="المالية والرواتب"
+              parent="hr_system_root"
+              sequence="30"/>
+
+    <menuitem id="menu_configuration_category"
+              name="الإعدادات والتهيئة"
+              parent="hr_system_root"
+              sequence="100"/>
+
+    <!-- المستوى الثالث: الأبناء (الروابط الفعلية التي تفتح الشاشات) -->
+    <menuitem id="menu_employees"
+              name="الموظفون"
+              parent="menu_core_hr_category"
+              action="action_employees"
+              sequence="1"/>
+
+    <menuitem id="menu_employee_contracts"
+              name="عقود الموظفين"
+              parent="menu_core_hr_category"
+              action="action_employee_contracts"
+              sequence="2"/>
+
+    <menuitem id="menu_attendance"
+              name="الحضور والدوام"
+              parent="menu_operations_category"
+              action="action_attendance"
+              sequence="1"/>
+
+    <menuitem id="menu_leave_management"
+              name="إدارة الإجازات"
+              parent="menu_operations_category"
+              action="action_leave_management"
+              sequence="2"/>
+
+    <menuitem id="menu_payroll"
+              name="الرواتب وحماية الأجور"
+              parent="menu_finance_category"
+              action="action_payroll"
+              sequence="1"/>
+
+    <menuitem id="menu_hr_settings"
+              name="إعدادات النظام"
+              parent="menu_configuration_category"
+              action="action_hr_settings"
+              sequence="1"/>
+</odoo>
