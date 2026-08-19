@@ -16,6 +16,9 @@ export interface JobTitle {
 
 export interface Company {
   id: string;
+  companyNumber?: number; // 1 for Al Manara (Master Admin), 2+ for subscribers
+  subdomain?: string; // e.g. "almanara", "client1", "client2"
+  customDomain?: string; // e.g. "hr.almanara.com.kw"
   nameAr: string;
   nameEn: string;
   commercialRegNo: string; // السجل التجاري
@@ -40,6 +43,8 @@ export interface Company {
   footerHtml?: string;
   stampUrl?: string;
   authorizedSignatureUrl?: string;
+  subscriptionPlan?: string;
+  status?: 'active' | 'suspended' | 'expired';
 }
 
 export interface Employee {
@@ -482,6 +487,22 @@ export interface EmployeeNotification {
   };
 }
 
+export interface DailyMovement {
+  id: string;
+  name: string; // e.g. "MOV/2026/00001"
+  employeeId: string;
+  companyId: string;
+  date: string; // YYYY-MM-DD
+  movementType: 'permission' | 'sick' | 'allowance' | 'other';
+  hourFrom?: number;
+  hourTo?: number;
+  totalHours?: number;
+  amount?: number; // KWD
+  state: 'draft' | 'approved' | 'refused';
+  createdAt?: string;
+  notes?: string;
+}
+
 export type ActiveApp = 
   | 'APP_LAUNCHER'
   | 'EMPLOYEES'
@@ -506,7 +527,8 @@ export type ActiveApp =
   | 'INNOVATIONS'
   | 'SAAS_ADMIN'
   | 'COMPANIES'
-  | 'SETTINGS';
+  | 'SETTINGS'
+  | 'DAILY_MOVEMENTS';
 
 export type ViewMode = 'KANBAN' | 'LIST' | 'FORM' | 'PIVOT' | 'GRAPH';
 

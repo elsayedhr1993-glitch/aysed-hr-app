@@ -42,7 +42,7 @@ export const SmartNotificationsBanner: React.FC<SmartNotificationsBannerProps> =
       <div className="bg-emerald-50/80 border border-emerald-200 rounded-lg p-2.5 mx-2 sm:mx-4 mt-2 flex items-center justify-between text-[11px] text-emerald-900 shadow-2xs">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <span className="font-bold truncate">نظام التنبيهات: جميع السجلات سليمة والتراخيص سارية المفعول</span>
+          <span className="font-bold truncate">جميع السجلات سارية ولا توجد تنبيهات حالياً</span>
         </div>
         <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-mono shrink-0">
           0 تنبيهات

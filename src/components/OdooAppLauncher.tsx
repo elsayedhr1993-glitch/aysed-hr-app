@@ -21,6 +21,7 @@ interface OdooAppLauncherProps {
     custodiesCount?: number;
     templatesCount?: number;
     auditLogsCount?: number;
+    shiftsCount?: number;
     totalSalariesThisMonth?: number;
     onLeaveToday?: number;
     absenceRate?: number;
@@ -114,7 +115,7 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
       icon: Calendar,
       bgColor: 'bg-cyan-50 text-cyan-600 border-cyan-200',
       iconBg: 'bg-cyan-600 text-white',
-      badge: 'جدول',
+      badge: `${stats.shiftsCount || 0}`,
       description: 'إدارة الورديات',
     },
     {
@@ -196,6 +197,16 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
       iconBg: 'bg-emerald-700 text-white',
       badge: 'رسمي',
       description: 'اعتماد المباشرة وسيرفس',
+    },
+    {
+      id: 'DAILY_MOVEMENTS' as ActiveApp,
+      titleAr: 'الحركات اليومية',
+      titleEn: 'Daily Movements',
+      icon: Clock,
+      bgColor: 'bg-purple-50 text-purple-700 border-purple-200',
+      iconBg: 'bg-purple-700 text-white',
+      badge: 'hr.daily',
+      description: 'استئذان ساعات، مرضيات، وبدلات',
     },
     {
       id: 'COMPANIES' as ActiveApp,

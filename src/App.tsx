@@ -17,7 +17,7 @@ import {
   AttendanceRecord, Payslip, DocumentItem, AutomationRule, 
   CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, DocumentTemplate, 
   GeneratedDocument, AuditLog, ShiftProfile, EmployeeShift, 
-  EmploymentCommencement, CompanySubscription, JobTitle, Department, EmployeeNotification
+  EmploymentCommencement, CompanySubscription, JobTitle, Department, EmployeeNotification, DailyMovement
 } from './types';
 import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts } from './data/initialData';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
@@ -27,6 +27,7 @@ import { auth, db, cleanFirestoreData } from './lib/firebase';
 import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData } from './utils/persistentStorage';
+import { calculateUnpaidLeaveDeductionRule, computeFinalPayslipSalary } from './services/salaryRulesService';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -92,6 +93,15 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Toggle aysed_owner class on body based on Super Admin role
+  useEffect(() => {
+    if (currentUserRole === 'SUPER_ADMIN') {
+      document.body.classList.add('aysed_owner');
+    } else {
+      document.body.classList.remove('aysed_owner');
+    }
+  }, [currentUserRole]);
 
   const [activeCompany, setActiveCompany] = useState<Company>(() => {
     const saved = localStorage.getItem('activeCompanyId');
@@ -239,6 +249,9 @@ export default function App() {
   const [employeeNotifications, setEmployeeNotifications] = useState<EmployeeNotification[]>(() => 
     getPersistentData<EmployeeNotification[]>(MANARA_STORAGE_KEYS.EMPLOYEE_NOTIFICATIONS, [])
   );
+  const [dailyMovements, setDailyMovements] = useState<DailyMovement[]>(() => 
+    getPersistentData<DailyMovement[]>(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, [])
+  );
 
   // Auto-sync all entity states to localStorage whenever updated
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, employees); }, [employees]);
@@ -263,6 +276,54 @@ export default function App() {
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.COMMENCEMENTS, commencements); }, [commencements]);
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.SUBSCRIPTIONS, subscriptions); }, [subscriptions]);
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEE_NOTIFICATIONS, employeeNotifications); }, [employeeNotifications]);
+  useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, dailyMovements); }, [dailyMovements]);
+
+  // ضمان جلب البيانات وعدم فراغها أبداً (Fallback Seeding)
+  useEffect(() => {
+    if (!employees || employees.length === 0) {
+      setEmployees(initialEmployees);
+    }
+    if (!contracts || contracts.length === 0) {
+      setContracts(initialContracts);
+    }
+    if (!departments || departments.length === 0) {
+      setDepartments(initialDepartments);
+    }
+    if (!jobTitles || jobTitles.length === 0) {
+      setJobTitles(initialJobTitles);
+    }
+  }, []);
+
+  // الاستحقاق الآلي الكامل في الخلفية (Odoo Automated Accrual Engine)
+  React.useEffect(() => {
+    const checkAndApplyAccrual = () => {
+      const today = new Date();
+      // مفتاح الشهر الحالي (مثال: "2026-08")
+      const currentMonthKey = today.toISOString().slice(0, 7);
+      const lastProcessedMonth = localStorage.getItem('odoo_last_accrual_month');
+
+      // إذا بدأ شهر جديد (أو اليوم تاريخ 1 فما فوق في شهر لم يتم احتسابه بعد)
+      if (lastProcessedMonth !== currentMonthKey) {
+        setEmployees((prevEmployees: any[]) =>
+          prevEmployees.map((emp) => {
+            // استحقاق 2.5 يوم لكل موظف على رأس عمله
+            const currentBalance = Number(emp.leaveBalance ?? 30);
+            return {
+              ...emp,
+              leaveBalance: +(currentBalance + 2.5).toFixed(2),
+              lastAccrualMonth: currentMonthKey
+            };
+          })
+        );
+
+        // حفظ الشهر الحالي لمنع تكرار الإضافة
+        localStorage.setItem('odoo_last_accrual_month', currentMonthKey);
+      }
+    };
+
+    // تشغيل الفحص الآلي فوراً عند فتح النظام
+    checkAndApplyAccrual();
+  }, []);
 
   // Quick Notification Modal State
   const [isQuickNotifModalOpen, setIsQuickNotifModalOpen] = useState(false);
@@ -923,6 +984,34 @@ export default function App() {
     });
   };
 
+  const handleSaveMovement = (movement: DailyMovement) => {
+    setDailyMovements(prev => {
+      const idx = prev.findIndex(m => m.id === movement.id);
+      const updated = idx >= 0 ? prev.map(m => m.id === movement.id ? movement : m) : [movement, ...prev];
+      setPersistentData(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, updated);
+      return updated;
+    });
+    toast.success('تم حفظ الحركة اليومية بنجاح');
+  };
+
+  const handleUpdateMovementState = (id: string, state: 'draft' | 'approved' | 'refused') => {
+    setDailyMovements(prev => {
+      const updated = prev.map(m => m.id === id ? { ...m, state } : m);
+      setPersistentData(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, updated);
+      return updated;
+    });
+    toast.success(`تم تحديث حالة الحركة إلى: ${state === 'approved' ? 'معتمد' : state === 'refused' ? 'مرفوض' : 'مسودة'}`);
+  };
+
+  const handleDeleteMovement = (id: string) => {
+    setDailyMovements(prev => {
+      const updated = prev.filter(m => m.id !== id);
+      setPersistentData(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, updated);
+      return updated;
+    });
+    toast.success('تم حذف الحركة اليومية');
+  };
+
   const handleSaveCommencement = (c: EmploymentCommencement) => {
     setCommencements(prev => {
       const idx = prev.findIndex(x => x.id === c.id);
@@ -1009,20 +1098,20 @@ export default function App() {
       if (!contract) return;
       
       const basic = contract.basicSalary;
-      const totalAllowances = (contract.allowances?.housing || 0) + (contract.allowances?.transport || 0) + (contract.allowances?.other || 0);
+      const totalAllowances = (contract.housingAllowance || 0) + (contract.transportAllowance || 0) + (contract.otherAllowance || 0);
       
       const empAtt = thisMonthAttendance.filter(a => a.employeeId === emp.id);
       const absentDays = empAtt.filter(a => a.status === 'ABSENT').length;
       
-      // Calculate daily rate: Gross / 26
-      const dailyRate = (basic + totalAllowances) / 26;
-      
-      // Deductions
-      const absentDeduction = absentDays * dailyRate;
-      const otherDeductions = absentDeduction; // Expand as needed
+      // Apply Kuwait Law rule (basic / 26 * unpaidDays) via salaryRulesService
+      const payslipCalc = computeFinalPayslipSalary({
+        basicWage: basic,
+        allowances: totalAllowances,
+        unpaidDays: absentDays,
+      });
       
       const gross = basic + totalAllowances;
-      const net = Math.max(0, gross - otherDeductions);
+      const deductionAmount = payslipCalc.deductions;
       
       newPayslips.push({
         id: 'pay-' + month + '-' + emp.id,
@@ -1032,9 +1121,10 @@ export default function App() {
         basicSalary: basic,
         allowances: totalAllowances,
         grossSalary: gross,
-        latenessDeduction: absentDeduction,
-        otherDeductions: otherDeductions,
-        netSalary: net,
+        latenessDeduction: deductionAmount,
+        unpaidLeaveDeduction: deductionAmount,
+        otherDeductions: 0,
+        netSalary: payslipCalc.netSalary,
         paymentStatus: 'DRAFT'
       });
     });
@@ -1044,7 +1134,7 @@ export default function App() {
       return [...newPayslips, ...filtered];
     });
     
-    toast.success("Payslips generated for " + month);
+    toast.success("تم توليد كشوف الرواتب لشهر " + month + " بنجاح مع تطبيق قاعدة خصم 26 يوم كويتي");
   };
 
   if (!isAuthenticated) {
@@ -1092,6 +1182,7 @@ export default function App() {
     automationsCount: (automationRules || []).filter(r => r.companyId === activeCompanyId).length,
     custodiesCount: (custodies || []).filter(c => c.companyId === activeCompanyId).length,
     templatesCount: (documentTemplates || []).filter(t => t.companyId === activeCompanyId).length,
+    shiftsCount: (shifts || []).filter(s => s.companyId === activeCompanyId).length,
     auditLogsCount: (auditLogs || []).filter(a => a.companyId === activeCompanyId).length,
     totalSalariesThisMonth: 0,
     onLeaveToday: (leaves || []).filter(l => l.companyId === activeCompanyId && l.status === 'APPROVED').length,
@@ -1259,6 +1350,10 @@ export default function App() {
               shifts={shifts}
               employeeShifts={employeeShifts}
               commencements={commencements}
+              dailyMovements={dailyMovements}
+              onSaveMovement={handleSaveMovement}
+              onUpdateMovementState={handleUpdateMovementState}
+              onDeleteMovement={handleDeleteMovement}
               companies={companies}
               setCompanies={setCompanies}
               employeeNotifications={employeeNotifications}

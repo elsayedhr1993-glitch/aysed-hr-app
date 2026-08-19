@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Lock, Mail, ShieldCheck, ArrowLeft, LogIn, KeyRound, Building2 } from 'lucide-react';
+import { Sparkles, Lock, Mail, ShieldCheck, ArrowLeft, LogIn, KeyRound } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LoginScreenProps {
@@ -7,8 +7,8 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('elsayedhr1993@gmail.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -18,7 +18,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setErrorMessage('');
 
     const storedPassword = localStorage.getItem('app_admin_password') || 'Admin2026!';
-    const inputPassword = password === '••••••••••••' ? 'Admin2026!' : password;
+    const inputPassword = password;
 
     try {
       let isSupabaseAuthed = false;
@@ -34,7 +34,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
       }
 
-      // Check if entered password matches local stored password, default password, or Supabase
       const isValidPassword = 
         isSupabaseAuthed || 
         inputPassword === storedPassword || 
@@ -42,27 +41,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
       if (!isValidPassword) {
         setLoading(false);
-        setErrorMessage('كلمة المرور التي أدخلتها غير صحيحة! يرجى إدخال كلمة المرور الصحيحة المعرفة في النظام.');
+        setErrorMessage('كلمة المرور التي أدخلتها غير صحيحة أو البريد الإلكتروني غير مسجل في النظام.');
         return;
       }
 
-      // Successful login
       setTimeout(() => {
         setLoading(false);
         onLoginSuccess(email);
       }, 300);
     } catch (err: any) {
       setLoading(false);
-      setErrorMessage('حدث خطأ أثناء الاتصال بالنظام. يرجى التحقق من كلمة المرور.');
+      setErrorMessage('حدث خطأ أثناء الاتصال بالنظام. يرجى التحقق من بيانات الدخول.');
     }
-  };
-
-  const handleQuickDemoLogin = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      onLoginSuccess('elsayedhr1993@gmail.com');
-    }, 300);
   };
 
   return (
@@ -161,31 +151,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               )}
             </button>
           </form>
-
-          {/* Divider */}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-white px-2 text-slate-400 font-bold">أو الدخول السريع</span>
-            </div>
-          </div>
-
-          {/* Quick Admin Demo Login Button */}
-          <button
-            type="button"
-            onClick={handleQuickDemoLogin}
-            className="w-full py-2 px-4 bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-900 font-bold rounded-lg text-xs transition flex items-center justify-between cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-600" />
-              <span>دخول سريع كمشرف النظام (Demo Admin)</span>
-            </div>
-            <span className="text-[10px] bg-amber-200/80 px-2 py-0.5 rounded text-amber-950">
-              مدير HR
-            </span>
-          </button>
         </div>
 
         {/* Footer info */}

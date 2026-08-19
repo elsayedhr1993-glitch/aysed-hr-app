@@ -63,6 +63,9 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
     }
   });
 
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
+  const [deviceFetchError, setDeviceFetchError] = useState<string | null>(null);
+
   const [editingDevice, setEditingDevice] = useState<Partial<BiometricDevice> | null>(null);
   const [testingDeviceId, setTestingDeviceId] = useState<string | null>(null);
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null);
@@ -76,37 +79,54 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
     pingMs: number;
   } | null>(null);
 
-  // Fetch real biometric devices from Supabase Database
+  // Fetch real biometric devices from Supabase Database with robust fallback & 404 handling
   useEffect(() => {
     const fetchDevicesFromSupabase = async () => {
-      if (supabase && import.meta.env.VITE_SUPABASE_URL && activeCompany?.id) {
-        try {
-          const { data: dbDevices, error } = await supabase
-            .from('biometric_devices')
-            .select('*')
-            .eq('company_id', activeCompany.id);
+      if (!supabase || !activeCompany?.id) return;
+      
+      setIsLoadingDevices(true);
+      setDeviceFetchError(null);
+      
+      try {
+        const { data: dbDevices, error } = await supabase
+          .from('biometric_devices')
+          .select('*')
+          .eq('company_id', activeCompany.id);
 
-          if (!error && dbDevices && dbDevices.length > 0) {
-            const mappedDevices: BiometricDevice[] = dbDevices.map((d: any) => ({
-              id: d.id,
-              companyId: d.company_id || activeCompany.id,
-              name: d.name,
-              ipAddress: d.ip_address,
-              port: d.port || 4370,
-              mapId: d.map_id || 1,
-              state: d.state || 'draft',
-              deviceModel: d.device_model || 'ZKTeco',
-              location: d.location || '',
-              lastSyncTime: d.last_sync_time || '—',
-              logsCount: d.logs_count || 0,
-              notes: d.notes || '',
-              createdAt: d.created_at,
-            }));
-            setDevices(mappedDevices);
+        if (error) {
+          // If table doesn't exist (404/PGRST205/42P01) or other error, handle gracefully
+          console.warn('[Supabase biometric_devices] Notice:', error.message || error);
+          if (error.code === 'PGRST205' || error.code === '42P01' || error.message?.includes('404')) {
+            setDeviceFetchError('جدول أجهزة البصمة غير مُعرّف بعد في قاعدة البيانات. يتم استخدام التخزين المحلي مؤقتاً.');
+          } else {
+            setDeviceFetchError('تعذر جلب أجهزة البصمة من الخادم. يتم عرض البيانات المخزنة محلياً.');
           }
-        } catch (err) {
-          console.warn('[Supabase] Failed to fetch biometric devices:', err);
+          return;
         }
+
+        if (dbDevices && dbDevices.length > 0) {
+          const mappedDevices: BiometricDevice[] = dbDevices.map((d: any) => ({
+            id: d.id,
+            companyId: d.company_id || activeCompany.id,
+            name: d.name,
+            ipAddress: d.ip_address,
+            port: d.port || 4370,
+            mapId: d.map_id || 1,
+            state: d.state || 'draft',
+            deviceModel: d.device_model || 'ZKTeco',
+            location: d.location || '',
+            lastSyncTime: d.last_sync_time || '—',
+            logsCount: d.logs_count || 0,
+            notes: d.notes || '',
+            createdAt: d.created_at,
+          }));
+          setDevices(mappedDevices);
+        }
+      } catch (err: any) {
+        console.warn('[Supabase] Failed to fetch biometric devices:', err?.message || err);
+        setDeviceFetchError('خطأ في الاتصال بالخادم لجلب الأجهزة.');
+      } finally {
+        setIsLoadingDevices(false);
       }
     };
 
@@ -1882,6 +1902,24 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Graceful Loading / Notice Banner */}
+          {isLoadingDevices && (
+            <div className="bg-purple-50 border border-purple-200 text-purple-900 px-4 py-3 rounded-xl text-xs flex items-center gap-2 animate-pulse">
+              <RefreshCw className="w-4 h-4 animate-spin text-[#714B67]" />
+              <span>جاري مزامنة أجهزة البصمة من قاعدة البيانات...</span>
+            </div>
+          )}
+
+          {deviceFetchError && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>{deviceFetchError}</span>
+              </div>
+              <span className="text-[10px] font-mono bg-amber-100 text-amber-800 px-2 py-0.5 rounded">الوضع الآمن (Offline Fallback)</span>
+            </div>
+          )}
 
           {/* Odoo Tree View Table (view_biometric_device_tree) */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">

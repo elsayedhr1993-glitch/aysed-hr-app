@@ -790,3 +790,371 @@ export function validateLocation(userLat: number, userLng: number): boolean {
     const distance = calculateDistance(userLat, userLng, OFFICE_LOCATION.lat, OFFICE_LOCATION.lng);
     return distance < 200; 
 }
+
+/**
+ * كود تـجميع أرصـدة الإجـازات (الـسنوي، المـرحل، والمـرضي) طبقاً لمعايير أودو وقانون العمل الكويتي
+ */
+export function get_aysed_comprehensive_report(employee: { joinDate?: string; date_start?: string }, leaves: any[] = [], carriedAllocations: number = 0) {
+    const joinDate = employee?.joinDate || employee?.date_start;
+    const annualRemaining = get_aysed_official_balance(joinDate);
+    const sickLeaveRemaining = 15; // 15 days full pay per year by default
+    return {
+        carried_forward: carriedAllocations,
+        annual_remaining: annualRemaining,
+        sick_leave_remaining: sickLeaveRemaining,
+        total_available: annualRemaining + carriedAllocations
+    };
+}
+
+/**
+ * كود إضافة رصيد الإجازات في أول يوم من كل شهر (مماثل لدالة الـ Cron في أودو بتوقيت الكويت Asia/Kuwait)
+ */
+export function _cron_aysed_monthly_accrual(employees: Array<{ id: string; status?: string; joinDate?: string; date_start?: string }>, currentDate: Date = new Date(), force: boolean = false) {
+    let targetDate = currentDate;
+    try {
+        const kuwaitOptions: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Kuwait', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false };
+        const kuwaitStr = new Intl.DateTimeFormat('en-US', kuwaitOptions).format(currentDate);
+        const parsed = new Date(kuwaitStr);
+        if (!isNaN(parsed.getTime())) {
+            targetDate = parsed;
+        }
+    } catch {
+        targetDate = currentDate;
+    }
+
+    // التأكد أن اليوم هو فعلاً يوم 1 في الشهر (أو تم فرضه يدوياً من لوحة التحكم)
+    if (!force && targetDate.getDate() !== 1) {
+        return {
+            addedCount: 0,
+            allocations: [],
+            note: `تنبيه (توقيت الكويت): اليوم هو ${targetDate.getDate()} من الشهر وليس اليوم الأول (1). لن يتم إضافة الرصيد التلقائي إلا في أول يوم من الشهر طبقاً لقاعدة Odoo Cron.`
+        };
+    }
+
+    const activeEmployees = (employees || []).filter(e => {
+        const jDate = e.joinDate || e.date_start;
+        const isJoined = jDate ? new Date(jDate) <= targetDate : true;
+        return (e.status === 'ACTIVE' || !e.status) && isJoined;
+    });
+
+    const monthNamesArabic = [
+        'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const mIdx = targetDate.getMonth();
+    const monthName = monthNamesArabic[mIdx >= 0 && mIdx < 12 ? mIdx : 0];
+    const year = targetDate.getFullYear() || new Date().getFullYear();
+
+    const allocations = activeEmployees.map(emp => ({
+        id: `alloc-${emp.id}-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+        employeeId: emp.id,
+        days: 2.5,
+        name: `رصيد تلقائي (نظام Aysed) - شهر ${mIdx + 1} (${monthName} ${year})`
+    }));
+
+    return {
+        addedCount: activeEmployees.length,
+        allocations,
+        note: `تمت إضافة 2.5 يوم لعدد ${activeEmployees.length} موظف بنجاح (توقيت الكويت: ${targetDate.toISOString().split('T')[0]})`
+    };
+}
+
+export function cron_aysed_monthly_accrual(employees: Array<{ id: string; status?: string; joinDate?: string; date_start?: string }>, currentDate: Date = new Date(), force: boolean = true) {
+    return _cron_aysed_monthly_accrual(employees, currentDate, force);
+}
+
+/**
+ * حساب بنود التسوية لشيت نظام Aysed 2026 (مماثل لـ get_aysed_settlement_report_data في Odoo)
+ */
+export function get_aysed_settlement_report_data(employeeBalance: number, requestedDays: number, employeeWage: number, additionalDays: number = 0) {
+    const bal = isNaN(employeeBalance) || employeeBalance === undefined ? 0 : employeeBalance;
+    const req = isNaN(requestedDays) || requestedDays === undefined ? 0 : requestedDays;
+    const wage = isNaN(employeeWage) || employeeWage === undefined ? 0 : employeeWage;
+    const add = isNaN(additionalDays) || additionalDays === undefined ? 0 : additionalDays;
+
+    const total_accrued = bal + add;
+
+    let aysed_paid_days = 0;
+    let aysed_unpaid_days = 0;
+
+    if (req <= bal) {
+        aysed_paid_days = req;
+        aysed_unpaid_days = 0;
+    } else {
+        aysed_paid_days = bal;
+        aysed_unpaid_days = req - bal;
+    }
+
+    const daily_wage = wage > 0 ? wage / 26 : 0;
+    const paid_amount = aysed_paid_days * daily_wage;
+
+    return {
+        total_accrued: isNaN(total_accrued) ? 0 : total_accrued,
+        requested_days: req,
+        available_paid: bal,
+        aysed_paid_days: isNaN(aysed_paid_days) ? 0 : aysed_paid_days,
+        aysed_unpaid_days: isNaN(aysed_unpaid_days) ? 0 : aysed_unpaid_days,
+        daily_wage: isNaN(daily_wage) ? 0 : Number(daily_wage.toFixed(3)),
+        paid_amount: isNaN(paid_amount) ? 0 : Number(paid_amount.toFixed(3))
+    };
+}
+
+/**
+ * دالة موحدة لحساب استحقاق الإجازات السنوية تعتمد فقط على تاريخ المباشرة (Date of Joining)
+ * لجميع الموظفين، بواقع 2.5 يوم عن كل شهر مكتمل حتى تاريخ اليوم بدقة تامة.
+ */
+export function calculateAysedLeaveByJoiningDate(joiningDateStr?: string | Date | null, asOfDate: Date = new Date()): number {
+  if (!joiningDateStr) return 0;
+  const joinDate = new Date(joiningDateStr);
+  if (isNaN(joinDate.getTime())) return 0;
+
+  const today = new Date(asOfDate.getFullYear(), asOfDate.getMonth(), asOfDate.getDate());
+  const start = new Date(joinDate.getFullYear(), joinDate.getMonth(), joinDate.getDate());
+
+  if (today < start) return 0;
+
+  let years = today.getFullYear() - start.getFullYear();
+  let months = today.getMonth() - start.getMonth();
+
+  if (today.getDate() < start.getDate()) {
+    months--;
+  }
+
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  const totalCompletedMonths = Math.max(0, years * 12 + months);
+  return totalCompletedMonths * 2.5;
+}
+
+/**
+ * حساب مكافأة نهاية الخدمة - نظام Aysed S HR 2026
+ * مبرمج وفق قانون العمل الكويتي (المادتين 51 و 53)
+ * 
+ * @param monthlySalary - الراتب الشامل الأخير
+ * @param serviceYears - مدة الخدمة بالسنوات (شاملة الكسور)
+ * @param isResignation - true للاستقالة، false لإنهاء الخدمة من قِبل الشركة
+ * @returns إجمالي المكافأة بالدينار الكويتي (3 خانات عشرية)
+ */
+export const calculateKuwaitIndemnity = (
+  monthlySalary: number,
+  serviceYears: number,
+  isResignation: boolean
+): number => {
+  if (monthlySalary <= 0 || serviceYears <= 0) return 0;
+
+  // 1. حساب أجر اليوم الواحد وفق معيار الـ 26 يوم عمل
+  const dailyWage = monthlySalary / 26;
+  let totalIndemnity = 0;
+
+  // 2. حساب أصل المكافأة الإجمالية (المادة 51)
+  if (serviceYears <= 5) {
+    totalIndemnity = serviceYears * 15 * dailyWage;
+  } else {
+    const firstFiveYears = 5 * 15 * dailyWage;
+    const remainingYears = (serviceYears - 5) * monthlySalary;
+    totalIndemnity = firstFiveYears + remainingYears;
+  }
+
+  // 3. تطبيق سقف الحد الأقصى للمكافأة (أجر 18 شهراً كحد أقصى)
+  const maxCap = monthlySalary * 18;
+  if (totalIndemnity > maxCap) {
+    totalIndemnity = maxCap;
+  }
+
+  // 4. تطبيق شروط الاستقالة (المادة 53)
+  if (isResignation) {
+    if (serviceYears < 3) {
+      return 0; // أقل من 3 سنوات: لا يستحق
+    } else if (serviceYears >= 3 && serviceYears < 5) {
+      return Number((totalIndemnity * 0.5).toFixed(3)); // يستحق النصف (50%)
+    } else if (serviceYears >= 5 && serviceYears < 10) {
+      return Number((totalIndemnity * (2 / 3)).toFixed(3)); // يستحق الثلثين (66.66%)
+    } else {
+      return Number(totalIndemnity.toFixed(3)); // 10 سنوات فأكثر: المكافأة كاملة
+    }
+  }
+
+  // 5. في حالة إنهاء الخدمة من قِبل الشركة (يشترط إكمال سنة واحدة)
+  if (serviceYears < 1) {
+    return 0;
+  }
+
+  return Number(totalIndemnity.toFixed(3));
+};
+
+/**
+ * محرك معالجة البصمة واحتساب التأخير والعمل الإضافي - نظام Aysed S HR 2026
+ * متوافق مع قانون العمل الكويتي (القطاع الأهلي)
+ */
+export interface AttendanceInput {
+  checkIn: Date;
+  checkOut: Date;
+  shiftStart: Date;
+  shiftEnd: Date;
+  basicSalary?: number;
+  isHoliday?: boolean;
+}
+
+export interface AttendanceMetricsResult {
+  lateMinutes: number;
+  earlyLeaveMinutes: number;
+  actualWorkHours: number;
+  rawOvertimeHours: number;
+  payableOvertimeHours: number;
+  overtimeAmount: number;
+  lateDeductionAmount: number;
+  status: 'حضور منتظم' | 'تأخير بسيط' | 'تأخير جسيم' | 'خروج مبكر';
+}
+
+export const processAttendanceMetrics = ({
+  checkIn,
+  checkOut,
+  shiftStart,
+  shiftEnd,
+  basicSalary = 0,
+  isHoliday = false,
+}: AttendanceInput): AttendanceMetricsResult => {
+  const GRACE_PERIOD_MINS = 15;
+  const STANDARD_DAILY_HOURS = 8;
+  const WORKING_DAYS_MONTH = 26;
+
+  // 1. حساب أجر الساعة (معيار الكويت: الراتب / 26 يوم / 8 ساعات)
+  const hourlyRate = basicSalary > 0 
+    ? basicSalary / WORKING_DAYS_MONTH / STANDARD_DAILY_HOURS 
+    : 0;
+
+  // 2. حساب التأخير الصباحي (بالدقائق)
+  let lateMinutes = 0;
+  const arrivalDiffMins = (checkIn.getTime() - shiftStart.getTime()) / (1000 * 60);
+  if (arrivalDiffMins > GRACE_PERIOD_MINS) {
+    lateMinutes = Math.round(arrivalDiffMins);
+  }
+
+  // 3. حساب الخروج المبكر (بالدقائق)
+  let earlyLeaveMinutes = 0;
+  const departureDiffMins = (shiftEnd.getTime() - checkOut.getTime()) / (1000 * 60);
+  if (departureDiffMins > 0) {
+    earlyLeaveMinutes = Math.round(departureDiffMins);
+  }
+
+  // 4. حساب ساعات العمل الفعلي
+  const actualWorkMs = Math.max(0, checkOut.getTime() - checkIn.getTime());
+  const actualWorkHours = parseFloat((actualWorkMs / (1000 * 60 * 60)).toFixed(2));
+
+  // 5. حساب ساعات العمل الإضافي (بعد نهاية الشفت المحدد)
+  let rawOvertimeHours = 0;
+  const overtimeMs = checkOut.getTime() - shiftEnd.getTime();
+  if (overtimeMs > 0) {
+    rawOvertimeHours = parseFloat((overtimeMs / (1000 * 60 * 60)).toFixed(2));
+  }
+
+  // معامل الإضافي الكويتي: 1.25x للأيام العادية، 1.5x للعطل والجمع
+  const overtimeMultiplier = isHoliday ? 1.5 : 1.25;
+  const payableOvertimeHours = parseFloat((rawOvertimeHours * overtimeMultiplier).toFixed(2));
+
+  // 6. الاحتساب المالي (بالدينار الكويتي)
+  const overtimeAmount = parseFloat((payableOvertimeHours * hourlyRate).toFixed(3));
+  const lateDeductionAmount = parseFloat(((lateMinutes / 60) * hourlyRate).toFixed(3));
+
+  // 7. تحديد الحالة الإدارية
+  let status: AttendanceMetricsResult['status'] = 'حضور منتظم';
+  if (lateMinutes > 60) {
+    status = 'تأخير جسيم';
+  } else if (lateMinutes > 0) {
+    status = 'تأخير بسيط';
+  } else if (earlyLeaveMinutes > 15) {
+    status = 'خروج مبكر';
+  }
+
+  return {
+    lateMinutes,
+    earlyLeaveMinutes,
+    actualWorkHours,
+    rawOvertimeHours,
+    payableOvertimeHours,
+    overtimeAmount,
+    lateDeductionAmount,
+    status,
+  };
+};
+
+/**
+ * نظام حماية الأجور الكويتي (Kuwait WPS / SIF Generator) - نظام Aysed S HR 2026
+ */
+export interface WPSEmployeeRecord {
+  civil_id: string;      // الرقم المدني (12 رقم)
+  bank_code: string;     // كود البنك (4 أرقام مثل NBK=0004)
+  iban: string;          // رقم الآيبان الكويتي (KW...)
+  basic_salary: number;  // الراتب الأساسي
+  allowances?: number;   // البدلات
+  deductions?: number;   // الاستقطاعات
+  net_salary: number;    // الصافي النهائي
+}
+
+export interface WPSHeaderInput {
+  companyMOSALId: string; // رقم ملف الشركة في وزارة الشؤون / القوى العاملة
+  employerBankCode: string; // كود بنك الشركة المحول منه
+  payrollMonthYear: string; // صيغة YYYY-MM
+}
+
+/**
+ * 1. دالة إنشاء محتوى ملف الـ SIF
+ */
+export const generateKuwaitSIFContent = (
+  headerInfo: WPSHeaderInput,
+  employees: WPSEmployeeRecord[]
+): string => {
+  const now = new Date();
+  const fileCreationDate = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const fileCreationTime = now.toTimeString().slice(0, 5).replace(/:/g, '');
+  const salaryMonth = headerInfo.payrollMonthYear.replace('-', '');
+
+  // حساب إجمالي رواتب المسير
+  const totalSalaries = employees.reduce((sum, emp) => sum + emp.net_salary, 0);
+
+  // السطر التعريفي (Header Record - H)
+  let sifContent = `H,${headerInfo.companyMOSALId},${headerInfo.employerBankCode},${fileCreationDate},${fileCreationTime},${salaryMonth},${employees.length},${totalSalaries.toFixed(3)}\n`;
+
+  // أسطر تفاصيل الموظفين (Detail Records - D)
+  employees.forEach((emp) => {
+    const civilId = (emp.civil_id || '').trim().padStart(12, '0');
+    const bankCode = (emp.bank_code || '').trim().padStart(4, '0');
+    const iban = (emp.iban || '').trim().replace(/\s+/g, '');
+    const basic = (emp.basic_salary || 0).toFixed(3);
+    const extra = (emp.allowances || 0).toFixed(3);
+    const ded = (emp.deductions || 0).toFixed(3);
+    const net = (emp.net_salary || 0).toFixed(3);
+
+    // الحقول القياسية: D, الرقم المدني, كود البنك, الآيبان, الراتب الأساسي, البدلات, الخصومات, الصافي
+    sifContent += `D,${civilId},${bankCode},${iban},${basic},${extra},${ded},${net}\n`;
+  });
+
+  return sifContent;
+};
+
+/**
+ * 2. دالة تنزيل الملف مباشرة من المتصفح
+ */
+export const downloadKuwaitWPSFile = (
+  headerInfo: WPSHeaderInput,
+  employees: WPSEmployeeRecord[]
+) => {
+  const content = generateKuwaitSIFContent(headerInfo, employees);
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  
+  link.href = url;
+  link.setAttribute('download', `WPS_${headerInfo.companyMOSALId}_${headerInfo.payrollMonthYear}.sif`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+
+
+

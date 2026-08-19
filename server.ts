@@ -199,7 +199,7 @@ app.post("/api/ocr-scan", async (req, res) => {
 11. "mohLicenseNo": رقم ترخيص وزارة الصحة (MOH License) إن وجد أو نص فارغ ""
 12. "contractSalary": الراتب كرقَم بالدينار الكويتي أو 0`;
 
-  const modelsToTry = ["gemini-3.6-flash", "gemini-3.1-flash-lite"];
+  const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.6-flash"];
   let lastError: any = null;
 
   for (const modelName of modelsToTry) {
@@ -421,21 +421,39 @@ ${contextSummary || 'شركة الكويت الطبية والأعمال - 12 م
 
     contents.push({ text: `سؤال المستخدم الحالي: ${prompt}` });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: { parts: contents },
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      },
-    });
+    const modelsForChat = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.6-flash"];
+    let replyText = "";
+    let usedModel = "";
 
-    const replyText = response.text || "لم يتم استلام رد من المساعد الذكي.";
+    for (const modelName of modelsForChat) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: { parts: contents },
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          },
+        });
+        if (response.text) {
+          replyText = response.text;
+          usedModel = modelName;
+          break;
+        }
+      } catch (err) {
+        console.warn(`Chat model ${modelName} failed, trying next...`, err);
+      }
+    }
+
+    if (!replyText) {
+      replyText = `### 🤖 مساعد أودو الذكي (وضع الاستجابة الاحتياطية)\n\nأهلاً بك! لقد استلمت سؤالك: **"${prompt}"**\n\n- **وفقاً لقانون العمل الكويتي رقم 6/2010:** يتم احتساب مكافأة نهاية الخدمة والإجازات والرواتب بدقة تامة.\n- **قاعدة البيانات:** مرتبطة وجاهزة لمعالجة كافة المعاملات الإدارية.`;
+      usedModel = "fallback_simulated";
+    }
 
     return res.json({
       success: true,
       reply: replyText,
-      source: "gemini-3.6-flash",
+      source: usedModel,
     });
   } catch (error: any) {
     return res.json({

@@ -62,6 +62,7 @@ const APP_MODELS: Record<ActiveApp, string> = {
   SAAS_ADMIN: 'res.company',
   COMPANIES: 'res.company',
   SETTINGS: 'res.config.settings',
+  DAILY_MOVEMENTS: 'hr.daily.movement',
 };
 
 const appTitles: Record<ActiveApp, { ar: string; en: string }> = {
@@ -72,6 +73,7 @@ const appTitles: Record<ActiveApp, { ar: string; en: string }> = {
   LEAVES: { ar: 'الإجازات والغياب', en: 'Time Off' },
   HOLIDAYS: { ar: 'العطلات الرسمية في دولة الكويت', en: 'Kuwait Official Holidays' },
   SHIFTS: { ar: 'إدارة الورديات وجداول الدوام', en: 'Shifts & Schedules' },
+  DAILY_MOVEMENTS: { ar: 'الحركات اليومية (استئذان، مرضية، بدل)', en: 'Daily Movements' },
   ATTENDANCE: { ar: 'الحضور والانصراف', en: 'Attendance' },
   PAYROLL: { ar: 'الرواتب والتأمينات', en: 'Payroll' },
   EOS: { ar: 'حاسبة نهاية الخدمة (م 51 & 53)', en: 'EOS Settlement' },
@@ -102,7 +104,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   onNavigateHome,
   onCloseApp,
   onToggleSidebar,
-  currentUserEmail,
+  currentUserEmail = '',
   onOpenAICopilot,
   searchTerm = '',
   onSearchChange = (_term: string) => {},
@@ -142,7 +144,9 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
     }
   };
 
-  const isSuperAdmin = currentUserEmail?.toLowerCase() === 'admin@aysed.com' || currentUserEmail?.toLowerCase() === 'elsayedhr1993@gmail.com';
+  const emailLower = (currentUserEmail || '').toLowerCase();
+  const isMasterEmail = emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com';
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || isMasterEmail;
 
   const criticalCount = (notifications || []).filter(n => n.severity === 'CRITICAL').length;
   const warningCount = (notifications || []).filter(n => n.severity === 'WARNING').length;
@@ -249,7 +253,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-md shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95 dir-rtl text-right">
               <button 
                 onClick={() => {
-                  if (typeof onNavigateToApp === 'function') onNavigateToApp('DOCUMENTS_TEMPLATES');
+                  if (typeof onNavigateToApp === 'function') onNavigateToApp('DOCUMENT_TEMPLATES');
                   setShowPrintMenu(false);
                 }}
                 className="w-full text-right px-3 py-2 hover:bg-purple-50 hover:text-purple-700 transition flex items-center gap-2 font-medium"
@@ -259,7 +263,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               </button>
               <button 
                 onClick={() => {
-                  if (typeof onNavigateToApp === 'function') onNavigateToApp('DOCUMENTS_TEMPLATES');
+                  if (typeof onNavigateToApp === 'function') onNavigateToApp('DOCUMENT_TEMPLATES');
                   setShowPrintMenu(false);
                 }}
                 className="w-full text-right px-3 py-2 hover:bg-purple-50 hover:text-purple-700 transition flex items-center gap-2 font-medium"
@@ -321,7 +325,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
 
         {/* Multi-Company Switcher / Isolated Tenant Badge */}
         <div className="relative">
-          {currentUserRole === 'SUPER_ADMIN' ? (
+          {isSuperAdmin ? (
             <>
               <button
                 onClick={() => {
@@ -411,12 +415,14 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         </div>
 
         {/* Odoo Enterprise Developer Mode Toolbar & Debug Dropdown */}
-        <OdooDebugMenu
-          currentModel={currentModel}
-          currentViewType={viewMode || 'kanban'}
-          isInspectorActive={isInspectorActive}
-          onToggleFieldInspector={onToggleFieldInspector}
-        />
+        {isSuperAdmin && (
+          <OdooDebugMenu
+            currentModel={currentModel}
+            currentViewType={viewMode || 'kanban'}
+            isInspectorActive={isInspectorActive}
+            onToggleFieldInspector={onToggleFieldInspector}
+          />
+        )}
 
         {/* Notifications Dropdown Trigger */}
         <div className="relative">
@@ -566,9 +572,11 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             title="حساب المستخدم وتسجيل الخروج"
           >
             <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-300">
-              S
+              {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : 'U'}
             </div>
-            <span className="text-xs font-semibold text-white/90 hidden lg:inline">Sayed</span>
+            <span className="text-xs font-semibold text-white/90 hidden lg:inline">
+              {currentUserEmail ? currentUserEmail.split('@')[0] : 'User'}
+            </span>
             <ChevronDown className="w-3 h-3 text-white/70" />
           </button>
 
@@ -579,18 +587,18 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 rounded-t-xl">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[#714B67] text-white font-bold flex items-center justify-center text-xs shadow">
-                    S
+                    {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : 'U'}
                   </div>
                   <div>
                     <h6 className="font-bold text-slate-900 text-xs flex items-center gap-1">
-                      <span>Sayed</span>
+                      <span>{currentUserEmail ? currentUserEmail.split('@')[0] : 'User'}</span>
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     </h6>
-                    <p className="text-[10px] text-slate-500 font-mono">{currentUserEmail || 'elsayedhr1993@gmail.com'}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{currentUserEmail || 'user@company.com'}</p>
                   </div>
                 </div>
-                <div className="mt-2 inline-block px-2 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-bold rounded-full">
-                  مشرف النظام العام (System Admin)
+                <div className={`mt-2 inline-block px-2 py-0.5 ${isSuperAdmin ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'} text-[10px] font-bold rounded-full`}>
+                  {isSuperAdmin ? 'مشرف النظام العام (System Admin)' : 'مدير المنشأة (Company Admin)'}
                 </div>
               </div>
 
@@ -617,29 +625,17 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   <span>الملف الشخصي والأمان (Profile)</span>
                 </button>
 
-                {onNavigateToApp && (
-                  <>
-                    <button
-                      onClick={() => {
-                        onNavigateToApp('SETTINGS');
-                        setShowUserMenu(false);
-                      }}
-                      className="w-full text-right px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
-                    >
-                      <Building2 className="w-4 h-4 text-[#714B67]" />
-                      <span>إعدادات الشركات والمنظومة</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onNavigateToApp('SETTINGS'); // Assume Developer Mode is part of settings
-                        setShowUserMenu(false);
-                      }}
-                      className="w-full text-right px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
-                    >
-                      <Settings className="w-4 h-4 text-[#714B67]" />
-                      <span>Administration / Settings</span>
-                    </button>
-                  </>
+                {isSuperAdmin && onNavigateToApp && (
+                  <button
+                    onClick={() => {
+                      onNavigateToApp('SETTINGS');
+                      setShowUserMenu(false);
+                    }}
+                    className="w-full text-right px-4 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium"
+                  >
+                    <Building2 className="w-4 h-4 text-[#714B67]" />
+                    <span>إعدادات الشركات والمنظومة</span>
+                  </button>
                 )}
               </div>
 
@@ -680,4 +676,3 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
     </header>
   );
 };
-

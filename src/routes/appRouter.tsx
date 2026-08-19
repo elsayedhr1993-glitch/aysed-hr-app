@@ -26,6 +26,7 @@ import { ExclusiveInnovationsSuite } from '../apps/ExclusiveInnovationsSuite';
 import { CompaniesApp } from '../apps/CompaniesApp';
 import { SettingsApp } from '../apps/SettingsApp';
 import { NotificationTemplatesLogApp } from '../apps/NotificationTemplatesLogApp';
+import { DailyMovementsApp } from '../apps/DailyMovementsApp';
 import { OdooAppLauncher } from '../components/OdooAppLauncher';
 
 export interface AppRouterProps {
@@ -131,6 +132,10 @@ export interface AppRouterProps {
   setBgTheme: (theme: any) => void;
   motionEnabled: boolean;
   setMotionEnabled: (enabled: boolean) => void;
+  dailyMovements: any[];
+  onSaveMovement: (m: any) => void;
+  onUpdateMovementState: (id: string, state: any) => void;
+  onDeleteMovement: (id: string) => void;
 }
 
 /**
@@ -237,6 +242,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     setBgTheme,
     motionEnabled,
     setMotionEnabled,
+    dailyMovements,
+    onSaveMovement,
+    onUpdateMovementState,
+    onDeleteMovement,
   } = props;
 
   const effectiveApp = props.currentApp !== undefined ? props.currentApp : (props.activeApp || null);
@@ -276,6 +285,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       case 'CUSTODY_LOANS': return { title: 'العهد والسلف والأقساط', code: 'hr.loan' };
       case 'COMMENCEMENT': return { title: 'مباشرة العمل الرسمية', code: 'hr.commencement' };
       case 'SHIFTS': return { title: 'جدولة الشفتات والورديات', code: 'hr.shift' };
+      case 'DAILY_MOVEMENTS': return { title: 'سجل الحركة اليومية للموظفين', code: 'hr.daily.movement' };
       case 'HOLIDAYS': return { title: 'العطلات الرسمية لدولة الكويت', code: 'hr.holiday' };
       case 'REPORTS': return { title: 'التقارير والتحليلات البيانية', code: 'hr.report' };
       case 'COMPANIES': return { title: 'إدارة الشركات والفروع', code: 'res.company' };
@@ -576,6 +586,19 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
           onSaveEmployee={onSaveEmployee}
           onSaveContract={handleSaveContract}
+        />
+      );
+
+    case 'DAILY_MOVEMENTS':
+      return (
+        <DailyMovementsApp
+          dailyMovements={dailyMovements}
+          employees={scopedEmployees}
+          activeCompany={activeCompany}
+          searchTerm={searchTerm}
+          onSaveMovement={onSaveMovement}
+          onUpdateMovementState={onUpdateMovementState}
+          onDeleteMovement={onDeleteMovement}
         />
       );
 

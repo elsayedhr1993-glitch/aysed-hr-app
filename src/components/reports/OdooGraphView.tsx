@@ -230,7 +230,7 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
                     outerRadius={105}
                     innerRadius={45}
                     paddingAngle={3}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                    label={({ name, percent }) => `${name}: ${(((percent !== undefined && !isNaN(percent)) ? percent : 0) * 100).toFixed(1)}%`}
                   >
                     {chartData.map((_, index) => (
                       <Cell key={`pie-cell-${index}`} fill={COLORS[index % COLORS.length]} />
