@@ -1358,7 +1358,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedRequest} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveEditedRequest} className="space-y-3.5 text-xs text-slate-900">
               <div>
                 <label className="block font-bold text-gray-700 mb-1 flex items-center gap-1">
                   <Building size={13} className="text-[#71639e]" />
@@ -1370,7 +1370,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   value={editingRequest.name}
                   onChange={(e) => setEditingRequest({ ...editingRequest, name: e.target.value })}
                   placeholder="مثال: عيادات الفنار التخصصية"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                 />
               </div>
 
@@ -1386,7 +1386,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     value={editingRequest.requester_name}
                     onChange={(e) => setEditingRequest({ ...editingRequest, requester_name: e.target.value })}
                     placeholder="اسم المسؤول"
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   />
                 </div>
 
@@ -1401,7 +1401,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     value={editingRequest.phone}
                     onChange={(e) => setEditingRequest({ ...editingRequest, phone: e.target.value })}
                     placeholder="965XXXXXXXX"
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   />
                 </div>
               </div>
@@ -1417,7 +1417,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   value={editingRequest.email || ''}
                   onChange={(e) => setEditingRequest({ ...editingRequest, email: e.target.value })}
                   placeholder="admin@company.com"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                 />
               </div>
 
@@ -1431,7 +1431,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   value={editPassword}
                   onChange={(e) => setEditPassword(e.target.value)}
                   placeholder="اتركها كما هي أو أدخل كلمة سر جديدة"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50 text-amber-700"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white text-amber-700"
                 />
                 <p className="text-[10px] text-gray-500 mt-0.5">سيتم حفظ وتحديث بيانات المرور للشركة مباشرة.</p>
               </div>
@@ -1442,7 +1442,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <select
                     value={editingRequest.plan_type}
                     onChange={(e) => setEditingRequest({ ...editingRequest, plan_type: e.target.value })}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   >
                     <option value="medical">طبي / عيادات ومراكز</option>
                     <option value="commercial">تجاري ومقاولات</option>
@@ -1458,7 +1458,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <select
                     value={editingRequest.emp_count}
                     onChange={(e) => setEditingRequest({ ...editingRequest, emp_count: e.target.value })}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   >
                     <option value="1-10">1 - 10 موظفين</option>
                     <option value="11-50">11 - 50 موظف</option>
@@ -1473,7 +1473,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <select
                   value={editingRequest.state}
                   onChange={(e) => setEditingRequest({ ...editingRequest, state: e.target.value as any })}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                 >
                   <option value="approved">مفعل ونشط (Approved / Active)</option>
                   <option value="draft">قيد المراجعة والانتظار (Draft / Pending)</option>
@@ -1521,10 +1521,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateCompanySubmit} className="p-5 space-y-3.5 text-xs text-right">
+            <form onSubmit={handleCreateCompanySubmit} className="p-5 space-y-3.5 text-xs text-right text-slate-900">
               <div className="bg-purple-50 p-2.5 rounded-xl border border-purple-100 flex items-start gap-2 text-purple-800">
                 <ShieldCheck size={16} className="shrink-0 mt-0.5" />
-                <p className="text-[11px] leading-relaxed">
+                <p className="text-[11px] leading-relaxed font-medium">
                   سيتم إنشاء حساب الشركة في <strong>Firebase Auth</strong> ومزامنة سجل المنشأة في <strong>Firestore (companies)</strong> فوراً وبشكل معزول دون التأثير على جلسة المالك (Super Admin).
                 </p>
               </div>
@@ -1540,7 +1540,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   value={newCompanyForm.companyName}
                   onChange={(e) => setNewCompanyForm({ ...newCompanyForm, companyName: e.target.value })}
                   placeholder="مثال: شركة النور الطبية"
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                 />
               </div>
 
@@ -1555,7 +1555,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     value={newCompanyForm.requesterName}
                     onChange={(e) => setNewCompanyForm({ ...newCompanyForm, requesterName: e.target.value })}
                     placeholder="مثال: د. محمد العلي"
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   />
                 </div>
 
@@ -1569,7 +1569,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     value={newCompanyForm.phone}
                     onChange={(e) => setNewCompanyForm({ ...newCompanyForm, phone: e.target.value })}
                     placeholder="99112233"
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   />
                 </div>
               </div>
@@ -1586,7 +1586,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     value={newCompanyForm.email}
                     onChange={(e) => setNewCompanyForm({ ...newCompanyForm, email: e.target.value })}
                     placeholder="admin@company.com"
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   />
                 </div>
 
@@ -1600,7 +1600,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     value={newCompanyForm.password}
                     onChange={(e) => setNewCompanyForm({ ...newCompanyForm, password: e.target.value })}
                     placeholder="Aysed2026#Secure"
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50 text-amber-700"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white text-amber-700"
                   />
                 </div>
               </div>
@@ -1611,7 +1611,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <select
                     value={newCompanyForm.planType}
                     onChange={(e) => setNewCompanyForm({ ...newCompanyForm, planType: e.target.value })}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   >
                     <option value="medical">طبي / عيادات ومراكز</option>
                     <option value="commercial">تجاري ومقاولات</option>
@@ -1627,7 +1627,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <select
                     value={newCompanyForm.empCount}
                     onChange={(e) => setNewCompanyForm({ ...newCompanyForm, empCount: e.target.value })}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                   >
                     <option value="1-10">1 - 10 موظفين</option>
                     <option value="11-50">11 - 50 موظف</option>
@@ -1642,7 +1642,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 <select
                   value={newCompanyForm.initialStatus}
                   onChange={(e) => setNewCompanyForm({ ...newCompanyForm, initialStatus: e.target.value as any })}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-gray-50"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 bg-white"
                 >
                   <option value="approved">مفعل ونشط فوراً (Active / Approved)</option>
                   <option value="draft">قيد المراجعة والانتظار (Draft)</option>

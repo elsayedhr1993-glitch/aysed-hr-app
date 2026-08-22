@@ -121,16 +121,16 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 font-sans" dir="rtl">
-        <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-xl text-center border-t-8 border-[#008784]">
-          <CheckCircle2 size={72} className="text-[#008784] mx-auto mb-5 animate-bounce" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">تم استلام طلبك بنجاح!</h2>
-          <p className="text-gray-600 mb-8 text-sm leading-relaxed">
-            شكراً لاهتمامك بـ <strong>Aysed S HR 2026</strong>. سيقوم فريق الإدارة بمراجعة بيانات شركة (<strong>{formData.company_name}</strong>) والتواصل معك لتفعيل نسختك التجريبية.
+      <div className="w-full flex items-center justify-center p-4 font-sans text-slate-900" dir="rtl">
+        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl text-center border-t-8 border-[#008784]">
+          <CheckCircle2 size={64} className="text-[#008784] mx-auto mb-4 animate-bounce" />
+          <h2 className="text-xl font-bold text-slate-900 mb-2">تم استلام طلبك بنجاح!</h2>
+          <p className="text-slate-700 mb-6 text-xs sm:text-sm leading-relaxed font-medium">
+            شكراً لاهتمامك بـ <strong className="text-[#714B67]">Aysed S HR 2026</strong>. سيقوم فريق الإدارة بمراجعة بيانات شركة (<strong className="text-slate-900">{formData.company_name}</strong>) والتواصل معك لتفعيل نسختك التجريبية.
           </p>
           <button 
             onClick={onBackToLogin ? onBackToLogin : () => window.location.reload()} 
-            className="w-full bg-[#71639e] text-white py-3 rounded-xl font-bold hover:bg-[#5d5182] transition-colors text-sm cursor-pointer"
+            className="w-full bg-[#714B67] hover:bg-[#583950] text-white py-2.5 rounded-xl font-bold transition-all text-xs sm:text-sm cursor-pointer shadow-md"
           >
             العودة لصفحة الدخول
           </button>
@@ -140,59 +140,59 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans" dir="rtl">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-slate-200">
+    <div className="w-full flex items-center justify-center font-sans text-slate-900" dir="rtl">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-200">
 
         {/* الجانب التعريفي */}
-        <div className="md:w-1/3 bg-[#71639e] p-8 text-white flex flex-col justify-between items-center text-center">
+        <div className="md:w-1/3 bg-[#714B67] p-6 text-white flex flex-col justify-between items-center text-center">
           <div className="w-full">
             {onBackToLogin && (
               <button 
                 onClick={onBackToLogin}
-                className="flex items-center gap-1 text-xs text-purple-200 hover:text-white mb-6 transition-colors cursor-pointer"
+                className="flex items-center gap-1 text-xs text-purple-200 hover:text-white mb-4 transition-colors cursor-pointer"
               >
                 <ArrowRight size={14} />
                 <span>العودة للدخول</span>
               </button>
             )}
-            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
-              <Building2 size={30} className="text-white" />
+            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20">
+              <Building2 size={26} className="text-white" />
             </div>
-            <h3 className="text-lg font-bold mb-2">Aysed Cloud</h3>
-            <p className="text-xs text-purple-100 leading-relaxed">
+            <h3 className="text-base font-bold mb-1 text-white">Aysed Cloud</h3>
+            <p className="text-xs text-white/80 leading-relaxed font-normal">
               منظومة الموارد البشرية المتكاملة والمتوافقة مع قانون العمل الكويتي.
             </p>
           </div>
 
-          <div className="text-[11px] text-purple-200 mt-6 md:mt-0">
+          <div className="text-[11px] text-white/75 mt-4 md:mt-0 font-medium">
             إصدار 2026 الرسمي
           </div>
         </div>
 
         {/* نموذج إدخال البيانات */}
-        <form onSubmit={handleSubmit} className="md:w-2/3 p-6 md:p-8 space-y-4">
-          <div className="border-b border-gray-100 pb-3">
-            <h2 className="text-xl font-bold text-gray-800">طلب تجربة مجانية</h2>
-            <p className="text-xs text-gray-400 mt-0.5">سجل بياناتك وسيتم التواصل معك مباشرة</p>
+        <form onSubmit={handleSubmit} className="md:w-2/3 p-6 space-y-3.5 bg-white text-slate-900">
+          <div className="border-b border-slate-200 pb-2.5">
+            <h2 className="text-lg font-bold text-slate-900">طلب تجربة مجانية واشتراك</h2>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">سجل بياناتك وسيتم تفعيل حسابك والتواصل معك مباشرة</p>
           </div>
 
           {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-700 text-xs">
-              <AlertCircle size={16} className="shrink-0" />
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-800 text-xs font-semibold">
+              <AlertCircle size={16} className="shrink-0 text-rose-600" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">الاسم الكامل</label>
+              <label className="text-xs font-bold text-slate-800">الاسم الكامل *</label>
               <div className="relative">
-                <User className="absolute right-3 top-3 text-gray-400" size={16} />
+                <User className="absolute right-3 top-3 text-slate-500" size={16} />
                 <input 
                   type="text" 
                   required
                   value={formData.name}
-                  className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#71639e] outline-none text-slate-900 text-sm font-medium placeholder:text-slate-400"
+                  className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs"
                   placeholder="محمد العازمي"
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                 />
@@ -200,14 +200,14 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">البريد الإلكتروني (لاستلام الترحيب)</label>
+              <label className="text-xs font-bold text-slate-800">البريد الإلكتروني *</label>
               <div className="relative">
-                <Mail className="absolute right-3 top-3 text-gray-400" size={16} />
+                <Mail className="absolute right-3 top-3 text-slate-500" size={16} />
                 <input 
                   type="email" 
                   required
                   value={formData.email}
-                  className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#71639e] outline-none text-slate-900 text-sm font-medium placeholder:text-slate-400"
+                  className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs font-mono"
                   placeholder="name@company.com"
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                 />
@@ -215,16 +215,16 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">اسم المنشأة / الشركة</label>
+              <label className="text-xs font-bold text-slate-800">اسم المنشأة / الشركة *</label>
               <div className="relative">
-                <Building2 className="absolute right-3 top-3 text-gray-400" size={16} />
+                <Building2 className="absolute right-3 top-3 text-slate-500" size={16} />
                 <input 
                   type="text" 
                   required
                   value={formData.company_name}
-                  className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#71639e] outline-none text-slate-900 text-sm font-medium placeholder:text-slate-400"
+                  className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs"
                   placeholder="مؤسسة الأعمال الحديثة"
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
                 />
@@ -232,14 +232,14 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-gray-600">رقم الهاتف (الكويت)</label>
+              <label className="text-xs font-bold text-slate-800">رقم الهاتف (الكويت) *</label>
               <div className="relative">
-                <Phone className="absolute right-3 top-3 text-gray-400" size={16} />
+                <Phone className="absolute right-3 top-3 text-slate-500" size={16} />
                 <input 
                   type="tel" 
                   required
                   value={formData.phone}
-                  className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#71639e] outline-none text-slate-900 text-sm font-medium placeholder:text-slate-400"
+                  className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs font-mono"
                   placeholder="9xxxxxxx"
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                 />
@@ -248,32 +248,32 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-gray-600">عدد الموظفين</label>
+            <label className="text-xs font-bold text-slate-800">عدد الموظفين</label>
             <div className="relative">
-              <Users className="absolute right-3 top-3 text-gray-400" size={16} />
+              <Users className="absolute right-3 top-3 text-slate-500" size={16} />
               <select 
                 value={formData.employee_count}
-                className="w-full pr-9 pl-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#71639e] outline-none text-slate-900 text-sm font-medium appearance-none cursor-pointer"
+                className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold appearance-none cursor-pointer shadow-xs"
                 onChange={(e) => setFormData({...formData, employee_count: e.target.value})}
               >
-                <option value="1-10">من 1 إلى 10 موظفين</option>
-                <option value="11-50">من 11 إلى 50 موظف</option>
-                <option value="50+">أكثر من 50 موظف</option>
+                <option value="1-10" className="text-slate-900 bg-white">من 1 إلى 10 موظفين</option>
+                <option value="11-50" className="text-slate-900 bg-white">من 11 إلى 50 موظف</option>
+                <option value="50+" className="text-slate-900 bg-white">أكثر من 50 موظف</option>
               </select>
             </div>
           </div>
 
           {/* اختيار القطاع */}
           <div className="space-y-1.5 pt-1">
-            <label className="text-xs font-semibold text-gray-600">قطاع العمل الرئيسي</label>
+            <label className="text-xs font-bold text-slate-800">قطاع العمل الرئيسي</label>
             <div className="grid grid-cols-2 gap-3">
               <button 
                 type="button"
                 onClick={() => setFormData({...formData, sector: 'medical'})}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   formData.sector === 'medical' 
-                    ? 'border-[#71639e] bg-purple-50 text-[#71639e]' 
-                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    ? 'border-[#714B67] bg-purple-50 text-[#714B67] shadow-xs' 
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <Stethoscope size={16} /> القطاع الطبي
@@ -281,10 +281,10 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
               <button 
                 type="button"
                 onClick={() => setFormData({...formData, sector: 'admin'})}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                   formData.sector === 'admin' 
-                    ? 'border-[#71639e] bg-purple-50 text-[#71639e]' 
-                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    ? 'border-[#714B67] bg-purple-50 text-[#714B67] shadow-xs' 
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <Briefcase size={16} /> القطاع الإداري والتجاري
@@ -296,7 +296,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#008784] hover:bg-[#00706e] text-white font-bold py-3 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.99] text-sm mt-3 cursor-pointer disabled:opacity-70"
+            className="w-full bg-[#008784] hover:bg-[#00706e] text-white font-bold py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.99] text-xs sm:text-sm mt-3 cursor-pointer disabled:opacity-70"
           >
             {loading ? <Loader2 className="animate-spin" size={18} /> : null}
             <span>إرسال طلب الانضمام</span>

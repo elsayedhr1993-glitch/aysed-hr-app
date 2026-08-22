@@ -602,12 +602,28 @@ div[class*="border"] {
 }
 
 /* 4. تثبيت لون وهوية التحديد للموظف النشط (Solid Active State) */
-.bg-\[\#714B67\],
-[class*="bg-[#714B67]"] {
+.bg-\[\#714B67\] {
   background-color: #714B67 !important;
-  color: #ffffff !important;
-  font-weight: 800 !important;
 }
+
+/* ضمان وضوح وتباين خطوط حقول الإدخال والاختيار في كافة النماذج وشاشات طلب الاشتراك */
+input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+    color: #0f172a !important;
+    background-color: #ffffff;
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #64748b !important;
+}
+
+select option {
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+}
+
 
 /* 5. تسميك الأزرار العلوية ورفع تباين النصوص */
 button, label[class*="cursor-pointer"] {
