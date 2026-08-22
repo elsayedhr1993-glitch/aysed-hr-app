@@ -514,25 +514,48 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       console.warn('Firebase fetch subscription_requests warn:', fbErr);
     }
 
-    // 3. LocalStorage fallback
+    // 3. LocalStorage registered companies & subscriptions fallback
     try {
+      const regComps = JSON.parse(localStorage.getItem('registered_companies_v1') || '[]');
+      if (Array.isArray(regComps)) {
+        regComps.forEach((rc: any) => {
+          if (!rc || rc.id === 'comp-super-admin') return;
+          const companyTitle = rc.nameAr || rc.name || rc.nameEn || rc.companyName || '';
+          if (companyTitle && !isTenantPurged(rc.id) && !isTenantPurged(companyTitle) && !isTenantPurged(rc)) {
+            if (!allRequests.some(r => r.id === rc.id || r.name.toLowerCase() === companyTitle.toLowerCase())) {
+              allRequests.push({
+                id: rc.id,
+                requester_name: rc.ownerName || rc.requesterName || rc.name || 'المسؤول',
+                name: companyTitle,
+                phone: rc.phone || rc.mobile || '99112233',
+                plan_type: rc.planType || rc.plan || 'Medical Pro',
+                emp_count: String(rc.employeeCount || rc.empCount || '1-10'),
+                state: rc.status === 'suspended' ? 'suspended' : 'approved',
+                created_at: rc.createdAt || new Date().toISOString(),
+                email: rc.email || `${rc.phone ? rc.phone.replace(/[^0-9]/g, '') : rc.id}@aysedhr.com`
+              });
+            }
+          }
+        });
+      }
+
       const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
       localSubs.forEach((ls: any) => {
         const companyTitle = ls.companyName || ls.name || '';
         if (companyTitle && !isTenantPurged(ls.id) && !isTenantPurged(companyTitle) && !isTenantPurged(ls)) {
           if (!allRequests.some(r => r.id === ls.id || r.name.toLowerCase() === companyTitle.toLowerCase())) {
-            let st: 'draft' | 'approved' | 'rejected' | 'suspended' = 'draft';
+            let st: 'draft' | 'approved' | 'rejected' | 'suspended' = 'approved';
             const valSt = ls.status || ls.state;
-            if (valSt === 'approved') st = 'approved';
+            if (valSt === 'draft' || valSt === 'pending') st = 'draft';
             else if (valSt === 'rejected') st = 'rejected';
             else if (valSt === 'suspended') st = 'suspended';
 
             allRequests.push({
               id: ls.id || 'sub-' + Math.random(),
-              requester_name: ls.requesterName || ls.name || '',
+              requester_name: ls.requesterName || ls.name || 'المسؤول',
               name: companyTitle,
               phone: ls.phone || '',
-              plan_type: ls.planType || ls.sector || 'admin',
+              plan_type: ls.planType || ls.sector || 'Medical Pro',
               emp_count: ls.empCount || ls.employee_count || '1-10',
               state: st,
               created_at: ls.createdAt || new Date().toISOString(),
@@ -543,52 +566,28 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       });
     } catch (lErr) {}
 
-    // 4. Default registered tenants (Only if NOT purged)
-    const defaultTenants = [
-      {
-        id: 'req-almanar',
-        name: 'عيادة المنار (Al-Manar Clinic)',
-        requester_name: 'د. أحمد عبد الله المحمود',
-        phone: '99112233',
-        email: 'almanar@hr.com',
-        plan_type: 'Medical Enterprise',
-        emp_count: '15-50',
-        state: 'approved' as const,
-        created_at: '2024-01-01T00:00:00.000Z'
-      },
-      {
-        id: 'req-fanar',
-        name: 'شركة عيادات الفنار التخصصية (Al-Fanar Clinic)',
-        requester_name: 'د. طارق خالد العازمي',
-        phone: '66968180',
-        email: '66968180@aysedhr.com',
-        plan_type: 'Medical Pro',
-        emp_count: '10-30',
-        state: 'approved' as const,
-        created_at: '2024-02-01T00:00:00.000Z'
-      },
-      {
-        id: 'req-elite',
-        name: 'شركة إيليت كلينك الطبية (Elite Clinic)',
-        requester_name: 'د. ناصر بدر العتيبي',
-        phone: '666968182',
-        email: '666968182@aysedhr.com',
-        plan_type: 'Medical Pro',
-        emp_count: '10-30',
-        state: 'approved' as const,
-        created_at: '2024-03-01T00:00:00.000Z'
-      }
-    ];
+    // 4. Default registered tenants (Only fallback if database & local storage are completely empty)
+    if (allRequests.length === 0) {
+      const defaultTenants = [
+        {
+          id: 'req-almanar',
+          name: 'عيادة المنار (Al-Manar Clinic)',
+          requester_name: 'د. أحمد عبد الله المحمود',
+          phone: '99112233',
+          email: 'almanar@hr.com',
+          plan_type: 'Medical Enterprise',
+          emp_count: '15-50',
+          state: 'approved' as const,
+          created_at: '2024-01-01T00:00:00.000Z'
+        }
+      ];
 
-    defaultTenants.forEach(dt => {
-      if (!isTenantPurged(dt.id) && !isTenantPurged(dt.name)) {
-        if (!allRequests.some(r => r.name.toLowerCase().includes('منار') && dt.id === 'req-almanar') &&
-            !allRequests.some(r => r.name.toLowerCase().includes('فنار') && dt.id === 'req-fanar') &&
-            !allRequests.some(r => r.name.toLowerCase().includes('إيليت') || r.name.toLowerCase().includes('elite') && dt.id === 'req-elite')) {
+      defaultTenants.forEach(dt => {
+        if (!isTenantPurged(dt.id) && !isTenantPurged(dt.name)) {
           allRequests.push(dt);
         }
-      }
-    });
+      });
+    }
 
     const filteredFinal = allRequests.filter(r => !isTenantPurged(r.id) && !isTenantPurged(r.name) && !isTenantPurged(r));
     setRequests(filteredFinal);
@@ -598,18 +597,38 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   useEffect(() => {
     fetchRequests();
 
-    // Setup real-time listener for incoming subscription requests
+    // Setup real-time listeners for incoming subscription requests, companies, and subscriptions
     let unsubscribeReq: (() => void) | null = null;
+    let unsubscribeComp: (() => void) | null = null;
+    let unsubscribeSubs: (() => void) | null = null;
     try {
       unsubscribeReq = onSnapshot(collection(db, 'subscription_requests'), () => {
         fetchRequests();
       }, (err) => {
         console.warn('Subscription requests listener warning:', err);
       });
+      unsubscribeComp = onSnapshot(collection(db, 'companies'), () => {
+        fetchRequests();
+      }, (err) => {
+        console.warn('Companies listener warning:', err);
+      });
+      unsubscribeSubs = onSnapshot(collection(db, 'subscriptions'), () => {
+        fetchRequests();
+      }, (err) => {
+        console.warn('Subscriptions listener warning:', err);
+      });
     } catch (e) {}
+
+    const handleCustomChange = () => {
+      fetchRequests();
+    };
+    window.addEventListener('aysed_companies_changed', handleCustomChange);
 
     return () => {
       if (unsubscribeReq) unsubscribeReq();
+      if (unsubscribeComp) unsubscribeComp();
+      if (unsubscribeSubs) unsubscribeSubs();
+      window.removeEventListener('aysed_companies_changed', handleCustomChange);
     };
   }, []);
 

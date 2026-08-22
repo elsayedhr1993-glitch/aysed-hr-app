@@ -134,6 +134,25 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   const [showLangMenu, setShowLangMenu] = useState(false);
   const { lang, setLang, currentLangCode } = useLang();
 
+  const superAdminComp: Company = (companies || []).find(c => c?.id === 'comp-super-admin') || {
+    id: 'comp-super-admin',
+    nameAr: 'منصة إدارة النظام المركزية (SaaS Platform)',
+    nameEn: 'SaaS Platform Controller',
+    commercialRegNo: 'SAAS-001',
+    civilIdCompany: '999999999999',
+    bankName: 'بنك الكويت الوطني (NBK)',
+    iban: 'KW12NBKW000000000000999',
+    wsiCode: 'WSI-ADMIN',
+    currency: 'KWD',
+    status: 'active'
+  };
+
+  const handleSelectSuperAdmin = () => {
+    onSelectCompany(superAdminComp);
+    setShowCompanyMenu(false);
+    if (onNavigateToApp) onNavigateToApp('SAAS_ADMIN');
+  };
+
   // Close all open menus when clicking outside
   React.useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -349,7 +368,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
 
         {/* Multi-Company Switcher Dropdown */}
         <div className="relative odoo-topbar-dropdown-container">
-          {isSuperAdmin ? (
+          {isSuperAdmin || (companies && companies.length > 1) ? (
             <>
               <button
                 onClick={() => {
@@ -367,11 +386,47 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               </button>
 
               {showCompanyMenu && (
-                <div className="absolute left-0 mt-1.5 w-64 bg-white rounded-lg shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95 dir-rtl text-right">
-                  <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-semibold text-slate-400">
-                    المنشآت المشتركة (Super Admin Multi-Tenant)
+                <div className="absolute left-0 mt-1.5 w-72 bg-white rounded-lg shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95 dir-rtl text-right">
+                  {/* Persistent Super Admin Platform Option pinned at top */}
+                  <div className="border-b border-slate-200 pb-1 mb-1 bg-purple-50/30">
+                    <div className="px-3 py-1.5 text-[11px] font-bold text-purple-800 flex items-center gap-1">
+                      <Globe className="w-3.5 h-3.5 text-purple-600" />
+                      <span>منصة إدارة النظام المركزية (SaaS Platform)</span>
+                    </div>
+                    <div
+                      className={`px-3 py-2 hover:bg-purple-50/50 flex items-center justify-between text-xs transition ${
+                        activeCompany?.id === 'comp-super-admin' ? 'bg-purple-100/70 font-semibold' : ''
+                      }`}
+                    >
+                      <div 
+                        onClick={handleSelectSuperAdmin}
+                        className="cursor-pointer flex-1 min-w-0"
+                      >
+                        <div className="font-bold text-purple-900 flex items-center gap-1.5">
+                          <span className="truncate">إدارة النظام المركزية (Super Admin)</span>
+                          {activeCompany?.id === 'comp-super-admin' && (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-purple-600 truncate">التحكم الشامل والاشتراكات والمنشآت</div>
+                      </div>
+
+                      <button
+                        type="button"
+                        title="دخول لوحة السوبر أدمن"
+                        onClick={handleSelectSuperAdmin}
+                        className="p-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-1 cursor-pointer text-[10px] font-bold mr-1 shrink-0 shadow-xs"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>دخول</span>
+                      </button>
+                    </div>
                   </div>
-                  {(companies || []).map((comp) => (
+
+                  <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-semibold text-slate-400">
+                    العيادات والمنشآت المشتركة (Tenant Clinics)
+                  </div>
+                  {((companies || []).filter(c => c?.id !== 'comp-super-admin')).map((comp) => (
                     <div
                       key={comp?.id || Math.random()}
                       className={`px-3 py-2 hover:bg-slate-50 flex items-center justify-between text-xs transition border-b border-slate-50 ${
@@ -386,6 +441,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                         className="cursor-pointer flex-1 min-w-0"
                       >
                         <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-[#714B67] shrink-0" />
                           <span className="truncate">{comp?.nameAr || ''}</span>
                           {comp?.id === activeCompany?.id && (
                             <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>

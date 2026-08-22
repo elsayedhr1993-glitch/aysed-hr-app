@@ -1,4 +1,4 @@
-import { Company, Employee, Candidate, Contract, LeaveRequest, AttendanceRecord, Payslip, DocumentItem, AutomationRule, Department, JobTitle, CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote } from '../types';
+import { Company, Employee, Candidate, Contract, LeaveRequest, AttendanceRecord, Payslip, DocumentItem, AutomationRule, Department, JobTitle, CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, CompanySubscription } from '../types';
 
 export const initialCompanies: Company[] = [
   {
@@ -37,7 +37,26 @@ export const initialCompanies: Company[] = [
     wsiCode: 'WSI-FANAR',
     currency: 'KWD',
     status: 'active',
-    email: '66968180@aysedhr.com'
+    email: '66968180@aysedhr.com',
+    phone: '+965 66968180',
+    ownerPhone: '66968180',
+    ownerName: 'د. طارق خالد العازمي'
+  },
+  {
+    id: 'comp-fanar-branches',
+    nameAr: 'مجموعة الفنار للخدمات الطبية والمختبرات (Al-Fanar Labs & Medical Services)',
+    nameEn: 'Al-Fanar Advanced Medical Services',
+    commercialRegNo: 'KW-554439',
+    civilIdCompany: '777777777778',
+    bankName: 'بيت التمويل الكويتي (KFH)',
+    iban: 'KW33KFH0000000000005549',
+    wsiCode: 'WSI-FANAR-LABS',
+    currency: 'KWD',
+    status: 'active',
+    email: '66968180@aysedhr.com',
+    phone: '+965 66968180',
+    ownerPhone: '66968180',
+    ownerName: 'د. طارق خالد العازمي'
   },
   {
     id: 'comp-elite',
@@ -51,6 +70,45 @@ export const initialCompanies: Company[] = [
     currency: 'KWD',
     status: 'active',
     email: '666968182@aysedhr.com'
+  }
+];
+
+export const initialSubscriptions: CompanySubscription[] = [
+  {
+    id: 'sub-almanar',
+    companyId: 'comp-almanar',
+    companyName: 'عيادة المنار (Al-Manar Clinic)',
+    ownerName: 'د. أحمد عبد الله المحمود',
+    email: 'almanar@hr.com',
+    status: 'active',
+    planType: 'سنوي (Medical Enterprise)',
+    subscriptionFee: 250,
+    startDate: '2024-01-01',
+    endDate: '2027-01-01'
+  },
+  {
+    id: 'sub-fanar',
+    companyId: 'comp-fanar',
+    companyName: 'شركة عيادات الفنار التخصصية (Al-Fanar Clinic)',
+    ownerName: 'د. طارق خالد العازمي',
+    email: '66968180@aysedhr.com',
+    status: 'active',
+    planType: 'سنوي (Medical Pro)',
+    subscriptionFee: 180,
+    startDate: '2024-02-01',
+    endDate: '2027-02-01'
+  },
+  {
+    id: 'sub-elite',
+    companyId: 'comp-elite',
+    companyName: 'شركة إيليت كلينك الطبية (Elite Clinic)',
+    ownerName: 'د. ناصر بدر العتيبي',
+    email: '666968182@aysedhr.com',
+    status: 'active',
+    planType: 'سنوي (Medical Pro)',
+    subscriptionFee: 180,
+    startDate: '2024-03-01',
+    endDate: '2027-03-01'
   }
 ];
 

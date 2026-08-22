@@ -82,10 +82,65 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
     }
 
     try {
-      const cleaned = cleanFirestoreData(editingCompany) as Company;
-      await setDoc(doc(db, 'companies', cleaned.id), cleaned);
-      onSaveCompany(cleaned);
-      toast.success("تم حفظ وتحديث بيانات الشركة بنجاح في قاعدة البيانات السحابية");
+      const compId = editingCompany.id || ('comp-' + Date.now());
+      const email = (editingCompany.email || `${editingCompany.phone ? editingCompany.phone.replace(/[^0-9]/g, '') : compId}@aysedhr.com`).trim().toLowerCase();
+      
+      const completeCompany: Company = {
+        ...editingCompany,
+        id: compId,
+        nameAr: editingCompany.nameAr.trim(),
+        nameEn: editingCompany.nameEn?.trim() || editingCompany.nameAr.trim(),
+        email: email,
+        phone: editingCompany.phone || '99112233',
+        status: editingCompany.status || 'active'
+      };
+
+      const cleaned = cleanFirestoreData(completeCompany) as Company;
+      await setDoc(doc(db, 'companies', compId), {
+        ...cleaned,
+        companyId: compId,
+        companyName: completeCompany.nameAr,
+        state: completeCompany.status === 'suspended' ? 'suspended' : 'active',
+        isActive: completeCompany.status !== 'suspended',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Also create/sync corresponding subscription
+      const subDocData = {
+        id: `sub-${compId}`,
+        companyId: compId,
+        companyName: completeCompany.nameAr,
+        ownerName: completeCompany.nameAr,
+        email: email,
+        phone: completeCompany.phone || '99112233',
+        status: completeCompany.status === 'suspended' ? 'suspended' : 'active',
+        planType: 'سنوي (Enterprise)',
+        subscriptionFee: 180,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'subscriptions', `sub-${compId}`), cleanFirestoreData(subDocData), { merge: true });
+
+      onSaveCompany(completeCompany);
+
+      // Persist in local storage caches
+      try {
+        const regRaw = localStorage.getItem('registered_companies_v1');
+        const regList = regRaw ? JSON.parse(regRaw) : [];
+        const filtered = regList.filter((c: any) => c.id !== compId);
+        filtered.push(completeCompany);
+        localStorage.setItem('registered_companies_v1', JSON.stringify(filtered));
+
+        const savedSubsRaw = localStorage.getItem('aysed_saved_subscriptions');
+        const savedSubs = savedSubsRaw ? JSON.parse(savedSubsRaw) : [];
+        const filteredSubs = savedSubs.filter((s: any) => s.companyId !== compId && s.id !== `sub-${compId}`);
+        filteredSubs.push(subDocData);
+        localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(filteredSubs));
+      } catch (e) {}
+
+      window.dispatchEvent(new CustomEvent('aysed_companies_changed'));
+      toast.success("تم حفظ وتحديث بيانات الشركة بنجاح في قاعدة البيانات ولوحة السوبر أدمن");
       setIsModalOpen(false);
       setEditingCompany(null);
     } catch (err) {
@@ -104,7 +159,18 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
     if (!companyToDelete) return;
     try {
       await deleteDoc(doc(db, 'companies', companyToDelete.id));
+      await deleteDoc(doc(db, 'subscriptions', `sub-${companyToDelete.id}`));
       onDeleteCompany(companyToDelete.id);
+      
+      try {
+        const regRaw = localStorage.getItem('registered_companies_v1');
+        if (regRaw) {
+          const regList = JSON.parse(regRaw).filter((c: any) => c.id !== companyToDelete.id);
+          localStorage.setItem('registered_companies_v1', JSON.stringify(regList));
+        }
+      } catch (e) {}
+
+      window.dispatchEvent(new CustomEvent('aysed_companies_changed'));
       toast.success("تم حذف الشركة والعيادة بنجاح من قاعدة البيانات");
       setCompanyToDelete(null);
     } catch (err) {

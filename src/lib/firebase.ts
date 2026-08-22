@@ -166,11 +166,9 @@ export function isTenantPurged(identifierOrObj?: any): boolean {
 
   if (typeof identifierOrObj === 'string') {
     const clean = identifierOrObj.trim().toLowerCase();
-    if (purged.has(clean)) return true;
-    for (const p of purged) {
-      if (clean.length > 3 && (clean.includes(p) || p.includes(clean))) return true;
-    }
-    return false;
+    if (!clean) return false;
+    // Strictly exact matching to avoid falsely purging valid companies
+    return purged.has(clean);
   }
 
   if (typeof identifierOrObj === 'object') {
@@ -185,9 +183,6 @@ export function isTenantPurged(identifierOrObj?: any): boolean {
     const candidates = [id, companyId, name, nameAr, nameEn, companyName, email].filter(Boolean);
     for (const c of candidates) {
       if (purged.has(c)) return true;
-      for (const p of purged) {
-        if (c.length > 3 && (c.includes(p) || p.includes(c))) return true;
-      }
     }
   }
 

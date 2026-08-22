@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { collection, onSnapshot, query, where, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth, cleanFirestoreData } from '../lib/firebase';
-import { Employee, Contract, LeaveRequest, AttendanceRecord, Payslip, DocumentItem, CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, EmployeeNotification } from '../types';
+import { Employee, Contract, LeaveRequest, AttendanceRecord, Payslip, DocumentItem, CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, EmployeeNotification, Company } from '../types';
 import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts } from '../data/initialData';
 import { MANARA_STORAGE_KEYS, setPersistentData, getPersistentData } from '../utils/persistentStorage';
 
@@ -87,19 +87,21 @@ export const useFirebaseSync = (
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Super Admin platform mode: Keep tenant employee data sterile & isolated
+    // Super Admin platform mode or clinic switching: Keep tenant employee data sterile & isolated
     const isSuperAdminPlatformMode = currentUserRole === 'SUPER_ADMIN' && (!activeCompanyId || activeCompanyId === 'SAAS_PLATFORM');
+    setEmployees([]);
+    setContracts([]);
+    setLeaves([]);
+    setAttendance([]);
+    setPayslips([]);
+    setDocuments([]);
+    setCustodies([]);
+    setLoans([]);
+    setWarnings([]);
+    setEmployeeNotes([]);
+
     if (isSuperAdminPlatformMode) {
-      setEmployees([]);
-      setContracts([]);
-      setLeaves([]);
-      setAttendance([]);
-      setPayslips([]);
-      setDocuments([]);
-      setCustodies([]);
-      setLoans([]);
-      setWarnings([]);
-      setEmployeeNotes([]);
+      return;
     }
 
     const tenantId = activeCompanyId || 'comp-super-admin';
@@ -318,7 +320,23 @@ export const useFirebaseSync = (
     const unsubCompanies = onSnapshot(collection(db, 'companies'), 
         snap => {
             if (setCompanies) {
-                const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                const docs = snap.docs.map(d => ({ ...d.data(), id: d.id })) as Company[];
+                const map = new Map<string, any>();
+                const nameMap = new Map<string, any>();
+                docs.forEach(c => {
+                    if (!c || !c.id) return;
+                    const nameKey = (c.nameAr || (c as any).companyName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                    if (nameKey && nameMap.has(nameKey)) {
+                        const existing = nameMap.get(nameKey)!;
+                        const merged = { ...existing, ...c };
+                        map.set(merged.id, merged);
+                        nameMap.set(nameKey, merged);
+                    } else {
+                        map.set(c.id, c);
+                        if (nameKey) nameMap.set(nameKey, c);
+                    }
+                });
+                const remote = Array.from(map.values());
                 if (remote.length > 0) {
                   setCompanies(remote);
                   setPersistentData(MANARA_STORAGE_KEYS.COMPANIES, remote, MANARA_STORAGE_KEYS.TENANTS);

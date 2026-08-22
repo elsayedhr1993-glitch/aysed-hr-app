@@ -39,6 +39,7 @@ export interface Company {
   block?: string;
   street?: string;
   phone?: string;
+  ownerPhone?: string;
   email?: string;
   ownerName?: string;
   planType?: string;

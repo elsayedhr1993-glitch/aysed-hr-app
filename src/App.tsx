@@ -21,7 +21,7 @@ import {
   GeneratedDocument, AuditLog, ShiftProfile, EmployeeShift, 
   EmploymentCommencement, CompanySubscription, JobTitle, Department, EmployeeNotification, DailyMovement
 } from './types';
-import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts } from './data/initialData';
+import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts, initialSubscriptions } from './data/initialData';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { generateSmartNotifications } from './utils/notificationsEngine';
 import toast, { Toaster } from 'react-hot-toast';
@@ -53,40 +53,58 @@ function MainActionManager() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
+  const deduplicateCompanies = (list: Company[]): Company[] => {
+    const map = new Map<string, Company>();
+    const nameMap = new Map<string, Company>();
+    (list || []).forEach(c => {
+      if (!c || !c.id || isTenantPurged(c.id) || isTenantPurged(c.nameAr)) return;
+      const nameKey = (c.nameAr || (c as any).companyName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (nameKey && nameMap.has(nameKey)) {
+        const existing = nameMap.get(nameKey)!;
+        const merged = { ...existing, ...c };
+        map.set(merged.id, merged);
+        nameMap.set(nameKey, merged);
+      } else {
+        map.set(c.id, c);
+        if (nameKey) nameMap.set(nameKey, c);
+      }
+    });
+    return Array.from(map.values());
+  };
+
   const [companies, setCompanies] = useState<Company[]>(() => {
     try {
       const savedReg = localStorage.getItem('registered_companies_v1');
-      const map = new Map<string, Company>();
-      initialCompanies.forEach(c => {
-        if (!isTenantPurged(c.id) && !isTenantPurged(c.nameAr) && !isTenantPurged(c.nameEn)) {
-          map.set(c.id, c);
-        }
-      });
+      const allComps: Company[] = [...initialCompanies];
       if (savedReg) {
         const parsed = JSON.parse(savedReg);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          parsed.forEach((c: any) => {
-            if (c && c.id && !isTenantPurged(c.id) && !isTenantPurged(c.nameAr) && !isTenantPurged(c.nameEn)) {
-              const existing = map.get(c.id);
-              if (existing) {
-                map.set(c.id, { ...existing, ...c });
-              } else {
-                map.set(c.id, c);
-              }
-            }
-          });
+          allComps.push(...parsed);
         }
       }
-      const list = Array.from(map.values());
-      return list.length > 0 ? list : [initialCompanies[0]];
+      const valid = deduplicateCompanies(allComps);
+      return valid.length > 0 ? valid : [initialCompanies[0]];
     } catch (e) {}
-    return initialCompanies.filter(c => !isTenantPurged(c.id) && !isTenantPurged(c.nameAr));
+    return deduplicateCompanies(initialCompanies);
   });
 
   useEffect(() => {
     const handleCompaniesChanged = (e: any) => {
+      try {
+        const raw = localStorage.getItem('registered_companies_v1');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            const valid = deduplicateCompanies(list);
+            if (valid.length > 0) {
+              setCompanies(valid);
+              return;
+            }
+          }
+        }
+      } catch (err) {}
       setCompanies(prev => {
-        const remaining = prev.filter(c => !isTenantPurged(c.id) && !isTenantPurged(c.nameAr) && !isTenantPurged(c.nameEn));
+        const remaining = deduplicateCompanies(prev);
         return remaining.length > 0 ? remaining : [initialCompanies[0]];
       });
     };
@@ -96,9 +114,10 @@ function MainActionManager() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('registered_companies_v1', JSON.stringify(companies));
+      const unique = deduplicateCompanies(companies);
+      localStorage.setItem('registered_companies_v1', JSON.stringify(unique));
     } catch (e) {}
-    setPersistentData(MANARA_STORAGE_KEYS.COMPANIES, companies, MANARA_STORAGE_KEYS.TENANTS);
+    setPersistentData(MANARA_STORAGE_KEYS.COMPANIES, deduplicateCompanies(companies), MANARA_STORAGE_KEYS.TENANTS);
   }, [companies]);
 
   const [activeCompany, setActiveCompany] = useState<Company>(() => {
@@ -115,13 +134,11 @@ function MainActionManager() {
 
   // Data state with persistent localStorage initialization
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    const loaded = getPersistentData<Employee[]>(MANARA_STORAGE_KEYS.EMPLOYEES, initialEmployees);
-    const map = new Map<string, Employee>();
-    initialEmployees.forEach(e => map.set(e.id, e));
-    (loaded || []).forEach(e => {
-      if (e && e.id) map.set(e.id, e);
-    });
-    return Array.from(map.values());
+    const loaded = getPersistentData<Employee[]>(MANARA_STORAGE_KEYS.EMPLOYEES, []);
+    if (Array.isArray(loaded) && loaded.length > 0) {
+      return loaded;
+    }
+    return initialEmployees;
   });
   const [jobTitles, setJobTitles] = useState<JobTitle[]>(() => 
     getPersistentData<JobTitle[]>(MANARA_STORAGE_KEYS.JOB_TITLES, initialJobTitles)
@@ -130,13 +147,11 @@ function MainActionManager() {
     getPersistentData<Department[]>(MANARA_STORAGE_KEYS.DEPARTMENTS, initialDepartments)
   );
   const [contracts, setContracts] = useState<Contract[]>(() => {
-    const loaded = getPersistentData<Contract[]>(MANARA_STORAGE_KEYS.CONTRACTS, initialContracts);
-    const map = new Map<string, Contract>();
-    initialContracts.forEach(c => map.set(c.id, c));
-    (loaded || []).forEach(c => {
-      if (c && c.id) map.set(c.id, c);
-    });
-    return Array.from(map.values());
+    const loaded = getPersistentData<Contract[]>(MANARA_STORAGE_KEYS.CONTRACTS, []);
+    if (Array.isArray(loaded) && loaded.length > 0) {
+      return loaded;
+    }
+    return initialContracts;
   });
   const [leaves, setLeaves] = useState<LeaveRequest[]>(() => 
     getPersistentData<LeaveRequest[]>(MANARA_STORAGE_KEYS.LEAVES, [])
@@ -185,7 +200,19 @@ function MainActionManager() {
   );
   const [subscriptions, setSubscriptions] = useState<CompanySubscription[]>(() => {
     const loaded = getPersistentData<CompanySubscription[]>(MANARA_STORAGE_KEYS.SUBSCRIPTIONS, []);
-    return loaded;
+    const validInitial = initialSubscriptions.filter(s => !isTenantPurged(s.companyId) && !isTenantPurged(s.companyName));
+    if (!loaded || loaded.length === 0) {
+      return validInitial;
+    }
+    // Merge existing loaded with initial subscriptions if missing
+    const map = new Map<string, CompanySubscription>();
+    validInitial.forEach(s => map.set(s.companyId, s));
+    loaded.forEach(s => {
+      if (!isTenantPurged(s.companyId) && !isTenantPurged(s.companyName)) {
+        map.set(s.companyId, { ...(map.get(s.companyId) || {}), ...s });
+      }
+    });
+    return Array.from(map.values());
   });
   
   // Automated Employee Notifications State
@@ -413,6 +440,18 @@ function MainActionManager() {
 
     if (!targetComp) return;
 
+    // Instantly reset view states upon switching clinic context
+    setEmployees([]);
+    setContracts([]);
+    setLeaves([]);
+    setAttendance([]);
+    setPayslips([]);
+    setDocuments([]);
+    setCustodies([]);
+    setLoans([]);
+    setWarnings([]);
+    setEmployeeNotes([]);
+
     setActiveCompany(targetComp);
     localStorage.setItem('activeCompanyId', targetComp.id);
 
@@ -538,9 +577,13 @@ function MainActionManager() {
   };
 
   const adminWorkspaceComp = companies.find(c => c.id === 'comp-super-admin') || companies[0];
+  const userEmailLower = (currentUserEmail || '').toLowerCase();
+  const matchingPhone = userEmailLower.match(/\d+/)?.[0] || '';
   const visibleCompanies = currentUserRole === 'SUPER_ADMIN'
     ? companies 
-    : (activeCompany ? [activeCompany] : (userCompanyId ? companies.filter(c => c.id === userCompanyId) : companies));
+    : (matchingPhone && companies.some(c => c.ownerPhone === matchingPhone || (c.phone && c.phone.includes(matchingPhone))))
+      ? companies.filter(c => c.ownerPhone === matchingPhone || (c.phone && c.phone.includes(matchingPhone)) || (c.email && c.email.includes(matchingPhone)))
+      : (activeCompany ? [activeCompany] : (userCompanyId ? companies.filter(c => c.id === userCompanyId) : companies));
 
   // Clean up legacy un-scoped shared cache keys for strict multi-tenancy
   useEffect(() => {
@@ -1805,38 +1848,78 @@ function MainActionManager() {
                 }
               }}
               handleSaveCompany={async (c) => {
+                const compId = c.id || ('comp-' + Date.now());
+                const cleanEmail = (c.email || `${c.phone ? c.phone.replace(/[^0-9]/g, '') : compId}@aysedhr.com`).trim().toLowerCase();
+                const completeCompany = {
+                  ...c,
+                  id: compId,
+                  nameAr: (c.nameAr || c.companyName || 'منشأة جديدة').trim(),
+                  nameEn: (c.nameEn || c.nameAr || 'New Company').trim(),
+                  email: cleanEmail,
+                  phone: c.phone || '99112233',
+                  status: c.status || 'active'
+                };
+
                 setCompanies(prev => {
-                  const exists = prev.some(comp => comp.id === c.id);
-                  const updated = exists ? prev.map(comp => comp.id === c.id ? { ...comp, ...c } : comp) : [...prev, c];
+                  const exists = prev.some(comp => comp.id === compId);
+                  const updated = exists ? prev.map(comp => comp.id === compId ? { ...comp, ...completeCompany } : comp) : [...prev, completeCompany];
                   try {
                     localStorage.setItem('registered_companies_v1', JSON.stringify(updated));
                   } catch(e) {}
                   return updated;
                 });
-                if (activeCompany?.id === c.id) {
-                  setActiveCompany(c);
+                if (activeCompany?.id === compId) {
+                  setActiveCompany(completeCompany);
                 }
                 try {
-                  await setDoc(doc(db, "companies", c.id), cleanFirestoreData(c), { merge: true });
+                  const companyDocData = {
+                    ...completeCompany,
+                    companyId: compId,
+                    companyName: completeCompany.nameAr,
+                    adminEmail: cleanEmail,
+                    state: completeCompany.status === 'suspended' ? 'suspended' : 'active',
+                    isActive: completeCompany.status !== 'suspended',
+                    updatedAt: new Date().toISOString()
+                  };
+                  await setDoc(doc(db, "companies", compId), cleanFirestoreData(companyDocData), { merge: true });
                   
-                  // Also update matching subscription if exists
+                  // Also create or update matching subscription
+                  const subId = `sub-${compId}`;
+                  const subDocData = {
+                    id: subId,
+                    companyId: compId,
+                    companyName: completeCompany.nameAr,
+                    ownerName: completeCompany.nameAr,
+                    email: cleanEmail,
+                    phone: completeCompany.phone || '99112233',
+                    status: completeCompany.status === 'suspended' ? 'suspended' : 'active',
+                    planType: 'سنوي (Enterprise)',
+                    subscriptionFee: 180,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    updatedAt: new Date().toISOString()
+                  };
+                  await setDoc(doc(db, "subscriptions", subId), cleanFirestoreData(subDocData), { merge: true });
+
                   setSubscriptions(prev => {
-                    return prev.map(sub => {
-                      if (sub.companyId === c.id || sub.companyName === c.nameAr || sub.companyName === c.nameEn) {
-                        const updatedSub = {
-                          ...sub,
-                          companyName: c.nameAr || sub.companyName,
-                          email: c.email || sub.email,
-                          phone: c.phone || sub.phone,
-                        };
-                        setDoc(doc(db, "subscriptions", sub.id), cleanFirestoreData(updatedSub), { merge: true }).catch(console.error);
-                        return updatedSub;
-                      }
-                      return sub;
-                    });
+                    const exists = prev.some(s => s.companyId === compId || s.id === subId);
+                    if (exists) {
+                      return prev.map(sub => (sub.companyId === compId || sub.id === subId) ? { ...sub, ...subDocData } : sub);
+                    }
+                    return [...prev, subDocData as any];
                   });
 
-                  toast.success("تم حفظ بيانات الشركة بنجاح في قاعدة البيانات");
+                  // Local storage caches
+                  try {
+                    const savedSubsRaw = localStorage.getItem('aysed_saved_subscriptions');
+                    const savedSubs = savedSubsRaw ? JSON.parse(savedSubsRaw) : [];
+                    const filteredSubs = savedSubs.filter((s: any) => s.companyId !== compId && s.id !== subId);
+                    filteredSubs.push(subDocData);
+                    localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(filteredSubs));
+                  } catch(e) {}
+
+                  window.dispatchEvent(new CustomEvent('aysed_companies_changed'));
+                  toast.success("تم حفظ بيانات الشركة واشتراكها بنجاح في قاعدة البيانات");
                 } catch(e) {
                   console.error(e);
                   toast.error("خطأ في حفظ بيانات الشركة");
@@ -1848,13 +1931,20 @@ function MainActionManager() {
                   if (activeCompany?.id === id && remaining.length > 0) {
                     setActiveCompany(remaining[0]);
                   }
+                  try {
+                    localStorage.setItem('registered_companies_v1', JSON.stringify(remaining));
+                  } catch(e) {}
                   return remaining;
                 });
+                setSubscriptions(prev => prev.filter(s => s.companyId !== id && s.id !== `sub-${id}`));
                 try {
                   await deleteDoc(doc(db, "companies", id));
+                  await deleteDoc(doc(db, "subscriptions", `sub-${id}`));
+                  window.dispatchEvent(new CustomEvent('aysed_companies_changed'));
                   toast.success("تم حذف الشركة نهائياً");
                 } catch(e) {
                   console.error(e);
+                  toast.error("خطأ في حذف الشركة");
                 }
               }}
               handlePurgeSystemData={handlePurgeSystemData}

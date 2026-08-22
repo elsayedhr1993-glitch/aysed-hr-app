@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Building, Users, CreditCard, LogOut, LayoutGrid, MessageCircle, Settings, CheckCircle2, PauseCircle, Trash2, Edit3, Save, X, Lock, Mail, Phone, Plus, Building2, ShieldCheck, User, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Shield, Building, Users, CreditCard, LogOut, LayoutGrid, MessageCircle, Settings, CheckCircle2, PauseCircle, Trash2, Edit3, Save, X, Lock, Mail, Phone, Plus, Building2, ShieldCheck, User, RefreshCw, AlertTriangle, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { db, provisionTenantAuth, cleanFirestoreData, purgeTenantCascading, isTenantPurged } from '../lib/firebase';
+import { initialCompanies, initialSubscriptions } from '../data/initialData';
 import { collection, getDocs, doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
@@ -214,50 +215,177 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
     }
   };
 
+  const handleResetDefaultTenants = async () => {
+    try {
+      localStorage.removeItem('aysed_purged_tenants');
+      
+      // Sync from Firestore to LocalStorage
+      const compSnap = await getDocs(collection(db, 'companies'));
+      const activeComps: any[] = [];
+      compSnap.docs.forEach(d => {
+        if (d.id === 'comp-super-admin') return;
+        const data = d.data();
+        activeComps.push({
+          id: d.id,
+          nameAr: data.nameAr || data.name || data.companyName || 'منشأة',
+          nameEn: data.nameEn || data.nameAr || 'Company',
+          phone: data.phone || '99112233',
+          email: data.email || `${d.id}@aysedhr.com`,
+          status: data.status || 'active',
+          commercialRegNo: data.commercialRegNo || '',
+          civilIdCompany: data.civilIdCompany || '',
+          wsiCode: data.wsiCode || '',
+          createdAt: data.createdAt || new Date().toISOString()
+        });
+      });
+
+      if (activeComps.length > 0) {
+        localStorage.setItem('registered_companies_v1', JSON.stringify(activeComps));
+      }
+
+      await loadData();
+      window.dispatchEvent(new CustomEvent('aysed_companies_changed'));
+      toast.success('تمت مزامنة وتحديث المنشآت بنجاح من قاعدة البيانات السحابية!');
+    } catch (e: any) {
+      toast.error('حدث خطأ أثناء استعادة الشركات: ' + e.message);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
-    let loadedTenants: any[] = [];
     const tenantMap = new Map<string, any>();
 
-    // 1. Fetch from Firestore (companies) as PRIMARY source of truth
+    // 1. Locally registered companies in localStorage (registered_companies_v1)
+    try {
+      const localCompRaw = localStorage.getItem('registered_companies_v1');
+      if (localCompRaw) {
+        const localComps = JSON.parse(localCompRaw);
+        if (Array.isArray(localComps)) {
+          localComps.forEach((c: any) => {
+            if (!c || c.id === 'comp-super-admin') return;
+            const name = c.nameAr || c.name || c.nameEn;
+            if (name && !isTenantPurged(c.id) && !isTenantPurged(name)) {
+              tenantMap.set(c.id, {
+                id: c.id,
+                name: name,
+                phone: (c as any).phone1 || c.phone || '99112233',
+                email: c.email || `${c.id}@aysedhr.com`,
+                state: c.status === 'suspended' ? 'suspended' : 'active',
+                created_at: c.createdAt || new Date().toISOString(),
+                plan: c.plan || c.planType || 'ENTERPRISE',
+                employees_count: c.employeeCount || 5,
+                commercialRegNo: c.commercialRegNo,
+                civilIdCompany: c.civilIdCompany,
+                wsiCode: c.wsiCode,
+                source: 'local'
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 2. Saved subscriptions in localStorage (aysed_saved_subscriptions)
+    try {
+      const savedSubsRaw = localStorage.getItem('aysed_saved_subscriptions');
+      if (savedSubsRaw) {
+        const savedSubs = JSON.parse(savedSubsRaw);
+        if (Array.isArray(savedSubs)) {
+          savedSubs.forEach((s: any) => {
+            const name = s.companyName || s.name;
+            const targetId = s.companyId || s.id;
+            if (name && targetId && targetId !== 'comp-super-admin' && !isTenantPurged(targetId) && !isTenantPurged(name)) {
+              const existing = tenantMap.get(targetId);
+              tenantMap.set(targetId, {
+                id: targetId,
+                name: name,
+                phone: s.phone || existing?.phone || '99112233',
+                email: s.email || existing?.email || `${targetId}@aysedhr.com`,
+                state: s.status === 'suspended' || s.state === 'suspended' ? 'suspended' : 'active',
+                created_at: s.createdAt || s.startDate || existing?.created_at || new Date().toISOString(),
+                plan: s.planType || existing?.plan || 'ENTERPRISE',
+                employees_count: s.empCount || existing?.employees_count || 5,
+                source: 'saved_subscription'
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+
+    // 3. Firestore (companies) as cloud source of truth
     try {
       const compSnap = await getDocs(collection(db, 'companies'));
       compSnap.docs.forEach(d => {
         const data = d.data();
-        const name = data.nameAr || data.name || data.companyName || 'شركة بدون اسم';
-        if (!isTenantPurged(d.id) && !isTenantPurged(name) && !isTenantPurged(data)) {
-          const tenantObj = {
+        if (d.id === 'comp-super-admin') return;
+        const name = data.nameAr || data.name || data.companyName;
+        if (name && !isTenantPurged(d.id) && !isTenantPurged(name)) {
+          const existing = tenantMap.get(d.id);
+          tenantMap.set(d.id, {
             id: d.id,
             name,
-            phone: data.phone || data.mobile || data.phone1 || '96590000000',
-            state: data.status === 'SUSPENDED' ? 'suspended' : (data.status === 'DRAFT' ? 'draft' : 'active'),
-            created_at: data.createdAt || new Date().toISOString(),
-            plan: data.plan || 'ENTERPRISE',
-            employees_count: data.employeeCount || 10,
+            phone: data.phone || data.mobile || (data as any).phone1 || existing?.phone || '96590000000',
+            email: data.email || data.adminEmail || existing?.email || `${d.id}@aysedhr.com`,
+            state: data.status === 'SUSPENDED' || data.state === 'suspended' ? 'suspended' : (data.status === 'DRAFT' || data.state === 'draft' ? 'draft' : 'active'),
+            created_at: data.createdAt || existing?.created_at || new Date().toISOString(),
+            plan: data.plan || data.planType || existing?.plan || 'ENTERPRISE',
+            employees_count: data.employeeCount || existing?.employees_count || 10,
+            commercialRegNo: data.commercialRegNo || existing?.commercialRegNo,
+            civilIdCompany: data.civilIdCompany || existing?.civilIdCompany,
+            wsiCode: data.wsiCode || existing?.wsiCode,
             source: 'firestore'
-          };
-          tenantMap.set(name.trim().toLowerCase(), tenantObj);
+          });
         }
       });
     } catch (e) {
       console.warn('Firestore companies fetch notice:', e);
     }
 
-    // 2. Also check subscription_requests
+    // 4. Firestore (subscriptions)
+    try {
+      const subSnap = await getDocs(collection(db, 'subscriptions'));
+      subSnap.docs.forEach(d => {
+        const data = d.data();
+        const targetId = data.companyId || d.id;
+        if (targetId === 'comp-super-admin') return;
+        const name = data.companyName || data.name;
+        if (name && !isTenantPurged(targetId) && !isTenantPurged(name)) {
+          const existing = tenantMap.get(targetId);
+          tenantMap.set(targetId, {
+            id: targetId,
+            name,
+            phone: data.phone || existing?.phone || '99112233',
+            email: data.email || existing?.email || `${targetId}@aysedhr.com`,
+            state: data.status === 'suspended' || data.state === 'suspended' ? 'suspended' : 'active',
+            created_at: data.createdAt || data.startDate || existing?.created_at || new Date().toISOString(),
+            plan: data.planType || existing?.plan || 'ENTERPRISE',
+            employees_count: existing?.employees_count || 3,
+            source: 'firestore_sub'
+          });
+        }
+      });
+    } catch (e) {}
+
+    // 5. Firestore (subscription_requests)
     try {
       const reqSnap = await getDocs(collection(db, 'subscription_requests'));
       reqSnap.docs.forEach(d => {
         const r = d.data();
         const reqName = r.companyName || r.name || r.requester_name;
-        if (reqName && !isTenantPurged(d.id) && !isTenantPurged(reqName) && !isTenantPurged(r)) {
-          const key = reqName.trim().toLowerCase();
-          if (!tenantMap.has(key)) {
-            tenantMap.set(key, {
-              id: d.id,
+        if (reqName && !isTenantPurged(d.id) && !isTenantPurged(reqName)) {
+          const targetId = d.id;
+          const existing = tenantMap.get(targetId);
+          if (!existing) {
+            tenantMap.set(targetId, {
+              id: targetId,
               name: reqName,
               phone: r.phone || '-',
+              email: r.email || `${targetId}@aysedhr.com`,
               state: r.state || (r.status === 'APPROVED' ? 'active' : 'draft'),
               created_at: r.createdAt || r.created_at || new Date().toISOString(),
+              plan: r.planType || r.plan || 'PRO',
+              employees_count: r.empCount || 5,
               source: 'request'
             });
           }
@@ -267,16 +395,16 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
       console.warn('Firestore requests fetch notice:', e);
     }
 
-    // 3. Try Supabase as secondary fallback
+    // 6. Supabase as fallback
     try {
       const { data, error } = await supabase.from('aysed_subscription').select('*');
       if (!error && data && data.length > 0) {
         data.forEach((item: any) => {
           const name = item.name || item.companyName;
-          if (name && !isTenantPurged(item.id) && !isTenantPurged(name) && !isTenantPurged(item)) {
-            const key = name.trim().toLowerCase();
-            if (!tenantMap.has(key)) {
-              tenantMap.set(key, item);
+          if (name && !isTenantPurged(item.id) && !isTenantPurged(name)) {
+            const targetId = item.id;
+            if (!tenantMap.has(targetId)) {
+              tenantMap.set(targetId, item);
             }
           }
         });
@@ -285,48 +413,30 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
       console.warn('Supabase fetch notice:', err);
     }
 
-    // 4. Default registered tenants (Only if not purged by user)
-    const defaultTenants = [
-      {
-        id: 'comp-almanar',
-        name: 'عيادة المنار (Al-Manar Clinic)',
-        phone: '99112233',
-        state: 'active',
-        created_at: '2024-01-01T00:00:00.000Z',
-        plan: 'ENTERPRISE',
-        employees_count: 3
-      },
-      {
-        id: 'comp-fanar',
-        name: 'شركة عيادات الفنار التخصصية (Al-Fanar Clinic)',
-        phone: '66968180',
-        state: 'active',
-        created_at: '2024-02-01T00:00:00.000Z',
-        plan: 'PRO',
-        employees_count: 2
-      },
-      {
-        id: 'comp-elite',
-        name: 'شركة إيليت كلينك الطبية (Elite Clinic)',
-        phone: '666968182',
-        state: 'active',
-        created_at: '2024-03-01T00:00:00.000Z',
-        plan: 'PRO',
-        employees_count: 2
-      }
-    ];
-
-    defaultTenants.forEach(dt => {
-      const key = dt.name.trim().toLowerCase();
-      if (!isTenantPurged(dt.id) && !isTenantPurged(dt.name) && !isTenantPurged(key)) {
-        if (!tenantMap.has(key) && 
-            !Array.from(tenantMap.keys()).some(k => (dt.id === 'comp-almanar' && k.includes('منار')) || (dt.id === 'comp-fanar' && k.includes('فنار')) || (dt.id === 'comp-elite' && (k.includes('إيليت') || k.includes('elite'))))) {
-          tenantMap.set(key, dt);
+    // 7. Fallback to initial default only if database & storage are completely empty
+    if (tenantMap.size === 0) {
+      initialCompanies.forEach(c => {
+        if (c.id === 'comp-super-admin') return;
+        if (!isTenantPurged(c.id) && !isTenantPurged(c.nameAr)) {
+          tenantMap.set(c.id, {
+            id: c.id,
+            name: c.nameAr || c.nameEn,
+            phone: (c as any).phone1 || c.phone || '99112233',
+            email: c.email || `${c.id}@aysedhr.com`,
+            state: c.status === 'suspended' ? 'suspended' : 'active',
+            created_at: '2024-01-01T00:00:00.000Z',
+            plan: 'ENTERPRISE',
+            employees_count: 5,
+            commercialRegNo: c.commercialRegNo,
+            civilIdCompany: c.civilIdCompany,
+            wsiCode: c.wsiCode,
+            source: 'default'
+          });
         }
-      }
-    });
+      });
+    }
 
-    loadedTenants = Array.from(tenantMap.values()).filter(t => !isTenantPurged(t.id) && !isTenantPurged(t.name) && !isTenantPurged(t));
+    const loadedTenants = Array.from(tenantMap.values()).filter(t => !isTenantPurged(t.id) && !isTenantPurged(t.name));
 
     setTenants(loadedTenants);
     setStats({
@@ -340,9 +450,10 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
   useEffect(() => {
     loadData();
 
-    // Listen to real-time subscription requests and company updates
+    // Listen to real-time subscription requests, companies, and subscriptions
     let unsubscribeReq: (() => void) | null = null;
     let unsubscribeComp: (() => void) | null = null;
+    let unsubscribeSubs: (() => void) | null = null;
     try {
       unsubscribeReq = onSnapshot(collection(db, 'subscription_requests'), () => {
         loadData();
@@ -354,11 +465,23 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
       }, (err) => {
         console.warn('SuperAdminPortal companies onSnapshot error:', err);
       });
+      unsubscribeSubs = onSnapshot(collection(db, 'subscriptions'), () => {
+        loadData();
+      }, (err) => {
+        console.warn('SuperAdminPortal subscriptions onSnapshot error:', err);
+      });
     } catch (e) {}
+
+    const handleCustomChange = () => {
+      loadData();
+    };
+    window.addEventListener('aysed_companies_changed', handleCustomChange);
 
     return () => {
       if (unsubscribeReq) unsubscribeReq();
       if (unsubscribeComp) unsubscribeComp();
+      if (unsubscribeSubs) unsubscribeSubs();
+      window.removeEventListener('aysed_companies_changed', handleCustomChange);
     };
   }, []);
 
@@ -652,6 +775,14 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
               سجل الشركات والمشتركين النشطين
             </h3>
             <div className="flex items-center gap-2">
+              <button 
+                onClick={handleResetDefaultTenants}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition border border-slate-300 cursor-pointer"
+                title="إعادة مزامنة الشركات الافتراضية مع السحابة والذاكرة المحلية"
+              >
+                <RotateCcw size={13} className="text-slate-500" />
+                <span>مزامنة واستعادة المنشآت</span>
+              </button>
               <button 
                 onClick={handleOpenCreateModal}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-[#71639e] hover:bg-[#5e5285] text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"

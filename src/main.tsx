@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AysedCoreProvider } from './context/AysedCoreProvider';
 import './index.css';
 import './utils/aysedUiTest';
 
@@ -10,7 +11,9 @@ if (rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <ErrorBoundary>
-        <App />
+        <AysedCoreProvider>
+          <App />
+        </AysedCoreProvider>
       </ErrorBoundary>
     </StrictMode>,
   );

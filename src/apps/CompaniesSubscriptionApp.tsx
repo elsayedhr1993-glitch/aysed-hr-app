@@ -3,7 +3,7 @@ import {
   Building2, CheckCircle2, XCircle, Clock, DollarSign, Calendar, Power, ShieldAlert, 
   Edit2, Save, X, Plus, Search, LayoutGrid, List as ListIcon, TrendingUp, Users, Shield, Trash2, Key, Mail
 } from 'lucide-react';
-import { CompanySubscription } from '../types';
+import { CompanySubscription, Company } from '../types';
 import toast from 'react-hot-toast';
 import { doc, setDoc, deleteDoc, getDocs, collection, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db, cleanFirestoreData, auth, provisionTenantAuth, purgeTenantCascading, isTenantPurged } from '../lib/firebase';
@@ -27,6 +27,7 @@ interface CompaniesSubscriptionAppProps {
   onDeleteSubscription?: (id: string) => void;
   currentUserEmail: string;
   onImpersonateCompany?: (companyName: string) => void;
+  companies?: Company[];
 }
 
 export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> = ({
@@ -35,6 +36,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
   onDeleteSubscription,
   currentUserEmail,
   onImpersonateCompany,
+  companies = [],
 }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +45,33 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [passwordModalSub, setPasswordModalSub] = useState<CompanySubscription | null>(null);
   const [newPassword, setNewPassword] = useState('');
+
+  // Unify subscriptions with companies list to prevent data divergence
+  const allMergedSubscriptions = React.useMemo(() => {
+    const list = [...(subscriptions || [])];
+    if (companies && Array.isArray(companies)) {
+      companies.forEach(c => {
+        if (c.id === 'comp-super-admin') return;
+        if (isTenantPurged(c.id) || isTenantPurged(c.nameAr) || isTenantPurged(c.nameEn)) return;
+        const exists = list.some(s => s.companyId === c.id || s.companyName === c.nameAr || (s.email && s.email === c.email));
+        if (!exists) {
+          list.push({
+            id: `sub-${c.id}`,
+            companyId: c.id,
+            companyName: c.nameAr || c.nameEn || 'منشأة مسجلة',
+            ownerName: c.nameAr?.includes('المنار') ? 'د. أحمد المحمود' : c.nameAr?.includes('الفنار') ? 'د. طارق العازمي' : 'المسؤول',
+            email: c.email || `${c.id}@aysedhr.com`,
+            status: c.status === 'suspended' ? 'suspended' : 'active',
+            planType: 'سنوي (Standard)',
+            subscriptionFee: 180,
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          });
+        }
+      });
+    }
+    return list;
+  }, [subscriptions, companies]);
 
   const handleSendResetEmail = async (email: string) => {
     if (!email) {
@@ -108,7 +137,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
     );
   }
 
-  const filteredSubscriptions = (subscriptions || []).filter(sub => {
+  const filteredSubscriptions = allMergedSubscriptions.filter(sub => {
     if (isTenantPurged(sub.id) || isTenantPurged(sub.companyName) || isTenantPurged(sub.companyId) || isTenantPurged(sub.email)) {
       return false;
     }
@@ -305,9 +334,9 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
   // Calculate KPIs
 
 
-  const totalMRR = (subscriptions || []).filter(s => s.status === 'active').reduce((acc, s) => acc + (s.subscriptionFee || 0), 0);
-  const activeCount = (subscriptions || []).filter(s => s.status === 'active').length;
-  const suspendedCount = (subscriptions || []).filter(s => s.status === 'suspended').length;
+  const totalMRR = allMergedSubscriptions.filter(s => s.status === 'active').reduce((acc, s) => acc + (s.subscriptionFee || 0), 0);
+  const activeCount = allMergedSubscriptions.filter(s => s.status === 'active').length;
+  const suspendedCount = allMergedSubscriptions.filter(s => s.status === 'suspended').length;
 
   const handleOpenCreate = () => {
     setEditingSub({
@@ -663,7 +692,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
             statusFilter === 'ALL' ? 'bg-[#714B67] text-white border-[#714B67]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
           }`}
         >
-          جميع الاشتراكات ({subscriptions.length})
+          جميع الاشتراكات ({allMergedSubscriptions.length})
         </button>
         <button
           onClick={() => setStatusFilter('active')}
@@ -671,7 +700,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
             statusFilter === 'active' ? 'bg-[#714B67] text-white border-[#714B67]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
           }`}
         >
-          النشطة فقط ({subscriptions.filter(s => s.status === 'active').length})
+          النشطة فقط ({allMergedSubscriptions.filter(s => s.status === 'active').length})
         </button>
         <button
           onClick={() => setStatusFilter('suspended')}
@@ -679,7 +708,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
             statusFilter === 'suspended' ? 'bg-[#714B67] text-white border-[#714B67]' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
           }`}
         >
-          الموقوفة ({subscriptions.filter(s => s.status === 'suspended').length})
+          الموقوفة ({allMergedSubscriptions.filter(s => s.status === 'suspended').length})
         </button>
       </div>
 
