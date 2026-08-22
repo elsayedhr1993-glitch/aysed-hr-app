@@ -148,36 +148,83 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
 
     setLoading(true);
     try {
-      // Save locally
-      const savedSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
-      savedSubs.push({
-        ...subscriptionForm,
-        id: 'sub-' + Date.now(),
-        createdAt: new Date().toISOString(),
-        status: 'new'
-      });
-      localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(savedSubs));
+      const cleanReqName = subscriptionForm.requesterName.trim();
+      const cleanCompName = subscriptionForm.companyName.trim();
+      const cleanPhone = subscriptionForm.phone.trim();
+      const cleanEmail = `${cleanPhone.replace(/[^0-9]/g, '')}@aysedhr.com`;
+      const reqId = `req_${Date.now()}`;
 
+      // 1. Save to Firestore subscription_requests
       try {
         await addDoc(collection(db, 'subscription_requests'), {
-          requesterName: subscriptionForm.requesterName,
-          companyName: subscriptionForm.companyName,
-          phone: subscriptionForm.phone,
+          id: reqId,
+          requesterName: cleanReqName,
+          requester_name: cleanReqName,
+          companyName: cleanCompName,
+          name: cleanCompName,
+          nameAr: cleanCompName,
+          email: cleanEmail,
+          phone: cleanPhone,
           empCount: subscriptionForm.empCount,
-          status: 'new',
+          employee_count: subscriptionForm.empCount,
+          planType: subscriptionForm.planType,
+          sector: subscriptionForm.planType,
+          status: 'draft',
+          state: 'draft',
           createdAt: serverTimestamp(),
-          planType: subscriptionForm.planType
+          created_at: new Date().toISOString()
         });
       } catch (fbErr) {
         console.warn('Firestore sub warning:', fbErr);
       }
 
+      // 2. Also register draft in companies collection
+      try {
+        await addDoc(collection(db, 'companies'), {
+          id: `comp_${Date.now()}`,
+          companyName: cleanCompName,
+          nameAr: cleanCompName,
+          nameEn: cleanCompName,
+          ownerName: cleanReqName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          plan: subscriptionForm.planType === 'medical' ? 'PRO_MEDICAL' : 'PRO',
+          planType: subscriptionForm.planType,
+          status: 'DRAFT',
+          state: 'draft',
+          employeeCount: subscriptionForm.empCount === '1-10' ? 10 : (subscriptionForm.empCount === '11-50' ? 50 : 100),
+          createdAt: serverTimestamp(),
+          created_at: new Date().toISOString()
+        });
+      } catch (cErr) {
+        console.warn('Firestore company draft sync warn:', cErr);
+      }
+
+      // 3. Save locally
+      const savedSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+      savedSubs.push({
+        id: reqId,
+        requesterName: cleanReqName,
+        companyName: cleanCompName,
+        name: cleanCompName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        empCount: subscriptionForm.empCount,
+        planType: subscriptionForm.planType,
+        status: 'draft',
+        state: 'draft',
+        createdAt: new Date().toISOString()
+      });
+      localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(savedSubs));
+
+      // 4. Save to Supabase fallback
       try {
         await supabase.from('aysed_subscription').insert([
           {
-            requester_name: subscriptionForm.requesterName.trim(),
-            name: subscriptionForm.companyName.trim(),
-            phone: subscriptionForm.phone.trim(),
+            requester_name: cleanReqName,
+            name: cleanCompName,
+            phone: cleanPhone,
+            email: cleanEmail,
             plan_type: subscriptionForm.planType,
             emp_count: subscriptionForm.empCount,
             state: 'draft'
@@ -187,21 +234,25 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
         console.warn('Supabase subscription insert warn:', sbErr);
       }
       
+      // 5. Notify Super Admin and trigger backend registration
       try {
-        await fetch('/api/send-email', {
+        await fetch('/api/subscription/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            to: 'elsayedhr1993@gmail.com',
-            subject: `مشترك جديد يطلب الانضمام إلى Aysed S HR: ${subscriptionForm.companyName}`,
-            text: `مرحباً أستاذ سيد،\nقام ${subscriptionForm.requesterName} بطلب اشتراك لنشاط ${subscriptionForm.planType === 'medical' ? 'القطاع الطبي' : 'القطاع الإداري'}.\nهاتف: ${subscriptionForm.phone}\nعدد الموظفين: ${subscriptionForm.empCount}`
+            requesterName: cleanReqName,
+            companyName: cleanCompName,
+            phone: cleanPhone,
+            email: cleanEmail,
+            empCount: subscriptionForm.empCount,
+            planType: subscriptionForm.planType
           })
         });
       } catch(e) {
-        console.error('Failed to notify owner', e);
+        console.warn('Failed to notify owner', e);
       }
 
-      toast.success('تم إرسال طلب الانضمام بنجاح! سيقوم فريق المبيعات بالتواصل معكم وتفعيل الحساب.');
+      toast.success('تم إرسال طلب الانضمام بنجاح! سيقوم فريق الإدارة بمراجعة البيانات وتفعيل الحساب.');
       setIsSubscriptionModalOpen(false);
       setSubscriptionForm({
         requesterName: '',

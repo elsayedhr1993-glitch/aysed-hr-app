@@ -16,6 +16,98 @@ export interface WelcomeEmailParams {
   companyName: string;
 }
 
+export interface AdminSubscriptionNotificationParams {
+  requesterName: string;
+  companyName: string;
+  email: string;
+  phone: string;
+  empCount: string;
+  planType: string;
+}
+
+/**
+ * إرسال إشعار فوري للأدمن / المالك بطلب اشتراك جديد
+ */
+export async function sendAdminNewSubscriptionNotification({
+  requesterName,
+  companyName,
+  email,
+  phone,
+  empCount,
+  planType,
+}: AdminSubscriptionNotificationParams): Promise<{ success: boolean; error?: string }> {
+  const adminEmail = 'elsayedhr1993@gmail.com';
+  const sectorName = planType === 'medical' ? 'القطاع الطبي / عيادات ومراكز' : 'القطاع الإداري والتجاري';
+  const dateStr = new Date().toLocaleString('ar-KW', { timeZone: 'Asia/Kuwait' });
+
+  const mailBody = `
+    <div style="direction: rtl; text-align: right; font-family: 'Tajawal', Arial, sans-serif; padding: 20px; background-color: #f1f5f9;">
+      <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+        <div style="background-color: #714B67; padding: 25px 20px; text-align: center; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 20px; font-weight: bold;">🔔 طلب اشتراك جديد لمنشأة (SaaS Tenant Request)</h1>
+          <p style="margin-top: 6px; opacity: 0.9; font-size: 13px;">منظومة Aysed S HR 2026 - لوحة الإدارة العليا</p>
+        </div>
+
+        <div style="padding: 25px; color: #1e293b; line-height: 1.8; font-size: 14px;">
+          <p style="font-size: 15px; font-weight: bold; color: #714B67;">عزيزي الأستاذ السيد (Super Admin)،</p>
+          <p>تم تسجيل طلب اشتراك جديد عبر بوابة الدخول والتسجيل. فيما يلي تفاصيل المنشأة والمشترك:</p>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px;">
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px; font-weight: bold; width: 35%; color: #475569;">اسم المنشأة / الشركة:</td>
+              <td style="padding: 10px; font-weight: bold; color: #0f172a;">${companyName}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px; font-weight: bold; color: #475569;">اسم المسؤول المتقدم:</td>
+              <td style="padding: 10px; color: #0f172a;">${requesterName}</td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px; font-weight: bold; color: #475569;">رقم الهاتف / الواتساب:</td>
+              <td style="padding: 10px; color: #0f172a; direction: ltr; text-align: right;"><a href="tel:${phone}" style="color: #0284c7; text-decoration: none; font-weight: bold;">${phone}</a></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px; font-weight: bold; color: #475569;">البريد الإلكتروني:</td>
+              <td style="padding: 10px; color: #0f172a;"><a href="mailto:${email}" style="color: #0284c7; text-decoration: none;">${email}</a></td>
+            </tr>
+            <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px; font-weight: bold; color: #475569;">نوع القطاع:</td>
+              <td style="padding: 10px; color: #0f172a;">${sectorName}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 10px; font-weight: bold; color: #475569;">عدد الموظفين المتوقع:</td>
+              <td style="padding: 10px; color: #0f172a;">${empCount} موظف</td>
+            </tr>
+            <tr style="background-color: #f8fafc;">
+              <td style="padding: 10px; font-weight: bold; color: #475569;">توقيت الطلب:</td>
+              <td style="padding: 10px; color: #64748b;">${dateStr}</td>
+            </tr>
+          </table>
+
+          <div style="background-color: #f0fdf4; border-right: 4px solid #16a34a; padding: 12px 16px; border-radius: 6px; margin-top: 15px;">
+            <p style="margin: 0; font-size: 13px; color: #166534; font-weight: 600;">
+              ✅ تم تسجيل الطلب بنجاح في قاعدة البيانات وهو جاهز الآن للمراجعة والتفعيل في لوحة الإدارة العليا (Super Admin Dashboard).
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    const userEmail = process.env.SMTP_GMAIL_USER || process.env.SMTP_USER || 'elsayedhr1993@gmail.com';
+    await transporter.sendMail({
+      from: `"Aysed S HR System" <${userEmail}>`,
+      to: adminEmail,
+      subject: `🔔 طلب اشتراك جديد: ${companyName} (${requesterName})`,
+      html: mailBody,
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('فشل إرسال إشعار الإدارة:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 /**
  * دالة إنشاء قالب HTML الفاخر وإرسال إيميل الترحيب آلياً
  */

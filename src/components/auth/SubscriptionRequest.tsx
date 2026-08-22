@@ -41,48 +41,88 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
     setErrorMsg('');
 
     try {
-      // Save to Firestore subscription_requests
+      const cleanReqName = formData.name.trim();
+      const cleanCompName = formData.company_name.trim();
+      const cleanEmail = (formData.email || `${formData.phone.trim().replace(/[^0-9]/g, '')}@aysedhr.com`).trim().toLowerCase();
+      const cleanPhone = formData.phone.trim();
+      const reqId = `req_${Date.now()}`;
+
+      // 1. Save to Firestore collection 'subscription_requests'
       try {
         await addDoc(collection(db, 'subscription_requests'), {
-          requesterName: formData.name.trim(),
-          companyName: formData.company_name.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim(),
+          id: reqId,
+          requesterName: cleanReqName,
+          requester_name: cleanReqName,
+          companyName: cleanCompName,
+          name: cleanCompName,
+          nameAr: cleanCompName,
+          email: cleanEmail,
+          phone: cleanPhone,
           empCount: formData.employee_count,
+          employee_count: formData.employee_count,
           planType: formData.sector,
-          status: 'new',
-          createdAt: serverTimestamp()
+          sector: formData.sector,
+          status: 'draft',
+          state: 'draft',
+          createdAt: serverTimestamp(),
+          created_at: new Date().toISOString()
         });
       } catch (fbErr) {
         console.warn('Firestore sub request warn:', fbErr);
       }
 
-      // Save locally
+      // 2. Also register draft in Firestore 'companies' collection for dual-visibility
+      try {
+        await addDoc(collection(db, 'companies'), {
+          id: `comp_${Date.now()}`,
+          companyName: cleanCompName,
+          nameAr: cleanCompName,
+          nameEn: cleanCompName,
+          ownerName: cleanReqName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          plan: formData.sector === 'medical' ? 'PRO_MEDICAL' : 'PRO',
+          planType: formData.sector,
+          status: 'DRAFT',
+          state: 'draft',
+          employeeCount: formData.employee_count === '1-10' ? 10 : (formData.employee_count === '11-50' ? 50 : 100),
+          createdAt: serverTimestamp(),
+          created_at: new Date().toISOString()
+        });
+      } catch (cErr) {
+        console.warn('Firestore company draft sync warn:', cErr);
+      }
+
+      // 3. Save locally to localStorage
       const savedSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
       savedSubs.push({
-        id: 'sub-' + Date.now(),
-        requesterName: formData.name.trim(),
-        companyName: formData.company_name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        id: reqId,
+        requesterName: cleanReqName,
+        companyName: cleanCompName,
+        name: cleanCompName,
+        email: cleanEmail,
+        phone: cleanPhone,
         empCount: formData.employee_count,
         planType: formData.sector,
-        status: 'new',
+        status: 'draft',
+        state: 'draft',
         createdAt: new Date().toISOString()
       });
       localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(savedSubs));
 
+      // 4. Save to Supabase fallback
       try {
         const { error } = await supabase
           .from('aysed_subscription')
           .insert([
             { 
-              requester_name: formData.name.trim(), 
-              name: formData.company_name.trim(), 
-              phone: formData.phone.trim(), 
+              requester_name: cleanReqName, 
+              name: cleanCompName, 
+              phone: cleanPhone, 
               plan_type: formData.sector,
               emp_count: formData.employee_count,
-              state: 'draft'
+              state: 'draft',
+              email: cleanEmail
             }
           ]);
 
@@ -93,21 +133,22 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
         console.warn('Supabase insert exception:', sbErr);
       }
 
-      // Send welcome email
-      if (formData.email) {
-        try {
-          await fetch('/api/send-welcome-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              subscriberEmail: formData.email.trim(),
-              subscriberName: formData.name.trim(),
-              companyName: formData.company_name.trim(),
-            }),
-          });
-        } catch (emailErr) {
-          console.warn('Welcome email fetch error:', emailErr);
-        }
+      // 5. Send Instant Email Notification to Admin & Welcome Email to Subscriber
+      try {
+        await fetch('/api/subscription/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requesterName: cleanReqName,
+            companyName: cleanCompName,
+            email: cleanEmail,
+            phone: cleanPhone,
+            empCount: formData.employee_count,
+            planType: formData.sector
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('Subscription register endpoint warning:', apiErr);
       }
 
       setSuccess(true);

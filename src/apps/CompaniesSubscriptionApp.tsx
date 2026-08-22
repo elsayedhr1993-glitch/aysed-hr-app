@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { CompanySubscription } from '../types';
 import toast from 'react-hot-toast';
-import { doc, setDoc, deleteDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, getDocs, collection, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db, cleanFirestoreData, auth, provisionTenantAuth, purgeTenantCascading, isTenantPurged } from '../lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
@@ -128,6 +128,19 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
   useEffect(() => {
     if (isSuperAdmin) {
       fetchRequests();
+
+      let unsubscribe: (() => void) | null = null;
+      try {
+        unsubscribe = onSnapshot(collection(db, 'subscription_requests'), () => {
+          fetchRequests();
+        }, (err) => {
+          console.warn('CompaniesSubscriptionApp requests onSnapshot error:', err);
+        });
+      } catch (e) {}
+
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
   }, [isSuperAdmin]);
 

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { db, auth, provisionTenantAuth, cleanFirestoreData, purgeTenantCascading, isTenantPurged } from '../lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 interface SubscriptionRequest {
@@ -457,14 +457,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
       console.warn('Supabase fetch subscriptions warn:', err);
     }
 
-    // 2. Try Firebase subscription_requests
+    // 2. Try Firebase subscription_requests & companies collections
     try {
       const snap = await getDocs(collection(db, 'subscription_requests'));
       snap.forEach(d => {
         const val = d.data();
-        const compName = val.companyName || val.name || '';
+        const compName = val.companyName || val.name || val.nameAr || '';
         if (!isTenantPurged(d.id) && !isTenantPurged(compName) && !isTenantPurged(val)) {
-          if (!allRequests.some(r => r.id === d.id || r.name === compName)) {
+          if (!allRequests.some(r => r.id === d.id || r.name.toLowerCase() === compName.toLowerCase())) {
             let st: 'draft' | 'approved' | 'rejected' | 'suspended' = 'draft';
             if (val.status === 'approved' || val.state === 'approved') st = 'approved';
             else if (val.status === 'rejected' || val.state === 'rejected') st = 'rejected';
@@ -472,13 +472,39 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
             allRequests.push({
               id: d.id,
-              requester_name: val.requesterName || val.name || '',
+              requester_name: val.requesterName || val.requester_name || val.name || '',
               name: compName,
               phone: val.phone || '',
-              plan_type: val.planType || val.sector || 'admin',
+              plan_type: val.planType || val.sector || val.plan || 'admin',
               emp_count: val.empCount || val.employee_count || '1-10',
               state: st,
-              created_at: val.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+              created_at: val.createdAt?.toDate?.()?.toISOString() || val.created_at || new Date().toISOString(),
+              email: val.email || `${val.phone ? val.phone.replace(/[^0-9]/g, '') : 'client'}@aysedhr.com`
+            });
+          }
+        }
+      });
+
+      // Also check Firestore companies collection
+      const compSnap = await getDocs(collection(db, 'companies'));
+      compSnap.forEach(d => {
+        const val = d.data();
+        const compName = val.companyName || val.nameAr || val.name || '';
+        if (compName && !isTenantPurged(d.id) && !isTenantPurged(compName) && !isTenantPurged(val)) {
+          if (!allRequests.some(r => r.id === d.id || r.name.toLowerCase() === compName.toLowerCase())) {
+            let st: 'draft' | 'approved' | 'rejected' | 'suspended' = 'approved';
+            if (val.status === 'DRAFT' || val.state === 'draft' || val.status === 'PENDING') st = 'draft';
+            else if (val.status === 'SUSPENDED' || val.state === 'suspended') st = 'suspended';
+
+            allRequests.push({
+              id: d.id,
+              requester_name: val.ownerName || val.requesterName || val.name || 'المسؤول',
+              name: compName,
+              phone: val.phone || val.mobile || '',
+              plan_type: val.planType || val.plan || 'admin',
+              emp_count: String(val.employeeCount || val.empCount || '1-10'),
+              state: st,
+              created_at: val.createdAt?.toDate?.()?.toISOString() || val.created_at || new Date().toISOString(),
               email: val.email || `${val.phone ? val.phone.replace(/[^0-9]/g, '') : 'client'}@aysedhr.com`
             });
           }
@@ -571,6 +597,20 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
   useEffect(() => {
     fetchRequests();
+
+    // Setup real-time listener for incoming subscription requests
+    let unsubscribeReq: (() => void) | null = null;
+    try {
+      unsubscribeReq = onSnapshot(collection(db, 'subscription_requests'), () => {
+        fetchRequests();
+      }, (err) => {
+        console.warn('Subscription requests listener warning:', err);
+      });
+    } catch (e) {}
+
+    return () => {
+      if (unsubscribeReq) unsubscribeReq();
+    };
   }, []);
 
   const handleActivate = async (req: SubscriptionRequest) => {
@@ -942,58 +982,61 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                     <tbody className="divide-y divide-gray-200">
                       {loading ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-gray-500">جاري تحميل سجلات المشتركين...</td>
+                          <td colSpan={6} className="p-8 text-center text-slate-600 font-medium">جاري تحميل سجلات المشتركين...</td>
                         </tr>
                       ) : filteredRequests.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-gray-500">لا توجد طلبات اشتراك مطابقة</td>
+                          <td colSpan={6} className="p-8 text-center text-slate-600 font-medium">لا توجد طلبات اشتراك مطابقة</td>
                         </tr>
                       ) : (
                         filteredRequests.map((req) => (
-                          <tr key={req.id} className="hover:bg-gray-50 transition-colors">
+                          <tr key={req.id} className="hover:bg-slate-50 transition-colors">
                             <td className="p-3.5">
-                              <p className="font-bold text-gray-900 text-sm">{req.name}</p>
-                              <p className="text-gray-500">{req.requester_name}</p>
-                              {req.email && <p className="text-[10px] text-[#71639e] font-mono mt-0.5">{req.email}</p>}
+                              <p className="font-bold text-slate-900 text-sm">{req.name}</p>
+                              <p className="text-slate-600 font-medium text-xs">{req.requester_name}</p>
+                              {req.email && <p className="text-[11px] text-[#714B67] font-mono font-medium mt-0.5">{req.email}</p>}
                             </td>
-                            <td className="p-3.5 font-mono text-gray-700">{req.phone}</td>
+                            <td className="p-3.5 font-mono text-slate-800 font-bold text-xs">{req.phone}</td>
                             <td className="p-3.5">
-                              <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[11px] mb-1">
+                              <span className="inline-block px-2.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 font-bold text-[11px] mb-1">
                                 {req.plan_type === 'medical' ? 'القطاع الطبي' : 'إداري / تجاري'}
                               </span>
-                              <p className="text-gray-500 text-[10px]">{req.emp_count} موظف</p>
+                              <p className="text-slate-600 font-semibold text-[11px]">{req.emp_count} موظف</p>
                             </td>
                             <td className="p-3.5">
                               {req.state === 'draft' && (
-                                <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-medium">
-                                  قيد المراجعة
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                                  قيد المراجعة (جديد)
                                 </span>
                               )}
                               {req.state === 'approved' && (
-                                <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-medium">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold shadow-xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                                   نشطة
                                 </span>
                               )}
                               {req.state === 'suspended' && (
-                                <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 border border-rose-200 text-[11px] font-medium">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-rose-100 text-rose-900 border border-rose-300 text-xs font-bold shadow-xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
                                   معلقة / مجمدة
                                 </span>
                               )}
                               {req.state === 'rejected' && (
-                                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 border border-gray-200 text-[11px] font-medium">
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold shadow-xs">
                                   مرفوض
                                 </span>
                               )}
                             </td>
-                            <td className="p-3.5 text-gray-500 font-mono text-[11px]">
-                              {new Date(req.created_at).toLocaleDateString('ar-EG')}
+                            <td className="p-3.5 text-slate-700 font-mono font-bold text-xs">
+                              {new Date(req.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}
                             </td>
                             <td className="p-3.5">
                               <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                 {/* WhatsApp button */}
                                 <button
                                   onClick={() => openWhatsApp(req.phone, req.name, req.requester_name)}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                                   title="تواصل فوري واتساب"
                                 >
                                   <MessageSquare size={13} />
@@ -1003,7 +1046,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                 {/* Edit account button */}
                                 <button
                                   onClick={() => handleOpenEdit(req)}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                                  className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                                   title="تعديل بيانات حساب واشتراك المنشأة"
                                 >
                                   <Edit3 size={13} />
@@ -1014,7 +1057,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                 {req.state !== 'approved' ? (
                                   <button
                                     onClick={() => handleActivate(req)}
-                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-[#71639e] hover:bg-[#5e5285] text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer shadow-sm"
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-[#71639e] hover:bg-[#5e5285] text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm"
                                     title="تفعيل أو إعادة تفعيل الشركة"
                                   >
                                     <PlayCircle size={13} />
@@ -1035,7 +1078,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                           requesterName: req.requester_name
                                         });
                                       }}
-                                      className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-gray-300"
+                                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-300"
                                       title="عرض بيانات الاعتماد"
                                     >
                                       بيانات الدخول
@@ -1043,7 +1086,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
                                     <button
                                       onClick={() => handleSuspend(req)}
-                                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                                       title="إيقاف مؤقت / تجميد الحساب"
                                     >
                                       <PauseCircle size={13} />

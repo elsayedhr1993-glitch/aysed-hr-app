@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Building, Users, CreditCard, LogOut, LayoutGrid, MessageCircle, Settings, CheckCircle2, PauseCircle, Trash2, Edit3, Save, X, Lock, Mail, Phone, Plus, Building2, ShieldCheck, User, RefreshCw, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { db, provisionTenantAuth, cleanFirestoreData, purgeTenantCascading, isTenantPurged } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 interface SuperAdminPortalProps {
@@ -339,6 +339,27 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
 
   useEffect(() => {
     loadData();
+
+    // Listen to real-time subscription requests and company updates
+    let unsubscribeReq: (() => void) | null = null;
+    let unsubscribeComp: (() => void) | null = null;
+    try {
+      unsubscribeReq = onSnapshot(collection(db, 'subscription_requests'), () => {
+        loadData();
+      }, (err) => {
+        console.warn('SuperAdminPortal requests onSnapshot error:', err);
+      });
+      unsubscribeComp = onSnapshot(collection(db, 'companies'), () => {
+        loadData();
+      }, (err) => {
+        console.warn('SuperAdminPortal companies onSnapshot error:', err);
+      });
+    } catch (e) {}
+
+    return () => {
+      if (unsubscribeReq) unsubscribeReq();
+      if (unsubscribeComp) unsubscribeComp();
+    };
   }, []);
 
   const formatSubscriptionDate = (dateVal: any) => {

@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import { initializeApp, cert, getApps, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { sendWelcomeEmail } from "./src/services/emailService";
+import { sendWelcomeEmail, sendAdminNewSubscriptionNotification } from "./src/services/emailService";
 
 dotenv.config();
 
@@ -689,6 +689,60 @@ app.post("/api/send-welcome-email", express.json(), async (req, res) => {
     console.error("Welcome email route error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// Comprehensive Subscription Registration & Notification Endpoint
+app.post("/api/subscription/register", express.json(), async (req, res) => {
+  const { requesterName, companyName, email, phone, empCount, planType } = req.body;
+  
+  if (!companyName || !phone) {
+    return res.status(400).json({ success: false, error: "اسم الشركة ورقم الهاتف مطلوبان" });
+  }
+
+  const reqName = requesterName || companyName;
+  const reqEmail = email || `${phone.replace(/[^0-9]/g, '')}@aysedhr.com`;
+  const reqEmpCount = empCount || "1-10";
+  const reqPlanType = planType || "medical";
+
+  console.log(`[Subscription Register] Received request from: ${companyName} (${reqName}), Phone: ${phone}, Email: ${reqEmail}`);
+
+  // 1. Notify Super Admin (elsayedhr1993@gmail.com)
+  let adminNotified = false;
+  try {
+    const adminEmailResult = await sendAdminNewSubscriptionNotification({
+      requesterName: reqName,
+      companyName,
+      email: reqEmail,
+      phone,
+      empCount: reqEmpCount,
+      planType: reqPlanType,
+    });
+    adminNotified = adminEmailResult.success;
+  } catch (err) {
+    console.warn("[Subscription Register] Admin notification warning:", err);
+  }
+
+  // 2. Send Welcome Email to Subscriber if valid email provided
+  let subscriberWelcomed = false;
+  if (email && email.includes("@") && !email.includes("@aysedhr.com")) {
+    try {
+      const welcomeResult = await sendWelcomeEmail({
+        subscriberEmail: email.trim(),
+        subscriberName: reqName,
+        companyName,
+      });
+      subscriberWelcomed = welcomeResult.success;
+    } catch (err) {
+      console.warn("[Subscription Register] Subscriber welcome email warning:", err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: "تم استلام وتسجيل طلب الاشتراك بنجاح وإشعار الإدارة العليا",
+    adminNotified,
+    subscriberWelcomed,
+  });
 });
 
 

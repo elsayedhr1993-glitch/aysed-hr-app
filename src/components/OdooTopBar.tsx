@@ -134,6 +134,22 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   const [showLangMenu, setShowLangMenu] = useState(false);
   const { lang, setLang, currentLangCode } = useLang();
 
+  // Close all open menus when clicking outside
+  React.useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.odoo-topbar-dropdown-container')) {
+        setShowCompanyMenu(false);
+        setShowNotifMenu(false);
+        setShowUserMenu(false);
+        setShowPrintMenu(false);
+        setShowLangMenu(false);
+      }
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
   const effectiveApp = currentApp !== undefined ? currentApp : (activeApp === 'APP_LAUNCHER' ? null : activeApp);
   const isInsideApp = Boolean(effectiveApp && effectiveApp !== 'LAUNCHER' && effectiveApp !== 'APP_LAUNCHER');
   const currentModel = effectiveApp ? (APP_MODELS[effectiveApp as ActiveApp] || 'hr.employee') : 'ir.module.module';
@@ -242,7 +258,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
       {/* Left Side: Actions, Switcher, Tools & Profile */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         {/* Global Print Menu */}
-        <div className="relative">
+        <div className="relative odoo-topbar-dropdown-container">
           <button
             onClick={() => {
               setShowPrintMenu(!showPrintMenu);
@@ -332,7 +348,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         )}
 
         {/* Multi-Company Switcher Dropdown */}
-        <div className="relative">
+        <div className="relative odoo-topbar-dropdown-container">
           {isSuperAdmin ? (
             <>
               <button
@@ -571,7 +587,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         </div>
 
         {/* User Profile Avatar & Dropdown Menu */}
-        <div className="relative border-r border-white/20 pr-2.5 mr-1">
+        <div className="relative border-r border-white/20 pr-2.5 mr-1 odoo-topbar-dropdown-container">
           <button
             onClick={() => {
               setShowUserMenu(!showUserMenu);
