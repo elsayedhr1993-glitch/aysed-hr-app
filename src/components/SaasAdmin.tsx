@@ -1,5 +1,5 @@
 import React from 'react';
-import { CompaniesSubscriptionApp } from '../apps/CompaniesSubscriptionApp';
+import { SuperAdminDashboard } from '../pages/SuperAdminDashboard';
 import { CompanySubscription } from '../types';
 
 export interface SaasAdminProps {
@@ -8,10 +8,17 @@ export interface SaasAdminProps {
   onDeleteSubscription?: (id: string) => void;
   currentUserEmail: string;
   onImpersonateCompany?: (companyName: string) => void;
+  onLogout?: () => void;
 }
 
-export const SaasAdmin: React.FC<SaasAdminProps> = (props) => {
-  return <CompaniesSubscriptionApp {...props} />;
+export const SaasAdmin: React.FC<SaasAdminProps> = ({ currentUserEmail, onImpersonateCompany, onLogout }) => {
+  return (
+    <SuperAdminDashboard 
+      currentUserEmail={currentUserEmail}
+      onImpersonateCompany={onImpersonateCompany}
+      onLogout={onLogout}
+    />
+  );
 };
 
 export default SaasAdmin;

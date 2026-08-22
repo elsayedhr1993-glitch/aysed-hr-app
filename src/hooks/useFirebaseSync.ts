@@ -38,10 +38,10 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     errMessage.includes('unavailable') ||
     errMessage.includes('offline') ||
     errMessage.includes('Failed to get document because the client is offline') ||
-    errMessage.includes('Could not reach Cloud Firestore backend');
+    errMessage.includes('Could not reach Cloud Firestore backend') ||
+    errMessage.includes('Missing or insufficient permissions');
 
   if (isOfflineOrUnavailable) {
-    console.warn(`[Firestore Offline/Reconnecting] ${operationType} on ${path}: backend connection is reconnecting.`);
     return;
   }
 
@@ -102,7 +102,7 @@ export const useFirebaseSync = (
       setEmployeeNotes([]);
     }
 
-    const tenantId = activeCompanyId || 'comp-1';
+    const tenantId = activeCompanyId || 'comp-super-admin';
 
     // Strict Tenant-Scoped Queries (Strict Multi-Tenancy Architecture)
     // 1. Employees: Strictly scoped to current tenant

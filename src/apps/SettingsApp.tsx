@@ -27,6 +27,8 @@ interface SettingsAppProps {
   motionEnabled?: boolean;
   setMotionEnabled?: (enabled: boolean) => void;
   initialSubTab?: 'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS';
+  currentUserRole?: string;
+  currentUserEmail?: string;
 }
 
 export const SettingsApp: React.FC<SettingsAppProps> = ({
@@ -43,10 +45,27 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
   motionEnabled = true,
   setMotionEnabled,
   initialSubTab = 'AYSED_CONFIG',
+  currentUserRole = '',
+  currentUserEmail = '',
 }) => {
-  const [activeTab, setActiveTab] = useState<'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS'>(initialSubTab);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(activeCompany?.id || 'comp-1');
+  const emailLower = (currentUserEmail || '').toLowerCase();
+  const isMasterEmail = emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com';
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || isMasterEmail;
+
+  const defaultTab = isSuperAdmin 
+    ? (initialSubTab || 'AYSED_CONFIG') 
+    : (initialSubTab === 'DEVELOPER_TOOLS' || initialSubTab === 'AYSED_CONFIG' ? 'COMPANY' : (initialSubTab || 'COMPANY'));
+
+  const [activeTab, setActiveTab] = useState<'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS'>(defaultTab);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(activeCompany?.id || companies?.[0]?.id || '');
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Security guard for non-superadmin accounts
+  useEffect(() => {
+    if (!isSuperAdmin && (activeTab === 'AYSED_CONFIG' || activeTab === 'DEVELOPER_TOOLS')) {
+      setActiveTab('COMPANY');
+    }
+  }, [isSuperAdmin, activeTab]);
 
   // -------------------------------------------------------------
   // Res.Config.Settings (Aysed 2026 Settings State & Business Logic)
@@ -560,7 +579,7 @@ class ResConfigSettings(models.TransientModel):
     }
   };
   
-  const currentEditingCompany = (companies || []).find(c => c?.id === selectedCompanyId) || activeCompany || { id: 'comp-1', nameAr: '', nameEn: '' } as Company;
+  const currentEditingCompany = (companies || []).find(c => c?.id === selectedCompanyId) || activeCompany || (companies && companies[0]) || ({ id: 'comp-super-admin', nameAr: 'إدارة النظام المركزية', nameEn: 'Super Admin Central' } as Company);
   const [editingCompany, setEditingCompany] = useState<Company>(currentEditingCompany);
 
   // Sync selected company when companies list changes
@@ -731,17 +750,19 @@ class ResConfigSettings(models.TransientModel):
     <div className="p-6 bg-transparent min-h-[calc(100vh-3rem)] dir-rtl text-right">
       {/* Tab Selector */}
       <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setActiveTab('AYSED_CONFIG')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-            activeTab === 'AYSED_CONFIG'
-              ? 'bg-[#714B67] text-white shadow'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Settings className="w-4 h-4 text-purple-300" />
-          <span>إعدادات Aysed 2026 (res.config.settings)</span>
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveTab('AYSED_CONFIG')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              activeTab === 'AYSED_CONFIG'
+                ? 'bg-[#714B67] text-white shadow'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Settings className="w-4 h-4 text-purple-300" />
+            <span>إعدادات المنظومة (res.config.settings)</span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('COMPANY')}
@@ -752,7 +773,7 @@ class ResConfigSettings(models.TransientModel):
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>إدارة الشركات والمؤسسات (Multi-Company)</span>
+          <span>{isSuperAdmin ? 'إدارة الشركات والمؤسسات (Multi-Company)' : 'ملف وبيانات المنشأة (Company Profile)'}</span>
         </button>
 
         <button
@@ -764,7 +785,7 @@ class ResConfigSettings(models.TransientModel):
           }`}
         >
           <Sliders className="w-4 h-4 text-purple-300" />
-          <span>ربط الميزات الخارجية والـ API (Integrations)</span>
+          <span>{isSuperAdmin ? 'ربط الميزات الخارجية والـ API (Integrations)' : 'الربط الخارجي والواتساب (Integrations)'}</span>
         </button>
 
         <button
@@ -776,7 +797,7 @@ class ResConfigSettings(models.TransientModel):
           }`}
         >
           <Shield className="w-4 h-4 text-emerald-400" />
-          <span>الأمان وكلمات المرور والـ OTP</span>
+          <span>{isSuperAdmin ? 'الأمان وكلمات المرور والـ OTP' : 'أمان الحساب وكلمة المرور'}</span>
         </button>
 
         <button
@@ -791,17 +812,19 @@ class ResConfigSettings(models.TransientModel):
           <span>المظهر والخلفية المتحركة (Appearance)</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('DEVELOPER_TOOLS')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-            activeTab === 'DEVELOPER_TOOLS'
-              ? 'bg-[#714B67] text-white shadow'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-purple-400" />
-          <span>أدوات المطورين (Developer Tools)</span>
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveTab('DEVELOPER_TOOLS')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              activeTab === 'DEVELOPER_TOOLS'
+                ? 'bg-[#714B67] text-white shadow'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>أدوات المطورين (Developer Tools)</span>
+          </button>
+        )}
       </div>
 
       {activeTab === 'AYSED_CONFIG' ? (
@@ -1831,10 +1854,12 @@ class ResConfigSettings(models.TransientModel):
             <div>
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-[#714B67]" />
-                <span>إدارة الشركات والسجل التجاري (SaaS Multi-Company)</span>
+                <span>{isSuperAdmin ? 'إدارة الشركات والسجل التجاري (SaaS Multi-Company)' : 'ملف وبيانات المنشأة (Company Profile)'}</span>
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                إضافة الشركات والمؤسسات التابعة وتحديد الشركة النشطة لتنقل البيانات المستقلة وفق قانون العمل الكويتي
+                {isSuperAdmin 
+                  ? 'إضافة الشركات والمؤسسات التابعة وتحديد الشركة النشطة لتنقل البيانات المستقلة وفق قانون العمل الكويتي'
+                  : 'تعديل وتحديث بيانات منشأتكم، السجل التجاري، الرقم المدني، الشعار والترويسة، والحساب البنكي المعتمد'}
               </p>
             </div>
 
@@ -1847,119 +1872,123 @@ class ResConfigSettings(models.TransientModel):
                 <span>حفظ التغييرات</span>
               </button>
 
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded shadow flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة شركة جديدة +</span>
-              </button>
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded shadow flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة شركة جديدة +</span>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* LIST OF REGISTERED COMPANIES CARDS */}
-          <div className="mb-6">
-            <h3 className="font-bold text-slate-800 text-xs mb-3 flex items-center gap-1.5">
-              <span>الشركات المسجلة بالنظام ({companies.length}):</span>
-            </h3>
+          {/* LIST OF REGISTERED COMPANIES CARDS (Super Admin Only) */}
+          {isSuperAdmin && (
+            <div className="mb-6">
+              <h3 className="font-bold text-slate-800 text-xs mb-3 flex items-center gap-1.5">
+                <span>الشركات المسجلة بالنظام ({companies.length}):</span>
+              </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {companies.map((comp) => {
-                const isActive = comp?.id === activeCompany?.id;
-                const isSelectedForEdit = comp?.id === editingCompany?.id;
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {companies.map((comp) => {
+                  const isActive = comp?.id === activeCompany?.id;
+                  const isSelectedForEdit = comp?.id === editingCompany?.id;
 
-                return (
-                  <div
-                    key={comp.id}
-                    className={`bg-white p-4 rounded-xl border transition shadow-2xs space-y-3 relative ${
-                      isSelectedForEdit 
-                        ? 'border-[#714B67] ring-2 ring-[#714B67]/20' 
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <h4 className="font-bold text-slate-900 text-sm">{comp?.nameAr || ''}</h4>
-                        <p className="text-[11px] text-slate-500 dir-ltr text-right">{comp.nameEn}</p>
+                  return (
+                    <div
+                      key={comp.id}
+                      className={`bg-white p-4 rounded-xl border transition shadow-2xs space-y-3 relative ${
+                        isSelectedForEdit 
+                          ? 'border-[#714B67] ring-2 ring-[#714B67]/20' 
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h4 className="font-bold text-slate-900 text-sm">{comp?.nameAr || ''}</h4>
+                          <p className="text-[11px] text-slate-500 dir-ltr text-right">{comp.nameEn}</p>
+                        </div>
+
+                        {isActive ? (
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>الشركة النشطة</span>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onSelectCompany && onSelectCompany(comp)}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-300 transition"
+                          >
+                            تفعيل هذه الشركة
+                          </button>
+                        )}
                       </div>
 
-                      {isActive ? (
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>الشركة النشطة</span>
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => onSelectCompany && onSelectCompany(comp)}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-300 transition"
-                        >
-                          تفعيل هذه الشركة
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-[11px] space-y-1 font-mono text-slate-700">
-                      <div>سجل تجاري: <strong className="text-slate-900">{comp.commercialRegNo}</strong></div>
-                      <div>الرقم المدني: <strong className="text-slate-900">{comp.civilIdCompany}</strong></div>
-                      <div>ملف الشؤون WSI: <strong className="text-slate-900">{comp.wsiCode}</strong></div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onSelectCompany) {
-                              onSelectCompany(comp);
-                            }
-                          }}
-                          className={`text-[11px] font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-md transition cursor-pointer ${
-                            isActive
-                              ? 'bg-emerald-600 text-white shadow-2xs'
-                              : 'bg-[#714B67]/10 hover:bg-[#714B67] text-[#714B67] hover:text-white'
-                          }`}
-                          title="زر العين: التبديل والاطلاع على تطبيقات هذه الشركة"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>{isActive ? 'معاينة التطبيقات' : 'دخول ومعاينة'}</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleSelectCompanyToEdit(comp)}
-                          className={`text-[11px] font-bold flex items-center gap-1 ${
-                            isSelectedForEdit ? 'text-[#714B67]' : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          <span>{isSelectedForEdit ? 'تعديل' : 'تعديل'}</span>
-                        </button>
+                      <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-[11px] space-y-1 font-mono text-slate-700">
+                        <div>سجل تجاري: <strong className="text-slate-900">{comp.commercialRegNo}</strong></div>
+                        <div>الرقم المدني: <strong className="text-slate-900">{comp.civilIdCompany}</strong></div>
+                        <div>ملف الشؤون WSI: <strong className="text-slate-900">{comp.wsiCode}</strong></div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => {
-                            setCompanyToDelete(comp);
-                          }}
-                          className="text-[11px] font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer hover:bg-rose-50 px-2 py-1 rounded transition"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>حذف</span>
-                        </button>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onSelectCompany) {
+                                onSelectCompany(comp);
+                              }
+                            }}
+                            className={`text-[11px] font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-md transition cursor-pointer ${
+                              isActive
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'bg-[#714B67]/10 hover:bg-[#714B67] text-[#714B67] hover:text-white'
+                            }`}
+                            title="زر العين: التبديل والاطلاع على تطبيقات هذه الشركة"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{isActive ? 'معاينة التطبيقات' : 'دخول ومعاينة'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleSelectCompanyToEdit(comp)}
+                            className={`text-[11px] font-bold flex items-center gap-1 ${
+                              isSelectedForEdit ? 'text-[#714B67]' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>{isSelectedForEdit ? 'تعديل' : 'تعديل'}</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => {
+                              setCompanyToDelete(comp);
+                            }}
+                            className="text-[11px] font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer hover:bg-rose-50 px-2 py-1 rounded transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>حذف</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Company Settings Card */}
             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6 shadow-sm text-xs space-y-4">
               <h3 className="font-bold text-slate-900 text-sm pb-2 border-b flex items-center justify-between">
-                <span>تعديل بيانات الشركة المحتارة: [{editingCompany?.nameAr || ''}]</span>
+                <span>{isSuperAdmin ? `تعديل بيانات الشركة المختارة: [${editingCompany?.nameAr || ''}]` : `ملف وبيانات منشأتكم: [${editingCompany?.nameAr || ''}]`}</span>
                 <span className="text-[10px] bg-purple-100 text-[#714B67] font-mono px-2 py-0.5 rounded font-bold">
-                  SaaS Multi-Company Editor
+                  {isSuperAdmin ? 'SaaS Multi-Company Editor' : 'بيئة المنشأة المعزولة'}
                 </span>
               </h3>
 

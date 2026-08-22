@@ -49,6 +49,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
   onDeleteWarning,
   onSaveNote,
   onDeleteNote,
+  onNavigateToApp,
 }) => {
   // Main Module Tab State
   const [activeTab, setActiveTab] = useState<'CUSTODY' | 'LOANS' | 'WARNINGS' | 'NOTES'>('CUSTODY');

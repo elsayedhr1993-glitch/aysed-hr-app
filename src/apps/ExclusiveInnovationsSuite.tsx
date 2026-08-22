@@ -539,11 +539,11 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
       let reply = '';
       let msgType: 'text' | 'payslip' | 'leave' | 'cert' = 'text';
 
-      const salaryBase = currentContract?.baseSalary || 650;
-      const salaryAllow = (currentContract?.housingAllowance || 0) + (currentContract?.transportAllowance || 0) + (currentContract?.natureOfWorkAllowance || 0);
+      const salaryBase = currentContract?.basicSalary || 650;
+      const salaryAllow = (currentContract?.housingAllowance || 0) + (currentContract?.transportAllowance || 0) + (currentContract?.otherAllowance || 0);
       const grossSalary = salaryBase + salaryAllow;
-      const pifssDeduction = currentBotEmployee?.isKuwaiti ? grossSalary * 0.115 : 0;
-      const netSalary = grossSalary - pifssDeduction;
+      const pifssDeduction = 0;
+      const netSalary = grossSalary;
 
       if (lower.includes('راتب') || lower.includes('مسير') || lower.includes('payslip') || lower.includes('salary')) {
         msgType = 'payslip';
@@ -561,7 +561,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
       } else if (lower.includes('إجاز') || lower.includes('رصيد') || lower.includes('اجاز') || lower.includes('leave')) {
         msgType = 'leave';
         const empLeaves = leaves.filter(l => l.employeeId === currentBotEmployee?.id);
-        const usedDays = empLeaves.filter(l => l.status === 'APPROVED').reduce((acc, l) => acc + l.daysCount, 0);
+        const usedDays = empLeaves.filter(l => l.status === 'APPROVED').reduce((acc, l) => acc + (l.totalDays || 0), 0);
         const totalEntitled = 30; // standard 30 days
         const remaining = Math.max(0, totalEntitled - usedDays);
 
@@ -1458,14 +1458,15 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
           isOpen={isKioskModalOpen}
           onClose={() => setIsKioskModalOpen(false)}
           activeCompany={activeCompany}
-          branches={branches.map(b => ({
-            id: b.id,
-            branchName: b.name,
-            latitude: b.lat,
-            longitude: b.lng,
-            radiusMeters: b.radiusMeters
-          }))}
-          currentBranchId={selectedBranch}
+          employees={employees}
+          attendance={attendance}
+          onAddAttendance={(rec) => {
+            if (onAddAttendance) onAddAttendance(rec);
+          }}
+          onOpenMobileScanner={() => {
+            setIsKioskModalOpen(false);
+            setIsMobileScannerOpen(true);
+          }}
         />
       )}
 
@@ -1476,13 +1477,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
           onClose={() => setIsMobileScannerOpen(false)}
           activeCompany={activeCompany}
           employees={employees}
-          branches={branches.map(b => ({
-            id: b.id,
-            branchName: b.name,
-            latitude: b.lat,
-            longitude: b.lng,
-            radiusMeters: b.radiusMeters
-          }))}
+          attendance={attendance}
           onAddAttendance={(rec) => {
             if (onAddAttendance) {
               onAddAttendance(rec);

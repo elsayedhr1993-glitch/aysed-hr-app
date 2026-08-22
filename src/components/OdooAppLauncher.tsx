@@ -4,13 +4,14 @@ import {
   Banknote, Scale, FolderKanban, Zap, Building2, Sparkles, Scan,
   Briefcase, FileText, ShieldCheck, Bell, AlertTriangle, TrendingUp, Activity, PieChart as PieIcon, ArrowUpRight, BarChart3, MessageSquare
 } from 'lucide-react';
-import { ActiveApp } from '../types';
+import { ActiveApp, Company } from '../types';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
 interface OdooAppLauncherProps {
   onSelectApp: (app: ActiveApp) => void;
   currentUserEmail?: string;
   currentUserRole?: string;
+  activeCompany?: Company;
   stats: {
     employeesCount: number;
     candidatesCount: number;
@@ -31,8 +32,9 @@ interface OdooAppLauncherProps {
   };
 }
 
-export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, currentUserEmail = '', currentUserRole = '', stats }) => {
+export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, currentUserEmail = '', currentUserRole = '', activeCompany, stats }) => {
   const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || currentUserEmail.toLowerCase() === 'admin@aysed.com'.toLowerCase() || currentUserEmail.toLowerCase() === 'elsayedhr1993@gmail.com'.toLowerCase();
+  const companyDisplayName = activeCompany?.nameAr || activeCompany?.nameEn || 'Aysed HR S 2026';
 
   const attendanceData = [
     { day: 'السبت', حضور: 94, غياب: 6 },
@@ -208,17 +210,16 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
       badge: 'hr.daily',
       description: 'استئذان ساعات، مرضيات، وبدلات',
     },
-    {
+    ...(isSuperAdmin ? [{
       id: 'COMPANIES' as ActiveApp,
-      titleAr: 'إدارة الشركات والعيادات',
+      titleAr: 'إدارة الشركات والمؤسسات',
       titleEn: 'Companies',
       icon: Building2,
       bgColor: 'bg-purple-50 text-purple-700 border-purple-200',
       iconBg: 'bg-[#714B67] text-white',
-      badge: 'أودو مخصص',
+      badge: 'Multi-Tenant',
       description: 'الشركات، الترويسات، الأختام، والفروع',
-    },
-    ...(isSuperAdmin ? [{
+    }, {
       id: 'SAAS_ADMIN' as ActiveApp,
       titleAr: 'إدارة الاشتراكات',
       titleEn: 'SaaS Admin',
@@ -226,7 +227,7 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
       bgColor: 'bg-amber-50 text-amber-700 border-amber-200',
       iconBg: 'bg-amber-600 text-white',
       badge: 'مالك',
-      description: 'تفعيل وإيقاف الشركات',
+      description: 'تفعيل وإيقاف الشركات والخطط',
     }] : []),
     {
       id: 'EXCLUSIVE_INNOVATIONS' as ActiveApp,
@@ -270,13 +271,13 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
     },
     {
       id: 'SETTINGS' as ActiveApp,
-      titleAr: 'الإعدادات العامة والربط الخارجي',
-      titleEn: 'Settings & Integrations',
+      titleAr: isSuperAdmin ? 'الإعدادات العامة والربط الخارجي' : 'بيانات المنشأة والإعدادات',
+      titleEn: isSuperAdmin ? 'Settings & Integrations' : 'Company Profile & Settings',
       icon: Building2,
       bgColor: 'bg-zinc-100 text-zinc-700 border-zinc-300',
       iconBg: 'bg-zinc-700 text-white',
-      badge: 'Geofence & API',
-      description: 'الشركات، المواقع، الواتساب، والتوثيق',
+      badge: isSuperAdmin ? 'Geofence & API' : 'ملف المنشأة',
+      description: isSuperAdmin ? 'المنظومة، الشركات، الواتساب، والتوثيق' : 'بيانات المنشأة، السجل التجاري، والواتساب',
     },
   ];
 
@@ -304,29 +305,32 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
         </div>
       </div>
 
-      {/* 🧩 Dafthra-Style App Grid (Clean white compact cards, auto-fit minmax(130px, 1fr)) */}
-      <div className="w-full max-w-7xl space-y-2">
-        <div className="flex items-center justify-between px-1">
+      {/* 🧩 Odoo Enterprise App Switcher Grid */}
+      <div className="w-full max-w-[1200px] space-y-3">
+        <div className="flex items-center justify-between px-2 pt-2">
           <div>
-            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-[#714B67]" />
-              <span>تطبيقات النظام (Dafthra ERP Modules)</span>
+            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#71639e]" />
+              <span>مشغل تطبيقات المنظومة (Odoo Enterprise Apps)</span>
             </h2>
-            <p className="text-[10px] text-slate-500">اختر التطبيق للانتقال السريع وإدارة العمليات بكفاءة تامة</p>
+            <p className="text-xs text-slate-500">اختر التطبيق للانتقال المباشر وإدارة العمليات بكفاءة تامة</p>
           </div>
-          <div className="text-[10px] font-mono font-bold bg-white px-2.5 py-1 rounded border border-slate-200 text-slate-700 shadow-2xs">
-            الشركة: مؤسسة الكويت الرقمية
+          <div className="text-xs font-mono font-bold bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 shadow-2xs flex items-center gap-1.5 max-w-[340px] shrink-0" title={companyDisplayName}>
+            <Building2 className="w-3.5 h-3.5 text-[#71639e] shrink-0" />
+            <span className="truncate">المنشأة: <strong>{companyDisplayName}</strong></span>
           </div>
         </div>
 
-        {/* Fluid Dafthra Grid */}
-        <div className="fluid-apps-grid w-full">
+        {/* Odoo Enterprise 4-Column App Switcher */}
+        <div className="o_app_switcher w-full">
           {apps.filter(app => {
-            if (currentUserRole === 'EMPLOYEE') {
-              return ['ATTENDANCE', 'LEAVES'].includes(app.id);
+            if (!isSuperAdmin) {
+              if (['SAAS_ADMIN', 'COMPANIES'].includes(app.id)) {
+                return false;
+              }
             }
-            if (currentUserRole === 'COMPANY_ADMIN') {
-              return !['SAAS_ADMIN', 'COMPANIES'].includes(app.id);
+            if (currentUserRole === 'EMPLOYEE') {
+              return ['ATTENDANCE', 'LEAVES', 'DOCUMENTS'].includes(app.id);
             }
             return true;
           }).map((app) => {
@@ -335,34 +339,34 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
               <button
                 key={app.id}
                 onClick={() => onSelectApp(app.id)}
-                className="group bg-white/80 backdrop-blur-md rounded-xl p-2.5 border border-white/60 shadow-xs hover:shadow-md hover:bg-white hover:border-[#714B67]/40 hover:-translate-y-0.5 transition-all duration-150 text-center flex flex-col items-center justify-between relative overflow-hidden focus:outline-none focus:ring-1 focus:ring-[#714B67]"
+                className="o_app_icon_card flex flex-col items-center justify-between text-center relative overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 shadow-xs"
               >
-                <div className="w-full flex justify-between items-center mb-1">
-                  <span className="text-[8px] font-bold text-slate-400 group-hover:text-slate-600 uppercase font-mono">
+                <div className="w-full flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 uppercase font-mono tracking-wider">
                     {app.titleEn}
                   </span>
-                  <span className="text-[8px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded group-hover:bg-[#714B67] group-hover:text-white transition">
+                  <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full group-hover:bg-[#71639e] group-hover:text-white transition-colors duration-200">
                     {app.badge}
                   </span>
                 </div>
 
                 {/* Flat Vibrant Icon Container */}
-                <div className={`w-9 h-9 ${app.iconBg} rounded-md flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform my-1`}>
-                  <IconComponent className="w-4 h-4" />
+                <div className={`w-12 h-12 ${app.iconBg} rounded-xl flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-200 my-2`}>
+                  <IconComponent className="w-6 h-6" />
                 </div>
 
-                <div className="mt-0.5 w-full">
-                  <h3 className="font-bold text-slate-800 text-xs group-hover:text-[#714B67] transition truncate">
+                <div className="my-1 w-full">
+                  <h3 className="font-bold text-slate-800 text-sm group-hover:text-[#71639e] transition-colors duration-200 truncate">
                     {app.titleAr}
                   </h3>
-                  <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-1 leading-tight">
+                  <p className="text-[11px] text-slate-500 mt-1 line-clamp-1 leading-normal font-normal">
                     {app.description}
                   </p>
                 </div>
 
-                <div className="mt-1.5 pt-1 border-t border-slate-100 w-full flex items-center justify-center text-[8px] text-slate-400 group-hover:text-[#714B67] font-bold">
+                <div className="mt-2 pt-2 border-t border-slate-100 w-full flex items-center justify-center text-[10px] text-slate-400 group-hover:text-[#71639e] font-bold transition-colors">
                   <span>فتح التطبيق</span>
-                  <ArrowUpRight className="w-2.5 h-2.5 mr-0.5" />
+                  <ArrowUpRight className="w-3 h-3 mr-1" />
                 </div>
               </button>
             );

@@ -16,6 +16,8 @@ export interface JobTitle {
 
 export interface Company {
   id: string;
+  name?: string;
+  civilId?: string;
   companyNumber?: number; // 1 for Al Manara (Master Admin), 2+ for subscribers
   subdomain?: string; // e.g. "almanara", "client1", "client2"
   customDomain?: string; // e.g. "hr.almanara.com.kw"
@@ -38,6 +40,8 @@ export interface Company {
   street?: string;
   phone?: string;
   email?: string;
+  ownerName?: string;
+  planType?: string;
   website?: string;
   headerHtml?: string;
   footerHtml?: string;
@@ -86,6 +90,15 @@ export interface Employee {
   openingLeaveBalance?: number; // الرصيد الافتتاحي للإجازات عند الانتقال للنظام (Opening Balance)
   unpaid_days_count?: number;   // إجمالي الأيام بدون راتب (Odoo Computed: unpaid_days_count)
   paid_days_remaining?: number; // رصيد الإجازات المتبقي (Odoo Computed: paid_days_remaining)
+  lastAccrualDate?: string;     // تاريخ آخر ترحيل آلي لرصيد الإجازات (YYYY-MM أو YYYY-MM-DD)
+  accrualHistory?: Array<{
+    date: string;
+    month: string;
+    daysAdded: number;
+    previousBalance: number;
+    newBalance: number;
+    reason?: string;
+  }>; // سجل الترحيل والاستحقاق الشهري الآلي
   resourceCalendarId?: string; // جدول ساعات العمل Odoo resource_calendar_id
   workingSchedule?: string; // مسمى جدول العمل (مثال: الدوام الصباحي القياسي 8 ساعات)
   workHoursType?: 'STANDARD' | 'FLEXIBLE' | 'PART_TIME' | 'SHIFT' | 'CUSTOM' | string; // نوع الدوام (widget="radio")
@@ -173,7 +186,37 @@ export interface LeaveRequest {
   excessDays?: number;         // أيام زائدة بدون راتب (تخصم من مدة الخدمة فقط بخصم مالي 0.000 د.ك)
   managerOverride?: boolean;   // تجاوز قيود النظام من قبل المدير للإجازات التي تتجاوز 30 يوماً
   managerOverrideNote?: string;// بيان وموافقة المدير لتجاوز حد 30 يوماً
+  allocationBreakdown?: Array<{
+    allocationId: string;
+    allocationName: string;
+    allocationType: 'regular' | 'accrual';
+    daysUsed: number;
+  }>; // تتبع استهلاك التخصيصات بنظام FIFO
 }
+
+// -------------------------------------------------------------------------
+// Odoo Leave Allocation Model (hr.leave.allocation)
+// -------------------------------------------------------------------------
+export interface HrLeaveAllocation {
+  id: string;
+  name: string; // e.g. "تخصيص رصيد سنوي افتتاحي" or "استحقاق شهري آلي 2.5 يوم"
+  employeeId: string;
+  companyId: string;
+  leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY' | 'HAJJ' | 'UNPAID' | 'COMPASSIONATE' | 'HOURLY_PERMISSION' | 'COMPENSATORY';
+  allocationType: 'regular' | 'accrual'; // 'regular' for fixed opening balance, 'accrual' for monthly plan
+  accrualMonthKey?: string; // e.g. '2026-08'
+  numberOfDays: number; // إجمالي الأيام المخصصة
+  consumedDays?: number; // الأيام المستهلكة وفق مبدأ FIFO
+  remainingDays?: number; // الأيام المتبقية
+  dateFrom: string; // YYYY-MM-DD
+  dateTo?: string;
+  expiryDate?: string;
+  state: 'draft' | 'confirm' | 'validate' | 'refuse';
+  notes?: string;
+  createdAt: string;
+}
+
+export type LeaveAllocation = HrLeaveAllocation;
 
 export interface BiometricDevice {
   id: string;
@@ -203,6 +246,7 @@ export interface AttendanceRecord {
   overtimeHours: number;
   status: 'PRESENT' | 'LATE' | 'ABSENT' | 'ON_LEAVE';
   latenessMinutes: number;
+  earlyLeaveMinutes?: number;
 }
 
 export interface Payslip {
@@ -217,6 +261,12 @@ export interface Payslip {
   pifssDeduction?: number;
   unpaidLeaveDays?: number;
   unpaidLeaveDeduction?: number;
+  loanDeduction?: number;
+  overtimeAmount?: number;
+  housingAllowance?: number;
+  transportAllowance?: number;
+  otherAllowance?: number;
+  notes?: string;
   otherDeductions: number;
   netSalary: number; // 0.000 KWD
   paymentStatus: 'DRAFT' | 'APPROVED' | 'PAID';
@@ -444,9 +494,11 @@ export interface CompanySubscription {
   id: string;
   companyName: string;
   ownerName: string;
+  requesterName?: string;
   email: string;
+  phone?: string;
   status: 'active' | 'suspended' | 'expired';
-  planType: 'شهري' | 'سنوي' | 'مخصص';
+  planType: 'شهري' | 'سنوي' | 'مخصص' | string;
   companyId?: string;
   subscriptionFee: number; // المبلغ بالدينار الكويتي
   startDate: string;
@@ -528,7 +580,9 @@ export type ActiveApp =
   | 'SAAS_ADMIN'
   | 'COMPANIES'
   | 'SETTINGS'
-  | 'DAILY_MOVEMENTS';
+  | 'DAILY_MOVEMENTS'
+  | 'HOLIDAY_WORK'
+  | 'LEAVE_TYPES_CONFIG';
 
 export type ViewMode = 'KANBAN' | 'LIST' | 'FORM' | 'PIVOT' | 'GRAPH';
 

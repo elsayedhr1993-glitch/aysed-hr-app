@@ -1,5 +1,5 @@
 // src/services/leaveSettlementService.ts
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface LeaveRequestInput {
   employeeId?: string;

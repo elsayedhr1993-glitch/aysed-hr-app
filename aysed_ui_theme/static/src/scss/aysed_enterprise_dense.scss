@@ -1,0 +1,107 @@
+/* 
+   Aysed S HR 2026 - Compact & Ultra-Dense Enterprise Theme
+   Optimized for Odoo 17 & RTL Kuwait HRMS
+*/
+
+// الخط المعتمد للنظام بالكامل
+.o_web_client {
+    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+// 1. تحسين وضغط شبكة التطبيقات (App Switcher Grid)
+.o_home_menu {
+    background-color: #f8fafc !important;
+
+    .o_apps, .o_app_switcher {
+        padding: 30px 40px !important;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+        gap: 16px !important;
+        max-width: 1200px;
+        margin: 0 auto;
+
+        .o_app, .o_app_icon_card {
+            background: #ffffff !important;
+            border-radius: 10px !important;
+            border: 1px solid #e2e8f0 !important;
+            padding: 14px 10px !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+            &:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 8px 18px rgba(113, 99, 158, 0.12) !important;
+                border-color: #71639e !important;
+            }
+
+            .o_caption {
+                font-weight: 700 !important;
+                color: #1e293b !important;
+                margin-top: 8px !important;
+                font-size: 13px !important;
+                letter-spacing: -0.2px;
+            }
+        }
+    }
+}
+
+// 2. زيادة كثافة النماذج والبطاقات (Form View Density)
+.o_form_view {
+    .o_form_sheet {
+        max-width: 1300px !important;
+        width: 96% !important;
+        padding: 20px 28px !important;
+        border-radius: 8px !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+    }
+
+    .o_group {
+        margin-top: 4px !important;
+        margin-bottom: 4px !important;
+
+        .o_field_widget {
+            margin-bottom: 3px !important;
+        }
+
+        .o_form_label {
+            font-weight: 700 !important;
+            color: #334155 !important;
+            font-size: 13px !important;
+        }
+    }
+}
+
+// 3. ضغط وتكثيف الجداول (Compact List View)
+.o_list_view {
+    .o_list_table {
+        thead th {
+            background-color: #f1f5f9 !important;
+            font-weight: 800 !important;
+            color: #71639e !important;
+            padding: 7px 10px !important;
+            font-size: 12.5px !important;
+            border-bottom: 2px solid #cbd5e1 !important;
+        }
+
+        tbody tr.o_data_row {
+            height: 36px !important; // ارتفاع متراص لسحب أكبر قدر من الموظفين في الشاشة
+            
+            &:hover {
+                background-color: #f8fafc !important;
+            }
+
+            td {
+                padding: 4px 10px !important;
+                font-size: 13px !important;
+                color: #1e293b;
+            }
+        }
+    }
+}
+
+// 4. إبراز الحقول المالية والأرصدة (High Contrast Digits)
+.o_field_monetary, .o_field_float, .o_stat_value {
+    font-weight: 800 !important;
+    color: #008784 !important;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+}

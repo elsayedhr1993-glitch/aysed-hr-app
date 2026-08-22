@@ -11,6 +11,7 @@ export const MANARA_STORAGE_KEYS = {
   PAYSLIPS: 'manara_payslips_data',
   PAYROLL_RUNS: 'manara_payroll_runs_data',
   LEAVES: 'manara_leaves_data',
+  LEAVE_ALLOCATIONS: 'manara_leave_allocations_data',
   LOANS: 'manara_loans_data',
   CONTRACTS: 'manara_contracts_data',
   CUSTODIES: 'manara_custodies_data',
@@ -86,4 +87,89 @@ export function removePersistentData(key: string, secondaryKey?: string): void {
   } catch (e) {
     console.error(`[PersistentStorage] Error removing key "${key}":`, e);
   }
+}
+
+/**
+ * Purges all legacy mock companies and demo employees/contracts from localStorage
+ */
+export function purgeLegacyMockData(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    // 1. Purge Companies
+    const rawComps = localStorage.getItem(MANARA_STORAGE_KEYS.COMPANIES);
+    if (rawComps) {
+      const comps = JSON.parse(rawComps);
+      if (Array.isArray(comps)) {
+        const cleaned = comps.filter((c: any) => c.id !== 'comp-1' && !c.nameAr?.includes('مجموعة العيادات'));
+        localStorage.setItem(MANARA_STORAGE_KEYS.COMPANIES, JSON.stringify(cleaned));
+        localStorage.setItem(MANARA_STORAGE_KEYS.TENANTS, JSON.stringify(cleaned));
+      }
+    }
+
+    // 2. Purge Employees
+    const rawEmps = localStorage.getItem(MANARA_STORAGE_KEYS.EMPLOYEES);
+    if (rawEmps) {
+      const emps = JSON.parse(rawEmps);
+      if (Array.isArray(emps)) {
+        const cleaned = emps.filter((e: any) => e.companyId !== 'comp-1' && !e.id?.startsWith('emp-20'));
+        localStorage.setItem(MANARA_STORAGE_KEYS.EMPLOYEES, JSON.stringify(cleaned));
+      }
+    }
+
+    // 3. Purge Contracts
+    const rawContracts = localStorage.getItem(MANARA_STORAGE_KEYS.CONTRACTS);
+    if (rawContracts) {
+      const contracts = JSON.parse(rawContracts);
+      if (Array.isArray(contracts)) {
+        const cleaned = contracts.filter((c: any) => c.companyId !== 'comp-1' && !c.id?.startsWith('cnt-20'));
+        localStorage.setItem(MANARA_STORAGE_KEYS.CONTRACTS, JSON.stringify(cleaned));
+      }
+    }
+
+    // 4. Purge Departments
+    const rawDepts = localStorage.getItem(MANARA_STORAGE_KEYS.DEPARTMENTS);
+    if (rawDepts) {
+      const depts = JSON.parse(rawDepts);
+      if (Array.isArray(depts)) {
+        const cleaned = depts.filter((d: any) => d.companyId !== 'comp-1' && d.id !== 'dept-med' && d.id !== 'dept-derm');
+        localStorage.setItem(MANARA_STORAGE_KEYS.DEPARTMENTS, JSON.stringify(cleaned));
+      }
+    }
+
+    // 5. Purge Attendance, Leaves, Payslips for comp-1
+    const arrayKeys = [
+      MANARA_STORAGE_KEYS.ATTENDANCE,
+      MANARA_STORAGE_KEYS.LEAVES,
+      MANARA_STORAGE_KEYS.PAYSLIPS,
+      MANARA_STORAGE_KEYS.CUSTODIES,
+      MANARA_STORAGE_KEYS.LOANS,
+      MANARA_STORAGE_KEYS.WARNINGS,
+      MANARA_STORAGE_KEYS.DOCUMENTS,
+    ];
+    arrayKeys.forEach(k => {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        try {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const cleaned = arr.filter((item: any) => item.companyId !== 'comp-1');
+            localStorage.setItem(k, JSON.stringify(cleaned));
+          }
+        } catch (_) {}
+      }
+    });
+
+    // 6. Reset active company ID if it was comp-1
+    const activeComp = localStorage.getItem('activeCompanyId');
+    if (activeComp === 'comp-1') {
+      localStorage.setItem('activeCompanyId', 'comp-super-admin');
+    }
+  } catch (err) {
+    console.warn('[PersistentStorage] Purge mock data warning:', err);
+  }
+}
+
+// Auto-execute purge on script evaluation
+if (typeof window !== 'undefined') {
+  purgeLegacyMockData();
 }

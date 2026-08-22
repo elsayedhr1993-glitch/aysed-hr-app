@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Users, UserPlus, FileSignature, Calendar, Clock, 
   Banknote, Scale, FolderKanban, Zap, Building2, 
-  ChevronDown, ChevronUp, LogOut, ShieldCheck, FileText, Briefcase, BarChart3, Sparkles, MessageSquare
+  ChevronDown, ChevronUp, LogOut, ShieldCheck, FileText, Briefcase, BarChart3, Sparkles, MessageSquare, Coins, CalendarPlus
 } from 'lucide-react';
 import { ActiveApp, ViewMode } from '../types';
 
@@ -18,6 +18,7 @@ interface OdooSidebarProps {
   onFilterTabChange?: (tab: string) => void;
   onLogout?: () => void;
   currentUserRole?: string;
+  currentUserEmail?: string;
 }
 
 interface SidebarGroup {
@@ -42,7 +43,12 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
   onFilterTabChange,
   onLogout,
   currentUserRole = '',
+  currentUserEmail = '',
 }) => {
+  const emailLower = (currentUserEmail || '').toLowerCase();
+  const isMasterEmail = emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com';
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || isMasterEmail;
+
   // Determine which group contains the activeApp initially
   const rawGroups: SidebarGroup[] = [
     {
@@ -74,6 +80,8 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
         { id: 'SHIFTS', title: 'جدولة الشيفتات', icon: Clock },
         { id: 'LEAVES', title: 'الإجازات', icon: Calendar },
         { id: 'HOLIDAYS', title: 'العطلات الرسمية', icon: Calendar },
+        { id: 'HOLIDAY_WORK', title: 'بدل العمل في العطلات', icon: Coins },
+        { id: 'LEAVE_TYPES_CONFIG', title: 'تهيئة أنواع الإجازات', icon: CalendarPlus },
       ],
     },
     {
@@ -98,22 +106,27 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
         { id: 'DOCUMENT_TEMPLATES', title: 'قوالب المستندات', icon: FileText },
         { id: 'AUTOMATION', title: 'الأتمتة والذكاء', icon: Zap },
         { id: 'AUDIT_LOGS', title: 'سجل الرقابة', icon: ShieldCheck },
-        { id: 'SETTINGS', title: 'إعدادات الشركات', icon: Building2 },
+        { id: 'SETTINGS', title: isSuperAdmin ? 'إعدادات المنظومة والشركات' : 'بيانات المنشأة والإعدادات', icon: Building2 },
       ],
     },
   ];
 
   const groups = rawGroups.map(group => {
     const filteredApps = group.apps.filter(app => {
-      if (currentUserRole === 'SUPER_ADMIN') {
-        return ['SAAS_ADMIN', 'COMPANIES'].includes(app.id);
+      // Super Admin (base.group_system) has access to everything including SAAS_ADMIN and COMPANIES
+      if (isSuperAdmin) {
+        return true;
       }
+      
+      // All non-superadmin subscribers must NEVER see SaaS Admin or Companies Management
+      if (app.id === 'SAAS_ADMIN' || app.id === 'COMPANIES') {
+        return false;
+      }
+
       if (currentUserRole === 'EMPLOYEE') {
-        return ['ATTENDANCE', 'LEAVES'].includes(app.id);
+        return ['ATTENDANCE', 'LEAVES', 'DOCUMENTS'].includes(app.id);
       }
-      if (currentUserRole === 'COMPANY_ADMIN') {
-        return !['SAAS_ADMIN', 'COMPANIES'].includes(app.id);
-      }
+      
       return true;
     });
     return { ...group, apps: filteredApps };
@@ -133,7 +146,7 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
   };
 
   return (
-    <aside className="w-[250px] h-screen fixed right-0 top-0 bg-slate-900 text-slate-100 border-l border-slate-800 flex flex-col justify-between select-none shadow-2xl z-[100] overflow-y-auto transition-transform duration-300" dir="rtl">
+    <aside className="w-[260px] h-screen fixed right-0 top-0 bg-slate-900 text-slate-100 border-l border-slate-800 flex flex-col justify-between select-none shadow-2xl z-50 overflow-y-auto transition-transform duration-300" dir="rtl">
       <div className="p-3 space-y-3">
         {/* Top Branding / Logo */}
         <div className="flex items-center gap-2 px-2 py-2 border-b border-slate-800">

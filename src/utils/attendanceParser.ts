@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { Employee, AttendanceRecord, LeaveRequest, Contract } from '../types';
 
 export interface ShiftConfig {
+  nameAr?: string;
   startTime: string; // e.g. "08:00"
   endTime: string;   // e.g. "16:00"
   graceMinutes: number; // e.g. 15
@@ -20,6 +21,7 @@ export interface ParsedAttendanceResult {
   records: AttendanceRecord[];
   matchedCount: number;
   unmatchedCodes: string[];
+  unmatchedBadgeIds?: string[];
   totalLogLines: number;
   datesFound: string[];
 }

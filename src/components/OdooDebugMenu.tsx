@@ -176,12 +176,12 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
 
   return (
     <>
-      <div className="relative inline-block text-right font-sans" dir="rtl">
+      <div className="relative inline-block text-right font-sans o_debug_manager" dir="rtl">
         {!isDebugActive ? (
           /* زر تفعيل وضع المطور في حال كان مغلقاً */
           <button
             onClick={enableDebugMode}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-purple-700/90 hover:bg-purple-800 rounded-md transition shadow-xs border border-purple-400/40 cursor-pointer"
+            className="o_debug_manager flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-white bg-purple-700/90 hover:bg-purple-800 rounded-md transition shadow-xs border border-purple-400/40 cursor-pointer"
             title="تفعيل وضع المطور (Odoo Debug Mode)"
           >
             <Bug className="w-3.5 h-3.5 text-amber-300" />
@@ -189,7 +189,7 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
           </button>
         ) : (
           /* أيقونة حشرة المطور Odoo Enterprise Bug Icon */
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 o_debug_manager">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className={`p-1.5 rounded-md transition-all border flex items-center gap-1 cursor-pointer ${

@@ -17,6 +17,7 @@ export interface LeaveManagementProps {
   onSaveEmployee?: (emp: Employee) => void;
   initialEmployeeId?: string;
   onOpenNotificationModal?: (emp: Employee, trigger?: any, data?: any) => void;
+  onNavigateToApp?: (app: any) => void;
 }
 
 export const LeaveManagement: React.FC<LeaveManagementProps> = (props) => {

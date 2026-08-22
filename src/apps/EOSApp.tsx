@@ -1,17 +1,18 @@
 import { printDocument, exportElementToPdf } from '../utils/printUtils';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, Company, Contract, EOSCalculation, LeaveRequest } from '../types';
-import { calculateKuwaitEOS, formatKWD } from '../utils/kuwaitLaw';
-import { Scale, Printer, FileCheck, AlertCircle, Info, Calculator, CheckCircle2, CalendarOff, ShieldAlert, ArrowDownRight, Layers, FileSpreadsheet, Check, Download, Loader2, ShieldCheck } from 'lucide-react';
+import { calculateKuwaitEOS, formatKWD, get_aysed_official_balance } from '../utils/kuwaitLaw';
+import { Scale, Printer, FileCheck, AlertCircle, Info, Calculator, CheckCircle2, CalendarOff, ShieldAlert, ArrowDownRight, Layers, FileSpreadsheet, Check, Download, Loader2, ShieldCheck, RotateCcw } from 'lucide-react';
 
 interface EOSAppProps {
   employees: Employee[];
   contracts: Contract[];
   leaves?: LeaveRequest[];
   activeCompany: Company;
+  onNavigateToApp?: (app: any) => void;
 }
 
-export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [], activeCompany }) => {
+export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [], activeCompany, onNavigateToApp }) => {
   const activeCompId = activeCompany?.id || 'comp-1';
   let companyEmps = (employees || []).filter(e => !e.isDeleted && ((e.companyId || 'comp-1') === activeCompId || true));
   if (companyEmps.length === 0 && (employees || []).filter(e => !e.isDeleted).length > 0) {
@@ -21,7 +22,7 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
   const [selectedEmpId, setSelectedEmpId] = useState<string>(companyEmps[0]?.id || '');
   const [terminationType, setTerminationType] = useState<'RESIGNATION' | 'TERMINATION' | 'RETIREMENT' | 'CONTRACT_EXPIRED'>('RESIGNATION');
   const [leaveDate, setLeaveDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [unusedLeaveDays, setUnusedLeaveDays] = useState<number>(15);
+  const [manualLeaveDaysOverride, setManualLeaveDaysOverride] = useState<number | null>(null);
   const [otherDeductions, setOtherDeductions] = useState<number>(0);
   const [manualUnpaidOverride, setManualUnpaidOverride] = useState<number | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
@@ -29,13 +30,26 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
   const activeEmp = employees.find(e => e.id === selectedEmpId) || companyEmps[0];
   const activeContract = contracts.find(c => c.employeeId === activeEmp?.id);
 
+  // Calculate actual unused leave balance for the active employee
+  const calculatedUnusedLeaveDays = useMemo(() => {
+    if (!activeEmp) return 0;
+    const opening = activeEmp.openingLeaveBalance ?? activeEmp.carriedOverLeave2025 ?? 0;
+    const accrued = get_aysed_official_balance(activeEmp);
+    const takenAnnualDays = (leaves || [])
+      .filter(l => !l.isHistorical && l.employeeId === activeEmp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && l.leaveType === 'ANNUAL')
+      .reduce((sum, l) => sum + (l.totalDays || 0), 0);
+    return Math.max(0, (opening + accrued) - takenAnnualDays);
+  }, [activeEmp, leaves]);
+
+  const effectiveUnusedLeaveDays = manualLeaveDaysOverride !== null ? manualLeaveDaysOverride : calculatedUnusedLeaveDays;
+
   // Filter approved unpaid leaves and excess annual days for the selected employee
   const employeeUnpaidLeaves = useMemo(() => {
     if (!activeEmp) return [];
     return (leaves || []).filter(
       l => l.employeeId === activeEmp.id &&
       (l.leaveType === 'UNPAID' || (l.excessDays && l.excessDays > 0)) &&
-      (l.status === 'APPROVED' || l.status === 'VALIDATED' || l.status === 'SUBMITTED')
+      (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED' || l.status === 'SUBMITTED')
     );
   }, [leaves, activeEmp]);
 
@@ -71,7 +85,7 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
     grossSalary: grossSalary,
     terminationType: terminationType,
     contractType: activeContract?.contractType || 'INDEFINITE',
-    unusedLeaveDays: unusedLeaveDays,
+    unusedLeaveDays: effectiveUnusedLeaveDays,
     otherDeductions: otherDeductions,
     totalUnpaidLeaveDays: effectiveUnpaidDays,
     unpaidLeavesBreakdown: unpaidLeavesBreakdown,
@@ -189,6 +203,31 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                 <span className="text-slate-500">الراتب الإجمالي الشامل (المادة 51):</span>
                 <span className="font-mono font-bold text-emerald-700 dir-ltr">{formatKWD(grossSalary)}</span>
               </div>
+              {onNavigateToApp && (
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToApp('EMPLOYEES')}
+                    className="text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition"
+                  >
+                    <span>ملف الموظف</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToApp('CONTRACTS')}
+                    className="text-teal-600 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition"
+                  >
+                    <span>عقد العمل</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToApp('LEAVES')}
+                    className="text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition"
+                  >
+                    <span>سجل الإجازات</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -260,13 +299,32 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
           </div>
 
           <div>
-            <label className="block font-bold text-slate-700 mb-1">رصيد الإجازات السنوية المتبقية المستحقة (بالأيام)</label>
-            <input
-              type="number"
-              value={unusedLeaveDays}
-              onChange={(e) => setUnusedLeaveDays(parseFloat(e.target.value) || 0)}
-              className="w-full border border-slate-300 rounded-lg p-2 text-xs outline-none font-mono bg-white focus:ring-2 focus:ring-[#714B67]"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block font-bold text-slate-700">رصيد الإجازات السنوية المتبقية المستحقة (بالأيام)</label>
+              {manualLeaveDaysOverride !== null && (
+                <button
+                  onClick={() => setManualLeaveDaysOverride(null)}
+                  className="text-[10px] text-purple-700 underline hover:text-purple-900 font-bold flex items-center gap-0.5"
+                  title="استعادة الرصيد الفعلي المحسوب للموظف"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  <span>استعادة الرصيد الفعلي ({calculatedUnusedLeaveDays.toFixed(1)} يوم)</span>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                value={effectiveUnusedLeaveDays}
+                onChange={(e) => setManualLeaveDaysOverride(Math.max(0, parseFloat(e.target.value) || 0))}
+                className="w-full border border-slate-300 rounded-lg p-2 text-xs outline-none font-mono font-bold bg-white focus:ring-2 focus:ring-[#714B67]"
+              />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-1">
+              الرصيد الفعلي المتبقي في سجل الإجازات: <strong className="font-mono text-emerald-700 font-bold">{calculatedUnusedLeaveDays.toFixed(1)} يوم</strong> (مرحّل + مكتسب - مستهلك).
+            </p>
           </div>
 
           <div>

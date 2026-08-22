@@ -37,12 +37,140 @@
   }
 }
 
-/* تنسيق الأرقام لتبدو احترافية (مثل البنوك) */
-.o_salary_value, .o_stat_value, [data-field="wage"] {
-    font-family: 'Inter', sans-serif !important;
+/* 
+   Aysed S HR 2026 - Compact & Ultra-Dense Enterprise Theme
+   Optimized for Odoo 17 & RTL Kuwait HRMS
+*/
+
+/* إخفاء وسوم النماذج التقنية والمترجمات عن غير المالك */
+body:not(.aysed_owner) .o_debug_manager,
+body:not(.aysed_owner) .o_field_translate,
+body:not(.aysed_owner) .badge-info,
+body:not(.aysed_owner) .o_tag_id {
+    display: none !important;
+}
+
+/* إخفاء زر إنشاء الشركات للمشتركين */
+body:not(.aysed_owner) .o_list_button_add,
+body:not(.aysed_owner) button[name="action_create_new_company"] {
+    display: none !important;
+}
+
+.o_web_client {
+    font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* 1. تحسين وضغط شبكة التطبيقات (App Switcher Grid) */
+.o_home_menu {
+    background-color: #f8fafc !important;
+}
+
+.o_home_menu .o_apps, 
+.o_home_menu .o_app_switcher,
+.o_app_switcher {
+    display: grid !important;
+    padding: 30px 40px !important;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    gap: 16px !important;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.o_home_menu .o_app, 
+.o_home_menu .o_app_icon_card,
+.o_app_icon_card {
+    background: #ffffff !important;
+    border-radius: 10px !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 14px 10px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.o_home_menu .o_app:hover, 
+.o_home_menu .o_app_icon_card:hover,
+.o_app_icon_card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(113, 99, 158, 0.12) !important;
+    border-color: #71639e !important;
+}
+
+.o_home_menu .o_caption,
+.o_app_icon_card .o_caption {
     font-weight: 700 !important;
-    letter-spacing: 0.5px;
-    color: var(--odoo-dark);
+    color: #1e293b !important;
+    margin-top: 8px !important;
+    font-size: 13px !important;
+    letter-spacing: -0.2px;
+}
+
+/* 2. زيادة كثافة النماذج والبطاقات (Form View Density) */
+.o_form_view .o_form_sheet,
+.o_form_sheet {
+    max-width: 1300px !important;
+    width: 96% !important;
+    padding: 20px 28px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+.o_form_view .o_group {
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+}
+
+.o_form_view .o_group .o_field_widget {
+    margin-bottom: 3px !important;
+}
+
+.o_form_view .o_group .o_form_label {
+    font-weight: 700 !important;
+    color: #334155 !important;
+    font-size: 13px !important;
+}
+
+/* 3. ضغط وتكثيف الجداول (Compact List View) */
+.o_list_view .o_list_table,
+.o_list_table {
+    width: 100%;
+}
+
+.o_list_view .o_list_table thead th,
+.o_list_table thead th {
+    background-color: #f1f5f9 !important;
+    font-weight: 800 !important;
+    color: #71639e !important;
+    padding: 7px 10px !important;
+    font-size: 12.5px !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+}
+
+.o_list_view .o_list_table tbody tr.o_data_row,
+.o_list_table tbody tr.o_data_row,
+tr.o_data_row {
+    height: 36px !important; /* ارتفاع متراص لسحب أكبر قدر من الموظفين في الشاشة */
+}
+
+.o_list_view .o_list_table tbody tr.o_data_row:hover,
+.o_list_table tbody tr.o_data_row:hover,
+tr.o_data_row:hover {
+    background-color: #f8fafc !important;
+}
+
+.o_list_view .o_list_table tbody tr.o_data_row td,
+.o_list_table tbody tr.o_data_row td,
+tr.o_data_row td {
+    padding: 4px 10px !important;
+    font-size: 13px !important;
+    color: #1e293b;
+}
+
+/* 4. إبراز الحقول المالية والأرصدة (High Contrast Digits) */
+.o_field_monetary, .o_field_float, .o_stat_value, .o_salary_value, [data-field="wage"] {
+    font-weight: 800 !important;
+    color: #008784 !important;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
 }
 
 .official-document {
@@ -55,6 +183,61 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: 1rem;
+}
+
+/* شبكة مشغل التطبيقات - نمط Odoo Enterprise */
+.o_app_switcher {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important; /* 4 أعمدة منتظمة */
+    gap: 24px !important;
+    padding: 40px !important;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+@media (max-width: 1024px) {
+  .o_app_switcher {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    padding: 24px !important;
+    gap: 16px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .o_app_switcher {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    padding: 16px !important;
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .o_app_switcher {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    padding: 12px !important;
+  }
+}
+
+/* بطاقات التطبيقات */
+.o_app_icon_card {
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease-in-out;
+}
+
+.o_app_icon_card:hover {
+    border-color: #71639e;
+    box-shadow: 0 8px 20px rgba(113, 99, 158, 0.12);
+    transform: translateY(-4px);
+}
+
+/* شريط الأدوات العلوي والأزرار */
+.top_action_bar .btn {
+    margin: 0 4px;
+    font-size: 13px;
+    padding: 6px 12px;
 }
 
 .fluid-apps-grid {
@@ -521,3 +704,138 @@ h1, h2 {
     color: #71639e; /* لون أودو */
     font-family: 'Inter', sans-serif;
 }
+
+/* إصلاحات لوحة تحكم Aysed 2026 */
+
+/* 1. تنسيق صناديق الإحصائيات */
+.o_stat_box {
+    display: flex;
+    flex-direction: column;
+    align-items: center !important; /* توسيط الأرقام */
+    justify-content: center;
+    padding: 20px !important;
+    border-radius: 12px !important;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.o_stat_box .o_stat_value {
+    font-size: 2.5rem !important;
+    font-weight: 800;
+    color: #71639e; /* لون أودو */
+    margin-top: 10px;
+}
+
+/* 2. تباعد أزرار الإجراءات */
+.o_owner_actions .btn {
+    margin: 4px !important; /* مسافة أمان بين الأزرار */
+    border-radius: 6px !important;
+    font-size: 12px !important;
+}
+
+/* 3. إصلاح الهيدر والزر الأرجواني */
+.super_admin_btn {
+    border-radius: 0 0 10px 10px !important;
+    font-weight: bold;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 10px rgba(113, 99, 158, 0.3);
+}
+
+/* 4. تحسين شكل جدول المشتركين */
+.o_main_table {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #eee !important;
+}
+
+.o_main_table th {
+    background-color: #f8f9fa !important;
+    color: #4c4c4c;
+    font-weight: 700;
+    padding: 15px !important;
+}
+
+/* إصلاح تداخل واجهة السوبر أدمن مع حاوية تطبيقات النظام (UI Layout Isolation) */
+
+:root {
+    --sidebar-width: 250px;
+}
+
+/* 1. ضبط مساحة الهيدر لعدم التداخل */
+.aysed_admin_portal_header {
+    position: sticky !important;
+    top: 0;
+    z-index: 1050 !important; /* أعلى من شريط أودو الأصلي */
+}
+
+/* 2. إعطاء مساحة أمان للوحة الجانبية في الـ RTL بنظام Flexbox مع الـ Push */
+body.o_rtl .o_action_manager {
+    margin-right: var(--sidebar-width) !important; /* ضمان إزاحة المحتوى لليسار */
+    transition: margin-right 0.3s ease;
+    width: calc(100% - var(--sidebar-width)) !important;
+}
+
+/* 3. تنسيق جدول المشتركين والشركات مع مسافات الصفوف */
+.aysed_subscription_table {
+    margin-top: 20px;
+    border-collapse: separate;
+    border-spacing: 0 8px !important; /* مسافات بين الصفوف لمنع التلاصق */
+}
+
+.aysed_subscription_table tr {
+    background: #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    border-radius: 8px;
+}
+
+.aysed_subscription_table td,
+.aysed_subscription_table th {
+    vertical-align: middle !important;
+}
+
+/* 4. إخفاء شريط أودو الأصلي فقط داخل لوحة السوبر أدمن */
+.o_main_navbar:has(+ .aysed_super_admin_view) {
+    display: none !important;
+}
+
+/* 5. كثافة العناصر وحاوية السوبر أدمن */
+.aysed_super_admin_view {
+    padding-bottom: 80px !important; /* منع اختفاء البيانات خلف شريط المهام */
+}
+
+/* إصلاح تداخل شريط السوبر أدمن مع نظام أودو */
+.aysed_admin_bar {
+    position: relative !important;
+    z-index: 1000 !important;
+    width: 100%;
+    height: 40px;
+}
+
+.o_main_navbar {
+    top: 0px !important;
+    margin-top: 0px !important; 
+    transition: margin-top 0.3s ease-in-out;
+}
+
+body.has_admin_bar .o_main_navbar {
+    top: 40px !important;
+}
+
+/* شريط الانتقال العائم */
+.aysed_admin_transition_bar {
+    position: sticky !important;
+    top: 0;
+    z-index: 1060 !important;
+    background: linear-gradient(90deg, #71639e 0%, #4c4c4c 100%) !important;
+    height: 35px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 2px solid #008784;
+}
+
+body.admin_mode .o_main_navbar {
+    margin-top: 35px !important;
+}
+
+

@@ -64,8 +64,8 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
   // Effective search query combining global top bar + local search
   const query = (searchTerm || localSearch).trim().toLowerCase();
 
-  const activeCompId = activeCompany?.id || 'comp-1';
-  let companyEmps = (employees || []).filter(e => !e.isDeleted && ((e.companyId || 'comp-1') === activeCompId || true));
+  const activeCompId = activeCompany?.id || '';
+  let companyEmps = (employees || []).filter(e => !e.isDeleted && (!activeCompId || e.companyId === activeCompId));
   if (companyEmps.length === 0 && (employees || []).filter(e => !e.isDeleted).length > 0) {
     companyEmps = (employees || []).filter(e => !e.isDeleted);
   }
@@ -82,7 +82,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
   });
 
   // Filtered payslips for selected month
-  const monthPayslips = (payslips || []).filter(p => p.companyId === (activeCompany?.id || 'comp-1') && p.month === selectedMonth);
+  const monthPayslips = (payslips || []).filter(p => (!activeCompId || p.companyId === activeCompId) && p.month === selectedMonth);
   const filteredPayslips = monthPayslips.filter(p => {
     const emp = employees.find(e => e.id === p.employeeId);
     if (!query) return true;
@@ -136,6 +136,25 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
     onSaveContract(updatedContract);
     setEditingStructureEmp(null);
     alert(`تم حفظ وتحديث هيكل راتب الموظف [${editingStructureEmp.fullNameAr}] بنجاح!`);
+  };
+
+  // Helper for bank color highlight badges
+  const getBankBadgeStyle = (bankName: string) => {
+    const name = (bankName || '').toLowerCase();
+    if (name.includes('وطني') || name.includes('nbk')) {
+      return 'bg-blue-100 text-blue-900 border-blue-300 ring-1 ring-blue-400/30';
+    } else if (name.includes('تمويل') || name.includes('kfh')) {
+      return 'bg-emerald-100 text-emerald-900 border-emerald-300 ring-1 ring-emerald-400/30';
+    } else if (name.includes('بوبيان') || name.includes('boubyan')) {
+      return 'bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-400/30';
+    } else if (name.includes('خليج') || name.includes('gulf')) {
+      return 'bg-sky-100 text-sky-900 border-sky-300 ring-1 ring-sky-400/30';
+    } else if (name.includes('برقان') || name.includes('burgan')) {
+      return 'bg-purple-100 text-purple-900 border-purple-300 ring-1 ring-purple-400/30';
+    } else if (name.includes('تجاري') || name.includes('cbk')) {
+      return 'bg-rose-100 text-rose-900 border-rose-300 ring-1 ring-rose-400/30';
+    }
+    return 'bg-slate-100 text-slate-800 border-slate-300';
   };
 
   // Generate WPS File content (Wage Protection System for Ministry of Social Affairs Kuwait)
@@ -559,29 +578,62 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-800 text-white font-bold">
                 <tr>
-                  <th className="p-2.5">الموظف</th>
-                  <th className="p-2.5">الرقم المدني</th>
-                  <th className="p-2.5">اسم البنك</th>
-                  <th className="p-2.5">رقم الحساب IBAN</th>
-                  <th className="p-2.5 text-left font-mono">الصافي المحول (KWD)</th>
+                  <th className="p-3">الموظف</th>
+                  <th className="p-3">الرقم المدني</th>
+                  <th className="p-3">اسم البنك</th>
+                  <th className="p-3">رقم الحساب IBAN</th>
+                  <th className="p-3 text-left font-mono">الصافي المحول (KWD)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {monthPayslips.map((p, index) => {
-                  const emp = employees.find(e => e.id === p.employeeId);
-                  return (
-                    <tr key={p.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                      <td className="p-2.5 font-bold text-slate-900">{emp?.fullNameAr || 'مجهول'}</td>
-                      <td className="p-2.5 font-mono dir-ltr">{emp?.civilId || '—'}</td>
-                      <td className="p-2.5 font-semibold text-slate-700">{emp?.bankName || activeCompany?.bankName || ''}</td>
-                      <td className="p-2.5 font-mono text-slate-800 dir-ltr">{emp?.iban || activeCompany?.iban || ''}</td>
-                      <td className="p-2.5 font-mono font-black text-emerald-700 dir-ltr text-left text-sm">
-                        {formatKWD(p.netSalary)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {monthPayslips.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-slate-400">
+                      لا توجد كشوف رواتب مولدة لهذا الشهر لعرضها في ملف WPS.
+                    </td>
+                  </tr>
+                ) : (
+                  monthPayslips.map((p, index) => {
+                    const emp = employees.find(e => e.id === p.employeeId);
+                    const bankName = emp?.bankName || activeCompany?.bankName || 'بنك الكويت الوطني (NBK)';
+                    return (
+                      <tr key={p.id} className={index % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/70 hover:bg-slate-100/60'}>
+                        <td className="p-3 font-bold text-slate-900">
+                          {emp?.fullNameAr || 'مجهول'}
+                          <span className="block text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</span>
+                        </td>
+                        <td className="p-3 font-mono dir-ltr text-slate-700">{emp?.civilId || '—'}</td>
+                        <td className="p-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border inline-flex items-center gap-1.5 ${getBankBadgeStyle(bankName)}`}>
+                            <Landmark className="w-3.5 h-3.5 opacity-70" />
+                            <span>{bankName}</span>
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-slate-800 dir-ltr font-medium">{emp?.iban || activeCompany?.iban || 'KW00 0000 0000 0000 0000 0000'}</td>
+                        <td className="p-3 font-mono font-black text-emerald-700 dir-ltr text-left text-sm">
+                          {formatKWD(p.netSalary)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
+              {/* Total Summary Footer for Reconciliation */}
+              {monthPayslips.length > 0 && (
+                <tfoot className="bg-slate-900 text-white font-bold text-xs">
+                  <tr>
+                    <td colSpan={2} className="p-3">
+                      إجمالي التحويلات ({monthPayslips.length} موظف):
+                    </td>
+                    <td colSpan={2} className="p-3 text-slate-300 text-[11px]">
+                      مطابقة مالية معتمدة لملف حماية الأجور (WSI)
+                    </td>
+                    <td className="p-3 text-left font-mono font-black text-emerald-400 text-base dir-ltr">
+                      {formatKWD(totalNet)}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Contract, Employee, Company, ViewMode } from '../types';
 import { formatKWD } from '../utils/kuwaitLaw';
-import { FileSignature, Plus, CheckCircle, ShieldAlert, Edit2, Trash2 } from 'lucide-react';
+import { FileSignature, Plus, CheckCircle, ShieldAlert, Edit2, Trash2, User, CreditCard, RotateCcw, FileText, ArrowLeftRight } from 'lucide-react';
 
 interface ContractsAppProps {
   contracts: Contract[];
@@ -13,6 +13,7 @@ interface ContractsAppProps {
   onSaveContract: (contract: Contract) => void;
   onDeleteContract: (contractId: string) => void;
   onViewModeChange: (mode: ViewMode) => void;
+  onNavigateToApp?: (app: any) => void;
 }
 
 export const ContractsApp: React.FC<ContractsAppProps> = ({
@@ -25,6 +26,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
   onSaveContract,
   onDeleteContract,
   onViewModeChange,
+  onNavigateToApp,
 }) => {
   const [editingContract, setEditingContract] = useState<Partial<Contract> | null>(null);
 
@@ -181,8 +183,20 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
               return (
                 <tr key={cnt.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                   <td className="p-3 font-mono font-bold text-slate-600">{cnt.id}</td>
-                  <td className="p-3 font-bold text-slate-900">
-                    {emp ? emp.fullNameAr : 'غير معرف'}
+                  <td className="p-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-900">{emp ? emp.fullNameAr : 'غير معرف'}</span>
+                      {emp && onNavigateToApp && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigateToApp('EMPLOYEES')}
+                          className="text-purple-600 hover:text-purple-800 hover:bg-purple-50 p-0.5 rounded transition text-[10px] flex items-center gap-0.5"
+                          title="عرض ملف الموظف"
+                        >
+                          <User className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
@@ -222,9 +236,39 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
       {editingContract && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 border border-slate-200 text-xs">
-            <h3 className="font-extrabold text-slate-900 text-base mb-4 pb-2 border-b">
-              {editingContract.id ? 'تعديل عقد العمل' : 'إنشاء عقد عمل جديد'}
-            </h3>
+            <div className="flex items-center justify-between mb-4 pb-2 border-b">
+              <h3 className="font-extrabold text-slate-900 text-base">
+                {editingContract.id ? 'تعديل عقد العمل' : 'إنشاء عقد عمل جديد'}
+              </h3>
+              {onNavigateToApp && editingContract.employeeId && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingContract(null);
+                      onNavigateToApp('PAYROLL');
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded text-[11px] font-bold transition"
+                    title="الانتقال إلى مسير الرواتب"
+                  >
+                    <CreditCard className="w-3 h-3" />
+                    <span>الراتب</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingContract(null);
+                      onNavigateToApp('EOS');
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded text-[11px] font-bold transition"
+                    title="الانتقال إلى حاسبة نهاية الخدمة"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>نهاية الخدمة</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>

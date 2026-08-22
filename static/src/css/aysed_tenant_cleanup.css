@@ -1,0 +1,18 @@
+/* ==========================================================================
+   Aysed S HR 2026 - Tenant Cleanup & Security Rules
+   إخفاء وسوم الـ Debug والترجمة وأزرار إنشاء الشركات عن المشتركين
+   ========================================================================== */
+
+/* إخفاء وسوم النماذج التقنية والمترجمات عن غير المالك */
+body:not(.aysed_owner) .o_debug_manager,
+body:not(.aysed_owner) .o_field_translate,
+body:not(.aysed_owner) .badge-info,
+body:not(.aysed_owner) .o_tag_id {
+    display: none !important;
+}
+
+/* إخفاء زر إنشاء الشركات للمشتركين */
+body:not(.aysed_owner) .o_list_button_add,
+body:not(.aysed_owner) button[name="action_create_new_company"] {
+    display: none !important;
+}

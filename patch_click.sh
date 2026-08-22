@@ -1,1 +1,0 @@
-sed -i 's/toast\.success("تم ترقية المستخدم لمدير نظام (ERP Manager) بنجاح!");/toast.success("تم ترقية المستخدم لمدير نظام (ERP Manager) بنجاح!"); alert("تم تنفيذ السكريبت وترقية الصلاحيات بنجاح!"); window.location.href = "\/?debug=1";/g' src/apps/SettingsApp.tsx

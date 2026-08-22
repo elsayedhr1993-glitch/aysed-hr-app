@@ -1,6 +1,6 @@
 // components/LeaveApprovalDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { onLeaveValidate } from '../services/leaveSettlementService';
 import { CheckCircle, XCircle, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -21,6 +21,9 @@ export const LeaveApprovalDashboard: React.FC = () => {
 
   // 1. جلب طلبات الإجازة المعلقة
   const fetchPendingLeaves = async () => {
+    if (!isSupabaseConfigured) {
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('hr_leaves')

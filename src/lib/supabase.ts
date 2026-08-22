@@ -4,6 +4,13 @@ const rawUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseUrl = (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('http')) ? rawUrl : 'https://placeholder-supabase-url.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key';
 
+export const isSupabaseConfigured = Boolean(
+  rawUrl &&
+  typeof rawUrl === 'string' &&
+  rawUrl.startsWith('http') &&
+  !rawUrl.includes('placeholder-supabase-url')
+);
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface Employee {

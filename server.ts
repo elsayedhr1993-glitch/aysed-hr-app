@@ -1,11 +1,13 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import { initializeApp, cert, getApps, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { sendWelcomeEmail } from "./src/services/emailService";
 
 dotenv.config();
 
@@ -15,6 +17,47 @@ const PORT = 3000;
 let adminApp: App | null = null;
 let authAdmin: ReturnType<typeof getAuth> | null = null;
 let firebaseAdminInitAttempted = false;
+
+function normalizeAndValidatePrivateKey(rawKey: any): string | null {
+  if (!rawKey || typeof rawKey !== 'string') return null;
+  let key = rawKey.trim();
+  if (key.startsWith('"') && key.endsWith('"')) {
+    key = key.slice(1, -1);
+  }
+  key = key.replace(/\\n/g, '\n').trim();
+
+  // Basic check for PEM headers
+  if (!key.includes('-----BEGIN') || !key.includes('KEY-----')) {
+    return null;
+  }
+
+  const beginMatch = key.match(/-----BEGIN [A-Z0-9_\-\s]+KEY-----/);
+  const endMatch = key.match(/-----END [A-Z0-9_\-\s]+KEY-----/);
+  if (!beginMatch || !endMatch) {
+    return null;
+  }
+
+  const header = beginMatch[0];
+  const footer = endMatch[0];
+  const startIndex = key.indexOf(header) + header.length;
+  const endIndex = key.indexOf(footer);
+  if (startIndex >= endIndex) return null;
+
+  const rawBase64 = key.substring(startIndex, endIndex).replace(/\s+/g, '');
+  if (!rawBase64 || rawBase64.length < 50) return null;
+
+  const chunks = rawBase64.match(/.{1,64}/g);
+  if (!chunks) return null;
+
+  const formattedKey = `${header}\n${chunks.join('\n')}\n${footer}\n`;
+
+  try {
+    crypto.createPrivateKey(formattedKey);
+    return formattedKey;
+  } catch {
+    return null;
+  }
+}
 
 function getAdminAuth(): ReturnType<typeof getAuth> | null {
   if (authAdmin) return authAdmin;
@@ -46,19 +89,11 @@ function getAdminAuth(): ReturnType<typeof getAuth> | null {
     }
 
     if (parsedServiceAccount && (parsedServiceAccount.private_key || parsedServiceAccount.client_email)) {
-      if (typeof parsedServiceAccount.private_key === 'string') {
-        let pk = parsedServiceAccount.private_key.replace(/\\n/g, '\n').trim();
-        // Remove accidental wrapping quotes if present
-        if (pk.startsWith('"') && pk.endsWith('"')) {
-          pk = pk.slice(1, -1).replace(/\\n/g, '\n').trim();
-        }
-        // Basic PEM structure validation to avoid OpenSSL decoder routine crashes
-        if (!pk.includes('-----BEGIN') || !pk.includes('PRIVATE KEY-----')) {
-          console.warn("[Firebase Admin] private_key does not appear to be a valid PEM private key string.");
-          return null;
-        }
-        parsedServiceAccount.private_key = pk;
+      const validKey = normalizeAndValidatePrivateKey(parsedServiceAccount.private_key);
+      if (!validKey) {
+        return null;
       }
+      parsedServiceAccount.private_key = validKey;
 
       if (getApps().length === 0) {
         adminApp = initializeApp({
@@ -72,7 +107,6 @@ function getAdminAuth(): ReturnType<typeof getAuth> | null {
       return authAdmin;
     }
   } catch (err: any) {
-    console.warn("[Firebase Admin] Could not initialize Firebase Admin service account:", err?.message || err);
     return null;
   }
   return null;
@@ -638,6 +672,25 @@ app.post("/api/send-email", express.json(), async (req, res) => {
   }
 });
 
+// Welcome Email Route for Subscription
+app.post("/api/send-welcome-email", express.json(), async (req, res) => {
+  const { subscriberEmail, subscriberName, companyName } = req.body;
+  if (!subscriberEmail || !subscriberName || !companyName) {
+    return res.status(400).json({ success: false, error: "جميع الحقول (subscriberEmail, subscriberName, companyName) مطلوبة" });
+  }
+  try {
+    const result = await sendWelcomeEmail({ subscriberEmail, subscriberName, companyName });
+    if (result.success) {
+      res.json({ success: true, message: "تم إرسال إيميل الترحيب بنجاح" });
+    } else {
+      res.status(500).json({ success: false, error: result.error || "فشل إرسال الإيميل" });
+    }
+  } catch (error: any) {
+    console.error("Welcome email route error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 
 app.post("/api/admin/force-password", express.json(), async (req, res) => {
   const { email, newPassword } = req.body;
@@ -655,6 +708,141 @@ app.post("/api/admin/force-password", express.json(), async (req, res) => {
     res.json({ success: true, message: "تم تغيير كلمة المرور بنجاح" });
   } catch (error: any) {
     console.error("Force password change failed:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Admin Route to Create or Sync Tenant Account seamlessly without overriding Super Admin session
+app.post("/api/admin/create-tenant", express.json(), async (req, res) => {
+  const { email, password, companyName, companyId, ownerName, phone, planType } = req.body;
+  
+  if (!email || !companyName) {
+    return res.status(400).json({ success: false, error: "البريد الإلكتروني واسم الشركة مطلوبان" });
+  }
+
+  const admin = getAdminAuth();
+  const cleanEmail = email.trim().toLowerCase();
+  let uid = `user_${Date.now()}`;
+  let alreadyExisted = false;
+
+  if (admin) {
+    try {
+      try {
+        const existingUser = await admin.getUserByEmail(cleanEmail);
+        uid = existingUser.uid;
+        alreadyExisted = true;
+        // Optionally update password if provided
+        if (password) {
+          await admin.updateUser(uid, {
+            password: password,
+            displayName: companyName
+          });
+        }
+      } catch (notFoundErr: any) {
+        if (notFoundErr.code === 'auth/user-not-found') {
+          const newUser = await admin.createUser({
+            email: cleanEmail,
+            password: password || 'Aysed2026#Secure',
+            displayName: companyName,
+            emailVerified: true
+          });
+          uid = newUser.uid;
+        } else {
+          throw notFoundErr;
+        }
+      }
+
+      // Set custom claims for role
+      try {
+        await admin.setCustomUserClaims(uid, {
+          role: 'COMPANY_ADMIN',
+          companyId: companyId || `comp_${Date.now()}`
+        });
+      } catch (claimErr) {
+        console.warn("Custom claims note:", claimErr);
+      }
+
+      return res.json({
+        success: true,
+        uid,
+        alreadyExisted,
+        message: alreadyExisted ? "تم ربط الحساب الموجود وتحديث بيانات الدخول" : "تم إنشاء حساب المستخدم في Firebase Auth بنجاح"
+      });
+    } catch (adminErr: any) {
+      console.error("Admin create user error:", adminErr);
+      return res.status(500).json({ success: false, error: adminErr.message });
+    }
+  } else {
+    // If Firebase Admin is not configured, inform client so it can use secondary client auth instance
+    return res.json({
+      success: false,
+      useClientFallback: true,
+      message: "Firebase Admin is not configured, falling back to secondary client app"
+    });
+  }
+});
+
+// Admin Route to Hard Delete a Tenant User from Firebase Authentication
+app.post("/api/admin/delete-tenant", express.json(), async (req, res) => {
+  const { email, uid, companyId } = req.body;
+  const admin = getAdminAuth();
+
+  if (!email && !uid) {
+    return res.status(400).json({ success: false, error: "البريد الإلكتروني أو معرف المستخدم مطلوب" });
+  }
+
+  if (admin) {
+    let targetUid = uid;
+    try {
+      if (!targetUid && email) {
+        try {
+          const userRecord = await admin.getUserByEmail(email.trim().toLowerCase());
+          targetUid = userRecord.uid;
+        } catch (notFoundErr: any) {
+          if (notFoundErr.code === 'auth/user-not-found') {
+            return res.json({ success: true, message: "لم يتم العثور على حساب مستخدم في Auth، تم الاستمرار بالحذف" });
+          }
+          throw notFoundErr;
+        }
+      }
+
+      if (targetUid) {
+        await admin.deleteUser(targetUid);
+      }
+
+      return res.json({
+        success: true,
+        message: "تم حذف حساب مسؤول الشركة من Firebase Authentication بنجاح"
+      });
+    } catch (adminErr: any) {
+      console.error("Admin delete tenant auth error:", adminErr);
+      return res.status(500).json({ success: false, error: adminErr.message });
+    }
+  } else {
+    return res.json({
+      success: true,
+      useClientFallback: true,
+      message: "Firebase Admin is not configured, client-side handles database and storage purge"
+    });
+  }
+});
+
+app.post("/api/admin/update-user-email", express.json(), async (req, res) => {
+  const { currentEmail, newEmail } = req.body;
+  const admin = getAdminAuth();
+  if (!admin) {
+    return res.status(400).json({ 
+      success: false, 
+      error: "Firebase Admin is not configured" 
+    });
+  }
+  
+  try {
+    const userRecord = await admin.getUserByEmail(currentEmail);
+    await admin.updateUser(userRecord.uid, { email: newEmail });
+    res.json({ success: true, message: "تم تحديث البريد الإلكتروني بنجاح" });
+  } catch (error: any) {
+    console.error("Update email failed in admin:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

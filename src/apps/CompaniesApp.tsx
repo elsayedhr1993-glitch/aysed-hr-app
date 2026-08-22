@@ -15,6 +15,7 @@ interface CompaniesAppProps {
   onSaveCompany: (company: Company) => void;
   onDeleteCompany: (companyId: string) => void;
   currentUserEmail: string;
+  currentUserRole?: string;
 }
 
 export const CompaniesApp: React.FC<CompaniesAppProps> = ({
@@ -23,8 +24,13 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
   onSelectCompany,
   onSaveCompany,
   onDeleteCompany,
-  currentUserEmail
+  currentUserEmail,
+  currentUserRole = ''
 }) => {
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || 
+    currentUserEmail?.toLowerCase() === 'elsayedhr1993@gmail.com' || 
+    currentUserEmail?.toLowerCase() === 'admin@aysed.com';
+
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
@@ -155,25 +161,31 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={handleOpenCreate}
-            className="bg-[#714B67] hover:bg-[#5e3f55] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>إنشاء شركة جديدة</span>
-          </button>
+          {/* View Access Control: Hide create company for non-superadmin */}
+          {isSuperAdmin && (
+            <button
+              id="action_create_new_company"
+              name="action_create_new_company"
+              data-groups="base.group_system"
+              onClick={handleOpenCreate}
+              className="o_list_button_add bg-[#714B67] hover:bg-[#5e3f55] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>إنشاء شركة جديدة</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Kanban View */}
+      {/* Kanban View - Odoo Enterprise Kanban Style */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 o_kanban_mobile">
           {filteredCompanies.map((comp) => {
             const isActive = comp.id === activeCompany?.id;
             return (
               <div 
                 key={comp.id}
-                className={`bg-white/95 backdrop-blur-md rounded-2xl border transition-all shadow-sm hover:shadow-md overflow-hidden flex flex-col justify-between ${
+                className={`bg-white/95 backdrop-blur-md rounded-2xl border transition-all shadow-sm hover:shadow-md overflow-hidden flex flex-col justify-between oe_kanban_global_click ${
                   isActive ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/10' : 'border-slate-200'
                 }`}
               >
@@ -181,15 +193,15 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                   {/* Card Header */}
                   <div className="p-5 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg border border-purple-200 shadow-inner overflow-hidden">
+                      <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg border border-purple-200 shadow-inner overflow-hidden o_kanban_image">
                         {comp.logoUrl ? (
                           <img src={comp.logoUrl} alt={comp.nameAr} className="w-full h-full object-cover" />
                         ) : (
                           <Building className="w-6 h-6 text-[#714B67]" />
                         )}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">{comp.nameAr}</h3>
+                      <div className="oe_kanban_details">
+                        <h3 className="font-bold text-slate-900 text-sm o_kanban_record_title">{comp.nameAr}</h3>
                         <p className="text-[11px] text-slate-500 font-mono">{comp.nameEn}</p>
                       </div>
                     </div>
@@ -199,10 +211,13 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       </span>
                     ) : (
                       <button
+                        name="action_switch_to_this_company"
+                        type="button"
+                        data-type="object"
                         onClick={() => onSelectCompany(comp)}
-                        className="bg-slate-100 hover:bg-purple-100 text-slate-700 hover:text-purple-700 text-[10px] font-bold px-2.5 py-1 rounded-lg transition cursor-pointer border border-slate-200"
+                        className="btn btn-primary btn-sm mt-2 bg-[#714B67] hover:bg-[#5e3f55] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer shadow-sm"
                       >
-                        اختيار كنشطة
+                        إدارة الشركة
                       </button>
                     )}
                   </div>
@@ -250,13 +265,15 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => handleDeleteClick(comp)}
-                      className="p-1.5 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-lg border border-slate-200 transition shadow-sm cursor-pointer"
-                      title="حذف الشركة"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {isSuperAdmin && (
+                      <button
+                        onClick={() => handleDeleteClick(comp)}
+                        className="p-1.5 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-lg border border-slate-200 transition shadow-sm cursor-pointer"
+                        title="حذف الشركة"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -328,13 +345,15 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => handleDeleteClick(comp)}
-                          className="p-1.5 bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-600 rounded-lg transition"
-                          title="حذف"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => handleDeleteClick(comp)}
+                            className="p-1.5 bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-600 rounded-lg transition"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

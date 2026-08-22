@@ -35,6 +35,7 @@ interface OdooTopBarProps {
   onToggleFieldInspector?: (active: boolean) => void;
   onOpenProfile?: () => void;
   currentUserRole?: string;
+  onOpenAdmin?: () => void;
 }
 
 const APP_MODELS: Record<ActiveApp, string> = {
@@ -63,6 +64,8 @@ const APP_MODELS: Record<ActiveApp, string> = {
   COMPANIES: 'res.company',
   SETTINGS: 'res.config.settings',
   DAILY_MOVEMENTS: 'hr.daily.movement',
+  HOLIDAY_WORK: 'hr.holiday.work',
+  LEAVE_TYPES_CONFIG: 'hr.leave.type',
 };
 
 const appTitles: Record<ActiveApp, { ar: string; en: string }> = {
@@ -91,6 +94,8 @@ const appTitles: Record<ActiveApp, { ar: string; en: string }> = {
   SAAS_ADMIN: { ar: 'إدارة اشتراكات الشركات (SaaS Super Admin)', en: 'SaaS Super Admin' },
   COMPANIES: { ar: 'إدارة الشركات والعيادات (Multi-Company)', en: 'Companies & Clinics' },
   SETTINGS: { ar: 'الإعدادات العامة والربط الخارجي', en: 'Settings & Integrations' },
+  HOLIDAY_WORK: { ar: 'العمل في العطلات والجمع (1.5x)', en: 'Holiday & Weekend Work' },
+  LEAVE_TYPES_CONFIG: { ar: 'تهيئة أنواع الإجازات وقواعد الاستحقاق', en: 'Leave Types Configuration' },
 };
 
 export const isDebug = typeof window !== 'undefined' ? window.location.search.includes('debug=1') : false;
@@ -120,6 +125,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   onToggleFieldInspector,
   onOpenProfile,
   currentUserRole = 'COMPANY_ADMIN',
+  onOpenAdmin,
 }) => {
   const [showCompanyMenu, setShowCompanyMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -148,91 +154,94 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   const isMasterEmail = emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com';
   const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || isMasterEmail;
 
+  // منطق توحيد اسم المنشأة والحرف التعريفي للمستخدم (get_aysed_header_info)
+  const getUserHeaderInfo = () => {
+    let userName = "Sayed";
+    if (currentUserEmail) {
+      const emailLocal = currentUserEmail.split('@')[0];
+      if (emailLocal.toLowerCase().includes('sayed')) {
+        userName = "Sayed";
+      } else if (emailLocal.toLowerCase() === 'admin') {
+        userName = "Sayed (Admin)";
+      } else {
+        userName = emailLocal.charAt(0).toUpperCase() + emailLocal.slice(1);
+      }
+    }
+    const userInitial = userName.trim().charAt(0).toUpperCase() || 'S';
+    const companyName = activeCompany?.nameAr || activeCompany?.nameEn || 'Aysed HR S 2026';
+    return {
+      userName,
+      userInitial, // يضمن توليد حرف 'S' تلقائياً
+      companyName,
+    };
+  };
+
+  const { userName, userInitial, companyName } = getUserHeaderInfo();
+
   const criticalCount = (notifications || []).filter(n => n.severity === 'CRITICAL').length;
   const warningCount = (notifications || []).filter(n => n.severity === 'WARNING').length;
   const unreadCount = (notifications || []).length;
 
   return (
-    <header className="bg-[#714B67]/80 backdrop-blur-md border-b border-white/20 text-white h-12 px-5 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.1)] select-none sticky top-0 z-40" dir="rtl">
-      {/* Right Side (Arabic RTL): App Grid Launcher + App Name + Permanent Close Button */}
-      <div className="flex items-center gap-3">
+    <header className="bg-[#714B67] border-b border-white/20 text-white h-12 px-3 sm:px-4 flex items-center justify-between shadow-md select-none sticky top-0 z-40 gap-2" dir="rtl">
+      {/* Right Side: App Grid Launcher + Breadcrumbs */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
         <button
           onClick={handleCloseToHome}
-          className="p-1.5 rounded hover:bg-white/10 transition flex items-center justify-center text-white/90 hover:text-white"
-          title="فتح شاشة التطبيقات الرئيسية (دفترة / Odoo Launcher)"
+          className="p-1.5 rounded-lg hover:bg-white/15 transition flex items-center justify-center text-white cursor-pointer shrink-0 active:scale-95"
+          title="فتح شاشة التطبيقات الرئيسية"
         >
-          <Grid className="w-5 h-5" />
+          <Grid className="w-5 h-5 text-white" />
         </button>
 
-        {isInsideApp && (
-          <button
-            onClick={handleCloseToHome}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-white/15 hover:bg-rose-600/80 text-white text-xs rounded-md transition font-medium border border-white/20 shadow-sm"
-            title="إغلاق هذا المكون والعودة للشاشة الرئيسية لدفترة"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">إغلاق التطبيق (دفترة)</span>
-          </button>
-        )}
+        {/* Company & Current App Breadcrumb */}
+        <div className="flex items-center gap-1.5 border-r border-white/25 pr-2.5 min-w-0">
+          <div className="flex items-center gap-1 max-w-[130px] sm:max-w-[180px] md:max-w-[220px] shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <span className="font-bold text-xs sm:text-sm text-amber-300 truncate font-sans" title={companyName}>
+              {companyName}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-3 border-r border-white/20 pr-3">
-          <span className="font-bold text-sm tracking-wide text-amber-300 flex items-center gap-1 font-sans">
-            <Sparkles className="w-4 h-4 text-amber-300 inline" />
-            Aysed HR S 2026
-          </span>
-          <span className="text-white/40 text-xs">|</span>
-          <span className="text-xs font-semibold text-white/90">
-            {effectiveApp ? (appTitles[effectiveApp as ActiveApp]?.ar || effectiveApp) : 'الشاشة الرئيسية لدفترة (قائمة التطبيقات)'}
+          <span className="text-white/40 text-xs shrink-0">/</span>
+
+          <span className="text-xs font-semibold text-white/95 truncate max-w-[120px] sm:max-w-[160px] md:max-w-[200px]" title={effectiveApp ? (appTitles[effectiveApp as ActiveApp]?.ar || effectiveApp) : 'قائمة التطبيقات'}>
+            {effectiveApp ? (appTitles[effectiveApp as ActiveApp]?.ar || effectiveApp) : 'قائمة التطبيقات'}
           </span>
         </div>
-        
-        {/* Unified Master Dashboard Navigation for Super Admin */}
-        {isSuperAdmin && (
-          <div className="hidden lg:flex items-center gap-2 mr-4 bg-black/20 rounded-lg p-1">
-            <button
-              onClick={() => onNavigateToApp && onNavigateToApp('SAAS_ADMIN')}
-              className={`text-xs px-3 py-1.5 rounded-md font-bold transition flex items-center gap-1.5 ${
-                effectiveApp === 'SAAS_ADMIN' || effectiveApp === 'COMPANIES'
-                  ? 'bg-amber-400 text-slate-900 shadow-sm'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>إدارة المنظومة (SaaS)</span>
-            </button>
-            <button
-              onClick={handleCloseToHome}
-              className={`text-xs px-3 py-1.5 rounded-md font-bold transition flex items-center gap-1.5 ${
-                !isInsideApp
-                  ? 'bg-emerald-500 text-white shadow-sm'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>تطبيقات الموارد البشرية</span>
-            </button>
-          </div>
+
+        {/* Direct Super Admin Quick Badge */}
+        {isSuperAdmin && onOpenAdmin && (
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="hidden md:flex text-[11px] px-2.5 py-1 rounded-md font-bold transition items-center gap-1 bg-gradient-to-r from-indigo-700 to-purple-900 hover:from-indigo-600 hover:to-purple-800 text-white shadow-xs border border-indigo-400/40 cursor-pointer active:scale-95 whitespace-nowrap shrink-0 mr-1"
+            title="الانتقال إلى لوحة السوبر أدمن المركزية"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <span>لوحة السوبر أدمن 👑</span>
+          </button>
         )}
       </div>
 
-      {/* Middle: Search & Filter Bar (Only if inside an app, not launcher) */}
+      {/* Middle: Search & Filter Bar */}
       {isInsideApp && effectiveApp !== 'SETTINGS' && (
-        <div className="flex-1 max-w-xl mx-4 hidden md:flex items-center bg-white/10 hover:bg-white/15 rounded text-white text-xs px-2.5 py-1 transition focus-within:bg-white focus-within:text-slate-900 border border-white/20">
-          <Search className="w-3.5 h-3.5 opacity-70 ml-2" />
+        <div className="flex-1 max-w-xs md:max-w-sm lg:max-w-md mx-2 hidden sm:flex items-center bg-white/15 hover:bg-white/20 rounded-lg text-white text-xs px-2.5 py-1 transition focus-within:bg-white focus-within:text-slate-900 border border-white/20 shrink min-w-0">
+          <Search className="w-3.5 h-3.5 opacity-80 ml-2 shrink-0" />
           <input
             type="text"
-            placeholder={`بحث في ${effectiveApp ? (appTitles[effectiveApp as ActiveApp]?.ar || effectiveApp) : ''}... (اسم، رقم مدني، كود)`}
+            placeholder={`بحث في ${effectiveApp ? (appTitles[effectiveApp as ActiveApp]?.ar || effectiveApp) : ''}...`}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="bg-transparent border-none outline-none w-full placeholder-white/60 focus:placeholder-slate-400 text-xs py-0.5"
+            className="bg-transparent border-none outline-none w-full placeholder-white/70 focus:placeholder-slate-400 text-xs py-0.5"
           />
-          <Filter className="w-3.5 h-3.5 opacity-70 mr-1 cursor-pointer hover:opacity-100" />
+          <Filter className="w-3.5 h-3.5 opacity-70 mr-1 cursor-pointer hover:opacity-100 shrink-0" />
         </div>
       )}
 
-      {/* Left Side: Actions, Company Switcher, OCR & Profile */}
-      <div className="flex items-center gap-3">
-        {/* Global Print Actions (Always visible) */}
+      {/* Left Side: Actions, Switcher, Tools & Profile */}
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        {/* Global Print Menu */}
         <div className="relative">
           <button
             onClick={() => {
@@ -241,16 +250,16 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               setShowNotifMenu(false);
               setShowUserMenu(false);
             }}
-            className="flex items-center gap-1.5 bg-purple-900/30 hover:bg-purple-900/50 text-white text-xs px-2.5 py-1 rounded border border-white/20 transition cursor-pointer font-bold"
-            title="خيارات الطباعة"
+            className="flex items-center gap-1 bg-purple-900/40 hover:bg-purple-900/60 text-white text-xs px-2 py-1 rounded-md border border-white/20 transition cursor-pointer font-medium"
+            title="خيارات الطباعة والتقارير"
           >
-            <Printer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">طباعة</span>
+            <Printer className="w-3.5 h-3.5 text-white/90" />
+            <span className="hidden lg:inline text-[11px]">طباعة</span>
             <ChevronDown className="w-3 h-3 text-white/70" />
           </button>
           
           {showPrintMenu && (
-            <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-md shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95 dir-rtl text-right">
+            <div className="absolute right-0 mt-1.5 w-48 bg-white rounded-lg shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95 dir-rtl text-right">
               <button 
                 onClick={() => {
                   if (typeof onNavigateToApp === 'function') onNavigateToApp('DOCUMENT_TEMPLATES');
@@ -289,41 +298,40 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         {onOpenAICopilot && (
           <button
             onClick={onOpenAICopilot}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs px-2.5 py-1 rounded flex items-center gap-1 font-bold transition shadow-sm border border-amber-300/40 cursor-pointer"
+            className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs px-2 sm:px-2.5 py-1 rounded-md flex items-center gap-1 font-bold transition shadow-xs border border-amber-300 cursor-pointer active:scale-95"
             title="مساعد أودو الذكي (Odoo AI Copilot)"
           >
-            <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
-            <span className="hidden sm:inline">اسأل الذكاء الاصطناعي</span>
+            <Sparkles className="w-3.5 h-3.5 fill-slate-950 shrink-0" />
+            <span className="hidden lg:inline text-[11px]">اسأل الذكاء الاصطناعي</span>
           </button>
         )}
 
         {/* Quick OCR Scanner Trigger */}
         <button
           onClick={onOpenOCRModal}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded flex items-center gap-1.5 font-medium transition shadow-sm border border-emerald-400/30 cursor-pointer"
+          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 sm:px-2.5 py-1 rounded-md flex items-center gap-1 font-medium transition shadow-xs border border-emerald-400/40 cursor-pointer active:scale-95"
           title="الماسح الضوئي الذكي للهويات والمستندات (OCR Vision)"
         >
-          <Scan className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">ماكينة OCR للهويات</span>
+          <Scan className="w-3.5 h-3.5 shrink-0" />
+          <span className="hidden xl:inline text-[11px]">OCR الهويات</span>
         </button>
 
-        {/* Ambient Sound / Atmosphere Toggle (Envato Nucleus 02 inspired) */}
+        {/* Ambient Sound / Atmosphere Toggle */}
         {onToggleAmbientSound && (
           <button
             onClick={onToggleAmbientSound}
-            className={`text-xs px-2.5 py-1 rounded flex items-center gap-1.5 font-medium transition shadow-sm border cursor-pointer ${
+            className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium transition shadow-xs border cursor-pointer ${
               isAmbientPlaying 
                 ? 'bg-purple-600 hover:bg-purple-500 text-white border-purple-400 animate-pulse' 
-                : 'bg-white/10 hover:bg-white/25 text-white/90 border-white/20'
+                : 'bg-white/10 hover:bg-white/20 text-white/90 border-white/20'
             }`}
-            title="تشغيل/إيقاف الأجواء الصوتية الهادئة والموسيقى البيئية"
+            title="تشغيل/إيقاف الأجواء الصوتية والموسيقى البيئية"
           >
-            {isAmbientPlaying ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 opacity-70" />}
-            <span className="hidden lg:inline">{isAmbientPlaying ? 'أجواء هادئة نشطة' : 'الموسيقى البيئية'}</span>
+            {isAmbientPlaying ? <Volume2 className="w-3.5 h-3.5 shrink-0" /> : <VolumeX className="w-3.5 h-3.5 opacity-70 shrink-0" />}
           </button>
         )}
 
-        {/* Multi-Company Switcher / Isolated Tenant Badge */}
+        {/* Multi-Company Switcher Dropdown */}
         <div className="relative">
           {isSuperAdmin ? (
             <>
@@ -334,16 +342,16 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   setShowUserMenu(false);
                   setShowPrintMenu(false);
                 }}
-                className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs px-2.5 py-1 rounded border border-white/20 transition cursor-pointer"
-                title="لوحة المالك: التبديل بين المنشآت المشتركة"
+                className="flex items-center gap-1 bg-white/15 hover:bg-white/25 text-white text-xs px-2 py-1 rounded-md border border-white/20 transition cursor-pointer"
+                title="لوحة المالك: التبديل بين المنشآت والشركات"
               >
-                <Building2 className="w-3.5 h-3.5 text-amber-300" />
-                <span className="truncate max-w-[130px] font-medium">{activeCompany?.nameAr || 'المنظومة'}</span>
-                <ChevronDown className="w-3 h-3 text-white/70" />
+                <Building2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                <span className="truncate max-w-[90px] sm:max-w-[120px] font-medium text-[11px]">{activeCompany?.nameAr || 'المنظومة'}</span>
+                <ChevronDown className="w-3 h-3 text-white/70 shrink-0" />
               </button>
 
               {showCompanyMenu && (
-                <div className="absolute left-0 mt-1.5 w-64 bg-white rounded-md shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95">
+                <div className="absolute left-0 mt-1.5 w-64 bg-white rounded-lg shadow-xl text-slate-800 text-xs py-1 z-50 border border-slate-200 animate-in fade-in zoom-in-95 dir-rtl text-right">
                   <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-semibold text-slate-400">
                     المنشآت المشتركة (Super Admin Multi-Tenant)
                   </div>
@@ -359,15 +367,15 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                           onSelectCompany(comp);
                           setShowCompanyMenu(false);
                         }}
-                        className="cursor-pointer flex-1"
+                        className="cursor-pointer flex-1 min-w-0"
                       >
                         <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <span>{comp?.nameAr || ''}</span>
+                          <span className="truncate">{comp?.nameAr || ''}</span>
                           {comp?.id === activeCompany?.id && (
-                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">نشط</span>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-500">سجل تجاري: {comp?.commercialRegNo || ''}</div>
+                        <div className="text-[10px] text-slate-500 truncate">سجل تجاري: {comp?.commercialRegNo || 'غير محدد'}</div>
                       </div>
 
                       <button
@@ -378,7 +386,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                           setShowCompanyMenu(false);
                           handleCloseToHome();
                         }}
-                        className="p-1.5 bg-[#714B67]/10 hover:bg-[#714B67] text-[#714B67] hover:text-white rounded-lg transition flex items-center gap-1 cursor-pointer text-[10px] font-bold mr-1"
+                        className="p-1.5 bg-[#714B67]/10 hover:bg-[#714B67] text-[#714B67] hover:text-white rounded-lg transition flex items-center gap-1 cursor-pointer text-[10px] font-bold mr-1 shrink-0"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>دخول</span>
@@ -404,12 +412,16 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             </>
           ) : (
             <div 
-              className="flex items-center gap-1.5 bg-white/10 text-white text-xs px-2.5 py-1 rounded border border-white/20 select-none"
+              className="flex items-center gap-1.5 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded-md border border-white/20 select-none shadow-xs"
               title="بيئة المنشأة المعزولة"
             >
-              <Building2 className="w-3.5 h-3.5 text-emerald-300" />
-              <span className="truncate max-w-[150px] font-medium">{activeCompany?.nameAr || 'المنشأة'}</span>
-              <span className="text-[9px] bg-emerald-500/30 text-emerald-200 px-1 rounded font-mono font-bold">معزول</span>
+              {activeCompany?.logoUrl ? (
+                <img src={activeCompany.logoUrl} alt="" className="w-4 h-4 rounded object-cover" />
+              ) : (
+                <Building2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              )}
+              <span className="truncate max-w-[140px] font-bold text-[11px]">{activeCompany?.nameAr || activeCompany?.nameEn || 'المنشأة'}</span>
+              <span className="text-[9px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">معزول</span>
             </div>
           )}
         </div>
@@ -418,7 +430,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         {isSuperAdmin && (
           <OdooDebugMenu
             currentModel={currentModel}
-            currentViewType={viewMode || 'kanban'}
+            currentViewType={(viewMode === 'list' || viewMode === 'form' || viewMode === 'kanban') ? viewMode : 'kanban'}
             isInspectorActive={isInspectorActive}
             onToggleFieldInspector={onToggleFieldInspector}
           />
@@ -572,10 +584,10 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             title="حساب المستخدم وتسجيل الخروج"
           >
             <div className="w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black flex items-center justify-center text-xs shadow-xs border border-amber-300">
-              {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : 'U'}
+              {userInitial}
             </div>
             <span className="text-xs font-semibold text-white/90 hidden lg:inline">
-              {currentUserEmail ? currentUserEmail.split('@')[0] : 'User'}
+              {userName}
             </span>
             <ChevronDown className="w-3 h-3 text-white/70" />
           </button>
@@ -587,14 +599,14 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 rounded-t-xl">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-[#714B67] text-white font-bold flex items-center justify-center text-xs shadow">
-                    {currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : 'U'}
+                    {userInitial}
                   </div>
                   <div>
                     <h6 className="font-bold text-slate-900 text-xs flex items-center gap-1">
-                      <span>{currentUserEmail ? currentUserEmail.split('@')[0] : 'User'}</span>
+                      <span>{userName}</span>
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                     </h6>
-                    <p className="text-[10px] text-slate-500 font-mono">{currentUserEmail || 'user@company.com'}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{currentUserEmail || 'sayed@company.com'}</p>
                   </div>
                 </div>
                 <div className={`mt-2 inline-block px-2 py-0.5 ${isSuperAdmin ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'} text-[10px] font-bold rounded-full`}>
@@ -624,6 +636,20 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   <ShieldCheck className="w-4 h-4 text-[#714B67]" />
                   <span>الملف الشخصي والأمان (Profile)</span>
                 </button>
+
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      if (onOpenAdmin) onOpenAdmin();
+                      else if (onNavigateToApp) onNavigateToApp('SAAS_ADMIN');
+                    }}
+                    className="w-full text-right px-4 py-2 hover:bg-indigo-50 flex items-center gap-2 text-indigo-900 font-bold bg-indigo-50/70 border-b border-indigo-100"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                    <span>لوحة تحكم السوبر أدمن (Master Portal)</span>
+                  </button>
+                )}
 
                 {isSuperAdmin && onNavigateToApp && (
                   <button

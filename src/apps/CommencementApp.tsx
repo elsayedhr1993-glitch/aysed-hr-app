@@ -20,6 +20,7 @@ interface CommencementAppProps {
   onUpdateEmployeeStatus: (employeeId: string, status: 'ACTIVE' | 'ON_LEAVE' | 'TERMINATED' | 'RESIGNED') => void;
   onSaveEmployee?: (emp: Employee) => void;
   onSaveContract?: (contract: Contract) => void;
+  onNavigateToApp?: (app: any) => void;
 }
 
 // Odoo Standard Working Calendars (resource.calendar)
@@ -103,6 +104,7 @@ export const CommencementApp: React.FC<CommencementAppProps> = ({
   onUpdateEmployeeStatus,
   onSaveEmployee,
   onSaveContract,
+  onNavigateToApp,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isDevCodeModalOpen, setIsDevCodeModalOpen] = useState<boolean>(false);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { supabase, type Employee, type LeaveBalance } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, type Employee, type LeaveBalance } from '@/lib/supabase';
 import { useLang } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
@@ -22,18 +22,23 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
   const [savedTick, setSavedTick] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!companyId) { setLoading(false); return; }
+    if (!companyId || !isSupabaseConfigured) { setLoading(false); return; }
     setError(null);
-    const [{ data: emps, error: empErr }, { data: bals, error: balErr }] = await Promise.all([
-      supabase.from('employees').select('*').eq('company_id', companyId).eq('status', 'active').order('full_name_ar'),
-      supabase.from('leave_balances').select('*').eq('company_id', companyId),
-    ]);
-    if (empErr || balErr) { setError(empErr?.message ?? balErr?.message ?? 'Error'); setLoading(false); return; }
-    const balMap = new Map<string, LeaveBalance>();
-    (bals as LeaveBalance[] | null)?.forEach((b) => balMap.set(b.employee_id, b));
-    const joined = ((emps as Employee[]) ?? []).map((e) => ({ ...e, balance: balMap.get(e.id) ?? null }));
-    setRows(joined);
-    setLoading(false);
+    try {
+      const [{ data: emps, error: empErr }, { data: bals, error: balErr }] = await Promise.all([
+        supabase.from('employees').select('*').eq('company_id', companyId).eq('status', 'active').order('full_name_ar'),
+        supabase.from('leave_balances').select('*').eq('company_id', companyId),
+      ]);
+      if (empErr || balErr) { setError(empErr?.message ?? balErr?.message ?? 'Error'); setLoading(false); return; }
+      const balMap = new Map<string, LeaveBalance>();
+      (bals as LeaveBalance[] | null)?.forEach((b) => balMap.set(b.employee_id, b));
+      const joined = ((emps as Employee[]) ?? []).map((e) => ({ ...e, balance: balMap.get(e.id) ?? null }));
+      setRows(joined);
+    } catch (err) {
+      console.warn('LeaveBalance fetch skipped/error:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);

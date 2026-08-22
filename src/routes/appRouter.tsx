@@ -6,6 +6,8 @@ import { LeaveManagement } from '../components/LeaveManagement';
 import { Attendance } from '../components/Attendance';
 import { Employees } from '../components/Employees';
 import { SaasAdmin } from '../components/SaasAdmin';
+import { HolidayWorkManagementView } from '../components/HolidayWorkManagementView';
+import { LeaveTypesConfigView } from '../components/LeaveTypesConfigView';
 
 // Additional Modules
 import { ContractsApp } from '../apps/ContractsApp';
@@ -81,6 +83,7 @@ export interface AppRouterProps {
   commencements: any[];
   companies: any[];
   setCompanies: React.Dispatch<React.SetStateAction<any[]>>;
+  onLogout?: () => void;
   employeeNotifications: any[];
   onSaveEmployee: (emp: any) => void;
   onDeleteEmployee: (empId: string) => void;
@@ -246,6 +249,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     onSaveMovement,
     onUpdateMovementState,
     onDeleteMovement,
+    onLogout,
   } = props;
 
   const effectiveApp = props.currentApp !== undefined ? props.currentApp : (props.activeApp || null);
@@ -265,6 +269,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
         onSelectApp={(app) => handleSetApp(app)} 
         currentUserEmail={currentUserEmail} 
         currentUserRole={currentUserRole} 
+        activeCompany={activeCompany}
         stats={stats} 
       />
     );
@@ -344,6 +349,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             onSaveAttendance={handleSaveAttendance}
             onSaveAttendanceBatch={handleSaveAttendanceBatch}
             onPostAttendanceToPayroll={() => {}}
+            onNavigateToApp={(app) => setActiveApp(app)}
           />
         );
 
@@ -365,6 +371,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             onSaveEmployee={onSaveEmployee}
             initialEmployeeId={selectedEmployeeForLeavesFilter || 'ALL'}
             onOpenNotificationModal={onOpenNotificationModal}
+            onNavigateToApp={(app) => setActiveApp(app)}
           />
         );
 
@@ -385,26 +392,42 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             onSaveEmployee={onSaveEmployee}
             initialEmployeeId={selectedEmployeeForLeavesFilter || 'ALL'}
             onOpenNotificationModal={onOpenNotificationModal}
+            onNavigateToApp={(app) => setActiveApp(app)}
           />
         );
 
       // 4. شاشة إدارة الاشتراكات (src/components/SaasAdmin.tsx)
       case 'SAAS_ADMIN':
-        return (
-          <SaasAdmin
-            subscriptions={subscriptions}
-            onUpdateSubscription={handleUpdateSubscription}
-            onDeleteSubscription={handleDeleteSubscription}
-            currentUserEmail={currentUserEmail}
-            onImpersonateCompany={(companyName) => {
-              const found = companies.find(c => c.nameAr.includes(companyName) || companyName.includes(c.nameAr));
-              if (found) {
-                setActiveCompany(found);
-                handleSetApp(null);
-              }
-            }}
-          />
-        );
+        {
+          const isSuper = currentUserRole === 'SUPER_ADMIN' || 
+            currentUserEmail?.toLowerCase() === 'elsayedhr1993@gmail.com' || 
+            currentUserEmail?.toLowerCase() === 'admin@aysed.com';
+          if (!isSuper) {
+            return (
+              <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 m-6 shadow-sm">
+                <div className="text-4xl mb-3">🔒</div>
+                <h2 className="text-lg font-bold text-slate-800">غير مصرح لك بالوصول</h2>
+                <p className="text-xs text-slate-500 mt-1">شاشة إدارة الاشتراكات (SaaS) مقيدة بصلاحيات base.group_system للمدير العام فقط.</p>
+              </div>
+            );
+          }
+          return (
+            <SaasAdmin
+              subscriptions={subscriptions}
+              onUpdateSubscription={handleUpdateSubscription}
+              onDeleteSubscription={handleDeleteSubscription}
+              currentUserEmail={currentUserEmail}
+              onImpersonateCompany={(companyName) => {
+                const found = companies.find(c => c.nameAr.includes(companyName) || companyName.includes(c.nameAr));
+                if (found) {
+                  setActiveCompany(found);
+                  handleSetApp(null);
+                }
+              }}
+              onLogout={onLogout}
+            />
+          );
+        }
 
       case 'CONTRACTS':
       return (
@@ -418,6 +441,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onSaveContract={handleSaveContract}
           onDeleteContract={handleDeleteContract}
           onViewModeChange={setViewMode}
+          onNavigateToApp={(app) => setActiveApp(app)}
         />
       );
 
@@ -447,8 +471,20 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           contracts={scopedContracts}
           leaves={scopedLeaves}
           activeCompany={activeCompany}
+          onNavigateToApp={(app) => setActiveApp(app)}
         />
       );
+
+    case 'HOLIDAY_WORK':
+      return (
+        <HolidayWorkManagementView
+          employees={scopedEmployees}
+          activeCompanyId={activeCompany?.id}
+        />
+      );
+
+    case 'LEAVE_TYPES_CONFIG':
+      return <LeaveTypesConfigView />;
 
     case 'REPORTS':
       return (
@@ -474,7 +510,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           filterTab={filterTab}
           onSaveDocument={handleSaveDocument}
           onDeleteDocument={handleDeleteDocument}
-          onAutoAddEmpFromOCR={handleAutoAddEmpFromOCR}
+          onAutoAddEmpFromOCR={(empData: any) => { handleAutoAddEmpFromOCR(empData); return ''; }}
           isOCRModalOpenInitially={isOCRModalOpen}
           onNavigateToApp={(app) => setActiveApp(app)}
           onSelectEmpForForm={(emp) => setSelectedEmpForForm(emp)}
@@ -536,6 +572,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onDeleteWarning={handleDeleteWarning}
           onSaveNote={handleSaveNote}
           onDeleteNote={handleDeleteNote}
+          onNavigateToApp={(app: any) => setActiveApp(app)}
         />
       );
 
@@ -586,6 +623,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
           onSaveEmployee={onSaveEmployee}
           onSaveContract={handleSaveContract}
+          onNavigateToApp={(app) => setActiveApp(app)}
         />
       );
 
@@ -599,6 +637,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onSaveMovement={onSaveMovement}
           onUpdateMovementState={onUpdateMovementState}
           onDeleteMovement={onDeleteMovement}
+          onNavigateToApp={(app) => setActiveApp(app)}
         />
       );
 
@@ -635,7 +674,30 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
         />
       );
 
-    case 'COMPANIES':
+    case 'COMPANIES': {
+      const emailLower = (currentUserEmail || '').toLowerCase();
+      const isSuperAdmin = currentUserRole === 'SUPER_ADMIN' || emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com';
+      if (!isSuperAdmin) {
+        return (
+          <SettingsApp
+            companies={visibleCompanies}
+            activeCompany={activeCompany}
+            onSaveCompany={handleSaveCompany}
+            onAddCompany={handleSaveCompany}
+            onDeleteCompany={handleDeleteCompany}
+            onSelectCompany={(c) => setActiveCompany(c)}
+            onPurgeSystemData={handlePurgeSystemData}
+            onLoadDemoData={handleLoadDemoData}
+            bgTheme={bgTheme}
+            setBgTheme={setBgTheme}
+            motionEnabled={motionEnabled}
+            setMotionEnabled={setMotionEnabled}
+            currentUserEmail={currentUserEmail}
+            currentUserRole={currentUserRole}
+            initialSubTab="COMPANY"
+          />
+        );
+      }
       return (
         <CompaniesApp
           companies={visibleCompanies}
@@ -644,8 +706,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onSaveCompany={handleSaveCompany}
           onDeleteCompany={handleDeleteCompany}
           currentUserEmail={currentUserEmail}
+          currentUserRole={currentUserRole}
         />
       );
+    }
 
     case 'SETTINGS':
       return (
@@ -659,9 +723,11 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onPurgeSystemData={handlePurgeSystemData}
           onLoadDemoData={handleLoadDemoData}
           bgTheme={bgTheme}
-          onThemeChange={setBgTheme}
+          setBgTheme={setBgTheme}
           motionEnabled={motionEnabled}
-          onMotionToggle={() => setMotionEnabled(!motionEnabled)}
+          setMotionEnabled={setMotionEnabled}
+          currentUserEmail={currentUserEmail}
+          currentUserRole={currentUserRole}
         />
       );
 
@@ -710,10 +776,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             type="button"
             onClick={() => handleSetApp(null)}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#714B67] hover:bg-[#583950] active:scale-95 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
-            title="الرجوع للشاشة الرئيسية لدفترة"
+            title="العودة للتطبيقات الرئيسية"
           >
             <ArrowRight className="w-4 h-4" />
-            <span>← العودة للرئيسية</span>
+            <span>العودة للتطبيقات الرئيسية</span>
           </button>
           <div className="h-4 w-px bg-slate-200" />
           <div className="flex items-center gap-2">

@@ -13,6 +13,7 @@ export interface PivotRowData {
   children?: PivotRowData[];
   values: Record<string, number>; // key: measureId, value: number
   recordsCount: number;
+  count?: number;
 }
 
 interface OdooPivotViewProps {
@@ -80,7 +81,7 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
       return `${val.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك`;
     }
     if (measure.unit === 'ساعة' || measure.unit === 'يوم') {
-      return `${val.toLocaleString('en-US', { maximumFractionDigits: 1 })} ${measure.unit}`;
+      return `${val.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} ${measure.unit}`;
     }
     return val.toLocaleString('en-US');
   };

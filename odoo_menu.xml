@@ -6,6 +6,17 @@
               web_icon="aysed_hr,static/description/icon.png"
               sequence="1"/>
 
+    <!-- تـقيد الوصول لـقائمة الاشـتراكات لـلمدير العام فـقط -->
+    <menuitem id="menu_aysed_saas_root" 
+              name="إدارة المنظومة SaaS" 
+              groups="base.group_system" 
+              web_icon="fa-cloud, #71639e"
+              active="True"
+              sequence="999"/>
+
+    <!-- مـلاحظة للمـبرمج: تـأكد أن جـميع المـشتركين الجـدد 
+         لـيسوا أعـضاء في مـجموعة base.group_system -->
+
     <!-- المستوى الثاني: تجميعات عائلية (تظهر لتنظيم اللوحة الجانبية) -->
     <menuitem id="menu_core_hr_category"
               name="شؤون الموظفين"

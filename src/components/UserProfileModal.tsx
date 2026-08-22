@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, User, Mail, Lock, CheckCircle2, Globe } from 'lucide-react';
+import { X, ShieldCheck, User, Mail, Lock, CheckCircle2, Globe, AlertCircle } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
-import { updateProfile, updateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { updateProfile, updateEmail, verifyBeforeUpdateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { useLang } from '../lib/i18n';
@@ -34,7 +34,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     }
     
     // We need current password to re-authenticate if email or password is changed
-    const needsReauth = (email !== user.email) || (newPassword !== '');
+    const needsReauth = (email.trim().toLowerCase() !== (user.email || '').toLowerCase()) || (newPassword !== '');
     
     if (needsReauth && !currentPassword) {
       toast.error('يرجى إدخال كلمة المرور الحالية لحفظ التعديلات الأمنية (البريد أو كلمة المرور)');
@@ -50,28 +50,69 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
       const updates: any = {};
       let authUpdated = false;
+      let emailVerificationSent = false;
 
-      // Update Display Name
+      // 1. Update Display Name
       if (displayName !== user.displayName) {
         await updateProfile(user, { displayName });
         updates.displayName = displayName;
         authUpdated = true;
       }
 
-      // Update Email
-      if (email !== user.email) {
-        await updateEmail(user, email);
-        updates.email = email;
-        authUpdated = true;
+      // 2. Update Email
+      const cleanNewEmail = email.trim().toLowerCase();
+      if (cleanNewEmail && cleanNewEmail !== (user.email || '').toLowerCase()) {
+        try {
+          // Attempt verifyBeforeUpdateEmail first (Firebase v9+ standard)
+          await verifyBeforeUpdateEmail(user, cleanNewEmail);
+          emailVerificationSent = true;
+          updates.pendingEmail = cleanNewEmail;
+        } catch (verifyErr: any) {
+          // Fallback to updateEmail if allowed
+          try {
+            await updateEmail(user, cleanNewEmail);
+            updates.email = cleanNewEmail;
+            authUpdated = true;
+          } catch (updateErr: any) {
+            // Attempt backend admin API update
+            try {
+              const res = await fetch('/api/admin/update-user-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentEmail: user.email, newEmail: cleanNewEmail })
+              });
+              const resJson = await res.json();
+              if (resJson.success) {
+                updates.email = cleanNewEmail;
+                authUpdated = true;
+              } else {
+                // If it required verification
+                if (verifyErr?.code === 'auth/operation-not-allowed' || verifyErr?.message?.includes('verify')) {
+                  emailVerificationSent = true;
+                  updates.pendingEmail = cleanNewEmail;
+                } else {
+                  throw verifyErr || updateErr;
+                }
+              }
+            } catch (adminErr) {
+              if (verifyErr?.code === 'auth/operation-not-allowed' || verifyErr?.message?.includes('verify')) {
+                emailVerificationSent = true;
+                updates.pendingEmail = cleanNewEmail;
+              } else {
+                throw verifyErr || updateErr;
+              }
+            }
+          }
+        }
       }
 
-      // Update Password
+      // 3. Update Password
       if (newPassword) {
         await updatePassword(user, newPassword);
         authUpdated = true;
       }
 
-      // Update Language Preference
+      // 4. Update Language Preference
       const newLangIso = userLang === 'en_US' ? 'en' : 'ar';
       if (newLangIso !== lang) {
         setLang(newLangIso);
@@ -80,26 +121,31 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
         updates.res_lang_direction = userLang === 'ar_001' ? 'rtl' : 'ltr';
       }
 
-      // Update in Firestore
+      // 5. Update in Firestore
       if (Object.keys(updates).length > 0) {
         const userRef = doc(db, 'users', user.uid);
         await setDoc(userRef, updates, { merge: true });
       }
 
-      if (authUpdated || Object.keys(updates).length > 0) {
-        toast.success('تم تحديث الملف الشخصي والأمان بنجاح');
-        onClose();
+      if (emailVerificationSent) {
+        toast.success(`تم إرسال رابط تأكيد إلى بريدك الجديد (${cleanNewEmail}). يرجى التحقق من البريد لتأكيد التغيير.`, { duration: 6000 });
+      } else if (authUpdated || Object.keys(updates).length > 0) {
+        toast.success('تم حفظ وتحديث بيانات الملف الشخصي والأمان بنجاح');
       } else {
         toast('لم يتم إجراء أي تعديلات');
-        onClose();
       }
+      onClose();
     } catch (err: any) {
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         toast.error('كلمة المرور الحالية غير صحيحة');
       } else if (err.code === 'auth/email-already-in-use') {
         toast.error('البريد الإلكتروني مستخدم بالفعل لحساب آخر');
       } else if (err.code === 'auth/weak-password') {
-        toast.error('كلمة المرور الجديدة ضعيفة جداً');
+        toast.error('كلمة المرور الجديدة ضعيفة جداً (يجب ألا تقل عن 6 أحرف)');
+      } else if (err.code === 'auth/requires-recent-login') {
+        toast.error('يرجى تسجيل الدخول مرة أخرى لإتمام التغييرات الأمنية الحساسة');
+      } else if (err.code === 'auth/operation-not-allowed' || err.message?.includes('verify the new email')) {
+        toast.error('يتطلب تغيير البريد الإلكتروني التحقق من عنوان البريد الجديد قبل الاعتماد.');
       } else {
         toast.error('خطأ في حفظ البيانات: ' + (err.message || 'خطأ غير معروف'));
       }

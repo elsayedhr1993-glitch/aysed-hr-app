@@ -13,6 +13,7 @@ interface DailyMovementsAppProps {
   onSaveMovement: (movement: DailyMovement) => void;
   onUpdateMovementState: (id: string, state: 'draft' | 'approved' | 'refused') => void;
   onDeleteMovement: (id: string) => void;
+  onNavigateToApp?: (app: any) => void;
 }
 
 export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
@@ -23,6 +24,7 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
   onSaveMovement,
   onUpdateMovementState,
   onDeleteMovement,
+  onNavigateToApp,
 }) => {
   const [editingMovement, setEditingMovement] = useState<Partial<DailyMovement> | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');

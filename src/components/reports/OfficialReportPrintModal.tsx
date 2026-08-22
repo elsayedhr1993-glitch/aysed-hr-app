@@ -22,7 +22,8 @@ interface OfficialReportPrintModalProps {
   activeCompany?: Company;
   pivotData: PivotRowData[];
   grandTotal: Record<string, number>;
-  selectedMeasures: MeasureOption[];
+  selectedMeasures?: MeasureOption[];
+  activeMeasures?: MeasureOption[];
   employees: Employee[];
   contracts?: Contract[];
   leaves?: LeaveRequest[];
@@ -30,6 +31,10 @@ interface OfficialReportPrintModalProps {
   payslips?: Payslip[];
   documents?: DocumentItem[];
   printConfig?: PrintWizardConfig;
+  wizardConfig?: PrintWizardConfig;
+  groupByLabel?: string;
+  totalRecords?: number;
+  activeFiltersLabels?: string[];
   selectedEmployeeId?: string;
 }
 
@@ -41,7 +46,8 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
   activeCompany,
   pivotData = [],
   grandTotal = {},
-  selectedMeasures = [],
+  selectedMeasures,
+  activeMeasures,
   employees = [],
   contracts = [],
   leaves = [],
@@ -49,13 +55,56 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
   payslips = [],
   documents = [],
   printConfig,
+  wizardConfig,
   selectedEmployeeId,
 }) => {
+  const effectiveMeasures = activeMeasures || selectedMeasures || [];
   const printAreaRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen) return null;
 
   const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
+
+  const formatMeasureValue = (val: number | undefined, measure: MeasureOption) => {
+    if (val === undefined || val === null) return '-';
+    
+    // 1. If explicitly currency (KWD)
+    if (measure.isCurrency) {
+      return (
+        <span dir="ltr" className="inline-flex items-center gap-1">
+          <span className="font-mono">{val.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
+          <span className="font-sans text-[10px] text-slate-500 font-bold">د.ك</span>
+        </span>
+      );
+    }
+
+    // 2. If day / hour / minute unit
+    if (measure.unit === 'يوم' || measure.unit === 'ساعة' || measure.unit === 'دقيقة') {
+      const isNegative = val < 0;
+      return (
+        <span dir="ltr" className={`inline-flex items-center gap-1 font-mono font-bold ${isNegative ? 'text-rose-600' : ''}`}>
+          <span>{val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+          <span className="font-sans text-[10px] text-slate-500 font-normal">{measure.unit}</span>
+        </span>
+      );
+    }
+
+    // 3. Count or standard integer
+    if (measure.id === 'count' || measure.field === 'count' || measure.label?.includes('عدد')) {
+      return (
+        <span dir="ltr" className="font-mono font-bold">
+          {val.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+        </span>
+      );
+    }
+
+    // 4. Default number
+    return (
+      <span dir="ltr" className="font-mono">
+        {val.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+      </span>
+    );
+  };
 
   const handlePrint = () => {
     window.print();
@@ -66,9 +115,9 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
       const rowObj: Record<string, any> = {
         '#': idx + 1,
         'البيان / الموظف': row.label,
-        'العدد': row.count,
+        'العدد': row.recordsCount ?? row.count ?? 1,
       };
-      selectedMeasures.forEach(m => {
+      effectiveMeasures.forEach(m => {
         rowObj[m.label] = row.values[m.id] || 0;
       });
       return rowObj;
@@ -136,9 +185,9 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                 <p className="text-xs text-slate-500">دولة الكويت</p>
               </div>
 
-              <div className="text-center">
-                <h1 className="text-xl font-black text-slate-900 border-2 border-slate-900 px-4 py-1.5 rounded-md bg-slate-50">
-                  {reportTitle}
+              <div className="text-center max-w-lg">
+                <h1 className="text-xl font-black text-slate-900 border-2 border-slate-900 px-5 py-2 rounded-md bg-slate-50 leading-tight">
+                  <bdi>{reportTitle}</bdi>
                 </h1>
                 <span className="text-[10px] font-bold text-slate-500 tracking-wider block mt-1 uppercase">
                   OFFICIAL ENTERPRISE REPORT
@@ -169,8 +218,8 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                     <th className="p-2.5 border-l border-slate-700 w-12 text-center">#</th>
                     <th className="p-2.5 border-l border-slate-700">البيان / الفئة</th>
                     <th className="p-2.5 border-l border-slate-700 text-center w-20">العدد</th>
-                    {selectedMeasures.map(m => (
-                      <th key={m.id} className="p-2.5 border-l border-slate-700 text-left font-mono">
+                    {effectiveMeasures.map(m => (
+                      <th key={m.id} className="p-2.5 border-l border-slate-700 text-center font-bold">
                         {m.label}
                       </th>
                     ))}
@@ -179,7 +228,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                 <tbody className="divide-y divide-slate-200">
                   {pivotData.length === 0 ? (
                     <tr>
-                      <td colSpan={3 + selectedMeasures.length} className="p-8 text-center text-slate-400 font-bold">
+                      <td colSpan={3 + effectiveMeasures.length} className="p-8 text-center text-slate-400 font-bold">
                         لا توجد بيانات مطابقة لهذا التقرير
                       </td>
                     </tr>
@@ -188,10 +237,10 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                         <td className="p-2.5 border-l border-slate-200 text-center font-mono text-slate-500">{idx + 1}</td>
                         <td className="p-2.5 border-l border-slate-200 font-bold text-slate-900">{row.label}</td>
-                        <td className="p-2.5 border-l border-slate-200 text-center font-mono font-bold text-purple-900">{row.count}</td>
-                        {selectedMeasures.map(m => (
-                          <td key={m.id} className="p-2.5 border-l border-slate-200 text-left font-mono font-bold text-slate-800">
-                            {(row.values[m.id] || 0).toLocaleString('en-US', { minimumFractionDigits: 3 })}
+                        <td className="p-2.5 border-l border-slate-200 text-center font-mono font-bold text-purple-900">{row.recordsCount ?? row.count ?? 1}</td>
+                        {effectiveMeasures.map(m => (
+                          <td key={m.id} className="p-2.5 border-l border-slate-200 text-center">
+                            {formatMeasureValue(row.values[m.id], m)}
                           </td>
                         ))}
                       </tr>
@@ -203,11 +252,11 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                     <tr>
                       <td colSpan={2} className="p-2.5 text-center text-xs font-black">الإجمالي العام (GRAND TOTAL)</td>
                       <td className="p-2.5 text-center font-mono text-purple-900 font-black">
-                        {pivotData.reduce((s, r) => s + r.count, 0)}
+                        {pivotData.reduce((s, r) => s + (r.recordsCount ?? r.count ?? 1), 0)}
                       </td>
-                      {selectedMeasures.map(m => (
-                        <td key={m.id} className="p-2.5 text-left font-mono text-emerald-800 font-black text-xs">
-                          {(grandTotal[m.id] || 0).toLocaleString('en-US', { minimumFractionDigits: 3 })} د.ك
+                      {effectiveMeasures.map(m => (
+                        <td key={m.id} className="p-2.5 text-center text-xs font-black">
+                          {formatMeasureValue(grandTotal[m.id], m)}
                         </td>
                       ))}
                     </tr>

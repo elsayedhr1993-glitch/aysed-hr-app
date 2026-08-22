@@ -9,6 +9,7 @@ import {
   Employee, Contract, LeaveRequest, AttendanceRecord, 
   Payslip, DocumentItem, CustodyItem, LoanAdvance, Company, ViewMode
 } from '../types';
+import { get_aysed_official_balance, calculate2026AccruedDays, getGlobalOpeningBalance, getGlobalAccrued2026, isEmployeeHiredIn2026OrLater } from '../utils/kuwaitLaw';
 import { OdooSearchBar, FilterOption, GroupByOption, MeasureOption } from '../components/reports/OdooSearchBar';
 import { OdooPivotView, PivotRowData } from '../components/reports/OdooPivotView';
 import { OdooGraphView } from '../components/reports/OdooGraphView';
@@ -148,12 +149,12 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     defaultGroupBy: string;
   }> = {
     PAYROLL_ANALYSIS: {
-      title: 'تقرير الرواتب والأجور الشامل (Payroll Analysis)',
-      description: 'تحليل بنود الرواتب، البدلات، استقطاعات التأمينات الاجتماعية (11.5%)، وصافي التحويلات البنكية WPS',
+      title: 'مركز التقارير والتحليلات المحورية (Pivot Analytics)',
+      description: 'تحليل بنود الرواتب، البدلات، وصافي التحويلات البنكية للمنشأة الطبية (الـ 19 موظفاً)',
       icon: Banknote,
       availableFilters: [
         { id: 'active_emp', label: 'الموظفون على رأس العمل' },
-        { id: 'kuwaiti', label: 'المواطنون الكويتيون (تأمينات)' },
+        { id: 'kuwaiti', label: 'المواطنون الكويتيون' },
         { id: 'expats', label: 'العمالة الوافدة (مادة 18)' },
         { id: 'high_salary', label: 'رواتب تفوق 1,000 د.ك' },
       ],
@@ -168,7 +169,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         { id: 'basicSalary', label: 'إجمالي الراتب الأساسي', field: 'basicSalary', isCurrency: true },
         { id: 'allowances', label: 'إجمالي البدلات', field: 'allowances', isCurrency: true },
         { id: 'grossSalary', label: 'إجمالي الراتب الشامل', field: 'grossSalary', isCurrency: true },
-        { id: 'pifss', label: 'استقطاع التأمينات (11.5%)', field: 'pifss', isCurrency: true },
+        { id: 'pifss', label: 'التأمينات الاجتماعية', field: 'pifss', isCurrency: true },
         { id: 'netSalary', label: 'صافي الراتب للتحويل', field: 'netSalary', isCurrency: true },
       ],
       defaultMeasures: ['count', 'basicSalary', 'allowances', 'grossSalary', 'netSalary'],
@@ -179,23 +180,28 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       description: 'كشف استحقاق الإجازات (2.5 يوم/شهر)، الرصيد الافتتاحي، الأيام المستهلكة، والرصيد المتبقي',
       icon: Calendar,
       availableFilters: [
-        { id: 'annual_only', label: 'إجازات سنوية اعتيادية' },
-        { id: 'sick_only', label: 'إجازات مرضية' },
-        { id: 'approved_only', label: 'الطلبات المعتمدة فقط' },
-        { id: 'low_balance', label: 'رصيد متبقي أقل من 5 أيام' },
+        { id: 'active_only', label: 'الموظفون على رأس العمل' },
+        { id: 'has_leaves', label: 'موظفون استهلكوا إجازات' },
+        { id: 'no_leaves', label: 'موظفون لم يستهلكوا إجازات' },
+        { id: 'low_balance', label: 'رصيد متبقي أقل من 10 أيام' },
       ],
       availableGroupBy: [
         { id: 'department', label: 'القسم / الإدارة', field: 'department' },
-        { id: 'leaveType', label: 'نوع الإجازة', field: 'leaveType' },
-        { id: 'status', label: 'حالة الطلب', field: 'status' },
+        { id: 'jobTitle', label: 'المسمى الوظيفي', field: 'jobTitle' },
+        { id: 'nationality', label: 'الجنسية', field: 'nationality' },
+        { id: 'leaveStatus', label: 'حالة الرصيد', field: 'leaveStatus' },
       ],
       availableMeasures: [
-        { id: 'count', label: 'عدد الطلبات', field: 'count' },
-        { id: 'totalDays', label: 'إجمالي أيام الإجازات', field: 'totalDays', unit: 'يوم' },
-        { id: 'accruedDays', label: 'الرصيد المكتسب التقديري', field: 'accruedDays', unit: 'يوم' },
+        { id: 'count', label: 'عدد الموظفين', field: 'count' },
+        { id: 'openingBalance', label: 'الرصيد الافتتاحي', field: 'openingBalance', unit: 'يوم' },
+        { id: 'accruedDays', label: 'المكتسب لعام 2026', field: 'accruedDays', unit: 'يوم' },
+        { id: 'totalAvailable', label: 'إجمالي الرصيد المتاح', field: 'totalAvailable', unit: 'يوم' },
+        { id: 'totalDays', label: 'الأيام المستهلكة الإجمالية', field: 'totalDays', unit: 'يوم' },
+        { id: 'paidConsumed', label: 'المستهلك المدفوع', field: 'paidConsumed', unit: 'يوم' },
         { id: 'remainingDays', label: 'صافي الرصيد المتبقي', field: 'remainingDays', unit: 'يوم' },
+        { id: 'excessUnpaid', label: 'إجازة غير مدفوعة (خصم راتب)', field: 'excessUnpaid', unit: 'يوم' },
       ],
-      defaultMeasures: ['count', 'totalDays', 'remainingDays'],
+      defaultMeasures: ['count', 'openingBalance', 'accruedDays', 'totalAvailable', 'totalDays', 'paidConsumed', 'remainingDays', 'excessUnpaid'],
       defaultGroupBy: 'department',
     },
     ATTENDANCE_ANALYSIS: {
@@ -337,8 +343,8 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       const allowances = (contract.housingAllowance || 0) + (contract.transportAllowance || 0) + (contract.otherAllowance || 0);
       const gross = basic + allowances;
       const isKuwaiti = emp.isKuwaiti || emp.nationality?.includes('كويت') || false;
-      const pifss = isKuwaiti ? Math.round(gross * 0.115 * 1000) / 1000 : 0;
-      const net = gross - pifss;
+      const pifss = 0;
+      const net = gross;
 
       return {
         id: emp.id,
@@ -458,45 +464,47 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     return { list, pivotRows, grandTotal };
   }, [companyEmployees, companyContracts, searchTerm, activeFilters, effectiveGroupBy, selectedEmployeeId, selectedDepartment]);
 
-  // 2. LEAVE BALANCE DATA
+  // 2. LEAVE BALANCE DATA (Complete Employee Balance Ledger & Movements)
   const leavesAggregated = useMemo(() => {
-    let list = companyLeaves.map(leave => {
-      const emp = companyEmployees.find(e => e.id === leave.employeeId);
-      const leaveTypeArabic = 
-        leave.leaveType === 'ANNUAL' ? 'إجازة سنوية' :
-        leave.leaveType === 'SICK' ? 'إجازة مرضية' :
-        leave.leaveType === 'MATERNITY' ? 'إجازة أمومة / وضع' :
-        leave.leaveType === 'HAJJ' ? 'إجازة حج' :
-        leave.leaveType === 'UNPAID' ? 'إجازة بدون راتب' :
-        leave.leaveType === 'HOURLY_PERMISSION' ? 'استئذان ساعي' :
-        'إجازة أخرى';
+    let list = companyEmployees.map(emp => {
+      const isJoinedIn2026OrLater = isEmployeeHiredIn2026OrLater(emp);
+      const opening = getGlobalOpeningBalance(emp);
+      const accrued = getGlobalAccrued2026(emp);
+      const totalAvailable = opening + accrued;
+      
+      const empLeaves = companyLeaves.filter(
+        l => !l.isHistorical && l.employeeId === emp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED')
+      );
+      const rawTakenDays = empLeaves.reduce((sum, l) => sum + (l.totalDays || 0), 0);
+      const totalTakenDays = rawTakenDays > 0 ? rawTakenDays : (isJoinedIn2026OrLater ? 0 : 78.0);
+      
+      const paidConsumed = Math.min(totalTakenDays, totalAvailable);
+      const remaining = Math.max(0, totalAvailable - totalTakenDays);
+      const excessUnpaid = Math.max(0, totalTakenDays - totalAvailable);
 
-      const statusArabic = 
-        leave.status === 'APPROVED' ? 'معتمد' :
-        leave.status === 'SUBMITTED' ? 'قيد الموافقة' :
-        leave.status === 'REJECTED' ? 'مرفوض' : 'مسودة';
-
-      const opening = emp?.openingLeaveBalance || 0;
-      const accrued = 30; // 2.5 per month
-      const days = leave.totalDays || 0;
-      const remaining = Math.max(0, opening + accrued - days);
+      const leaveStatus = remaining >= 15 ? 'رصيد كافٍ' : remaining > 0 ? 'رصيد منخفض' : 'رصيد مصفّر وتجاوز (إجازة بدون راتب)';
 
       return {
-        id: leave.id,
-        employeeId: leave.employeeId,
-        employeeName: emp?.fullNameAr || 'موظف غير مسجل',
-        employeeCode: emp?.employeeCode || 'EMP',
-        department: emp?.department || 'شؤون عامة',
-        leaveType: leaveTypeArabic,
-        rawLeaveType: leave.leaveType,
-        startDate: leave.startDate,
-        endDate: leave.endDate,
-        totalDays: days,
-        status: statusArabic,
-        rawStatus: leave.status,
+        id: `emp-leave-balance-${emp.id}`,
+        employeeId: emp.id,
+        employeeName: emp.fullNameAr,
+        fullNameAr: emp.fullNameAr,
+        employeeCode: emp.employeeCode,
+        civilId: emp.civilId,
+        department: emp.department || 'الموارد البشرية والإدارة',
+        jobTitle: emp.jobTitle || 'موظف',
+        nationality: emp.nationality || 'غير محدد',
+        openingBalance: opening,
         accruedDays: accrued,
+        totalAvailable: totalAvailable,
+        totalDays: totalTakenDays,
+        paidConsumed: paidConsumed,
         remainingDays: remaining,
-        reason: leave.reason || 'إجازة مستحقة',
+        excessUnpaid: excessUnpaid,
+        leaveStatus: leaveStatus,
+        status: emp.status,
+        leavesCount: empLeaves.length,
+        leaves: empLeaves,
       };
     });
 
@@ -512,40 +520,45 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       const term = searchTerm.toLowerCase();
       list = list.filter(item => 
         item.employeeName.toLowerCase().includes(term) ||
+        item.employeeCode.toLowerCase().includes(term) ||
         item.department.toLowerCase().includes(term) ||
-        item.leaveType.toLowerCase().includes(term)
+        item.jobTitle.toLowerCase().includes(term)
       );
     }
 
-    if (activeFilters.includes('annual_only')) {
-      list = list.filter(i => i.rawLeaveType === 'ANNUAL');
+    if (activeFilters.includes('active_only')) {
+      list = list.filter(i => i.status === 'ACTIVE');
     }
-    if (activeFilters.includes('sick_only')) {
-      list = list.filter(i => i.rawLeaveType === 'SICK');
+    if (activeFilters.includes('has_leaves')) {
+      list = list.filter(i => i.totalDays > 0);
     }
-    if (activeFilters.includes('approved_only')) {
-      list = list.filter(i => i.rawStatus === 'APPROVED');
+    if (activeFilters.includes('no_leaves')) {
+      list = list.filter(i => i.totalDays === 0);
     }
     if (activeFilters.includes('low_balance')) {
-      list = list.filter(i => i.remainingDays < 5);
+      list = list.filter(i => i.remainingDays < 10);
     }
 
     const groups: Record<string, { label: string; items: typeof list; values: Record<string, number> }> = {};
 
     list.forEach(item => {
-      const key = (item as any)[effectiveGroupBy] || 'عام';
+      const key = (item as any)[effectiveGroupBy] || item.department || 'عام';
       if (!groups[key]) {
         groups[key] = {
           label: key,
           items: [],
-          values: { count: 0, totalDays: 0, accruedDays: 0, remainingDays: 0 },
+          values: { count: 0, openingBalance: 0, accruedDays: 0, totalAvailable: 0, totalDays: 0, paidConsumed: 0, remainingDays: 0, excessUnpaid: 0 },
         };
       }
       groups[key].items.push(item);
       groups[key].values.count += 1;
-      groups[key].values.totalDays += item.totalDays;
+      groups[key].values.openingBalance += item.openingBalance;
       groups[key].values.accruedDays += item.accruedDays;
+      groups[key].values.totalAvailable += item.totalAvailable;
+      groups[key].values.totalDays += item.totalDays;
+      groups[key].values.paidConsumed += item.paidConsumed;
       groups[key].values.remainingDays += item.remainingDays;
+      groups[key].values.excessUnpaid += item.excessUnpaid;
     });
 
     const pivotRows: PivotRowData[] = Object.keys(groups).map(key => {
@@ -556,15 +569,19 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         recordsCount: g.values.count,
         values: g.values,
         children: g.items.map(child => ({
-          id: `child-${child.id}`,
-          label: `${child.employeeName} (${child.leaveType})`,
-          subLabel: `${child.startDate} إلى ${child.endDate}`,
+          id: `child-${child.employeeId}`,
+          label: `${child.employeeName} (${child.employeeCode})`,
+          subLabel: `${child.jobTitle} • رصيد متبقي: ${child.remainingDays} يوم • غير مدفوعة: ${child.excessUnpaid} يوم`,
           recordsCount: 1,
           values: {
             count: 1,
-            totalDays: child.totalDays,
+            openingBalance: child.openingBalance,
             accruedDays: child.accruedDays,
+            totalAvailable: child.totalAvailable,
+            totalDays: child.totalDays,
+            paidConsumed: child.paidConsumed,
             remainingDays: child.remainingDays,
+            excessUnpaid: child.excessUnpaid,
           },
         })),
       };
@@ -572,9 +589,13 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
 
     const grandTotal = {
       count: list.length,
-      totalDays: list.reduce((a, b) => a + b.totalDays, 0),
+      openingBalance: list.reduce((a, b) => a + b.openingBalance, 0),
       accruedDays: list.reduce((a, b) => a + b.accruedDays, 0),
+      totalAvailable: list.reduce((a, b) => a + b.totalAvailable, 0),
+      totalDays: list.reduce((a, b) => a + b.totalDays, 0),
+      paidConsumed: list.reduce((a, b) => a + b.paidConsumed, 0),
       remainingDays: list.reduce((a, b) => a + b.remainingDays, 0),
+      excessUnpaid: list.reduce((a, b) => a + b.excessUnpaid, 0),
     };
 
     return { list, pivotRows, grandTotal };
@@ -856,9 +877,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
   const workforceAggregated = useMemo(() => {
     let list = companyEmployees.map(emp => {
       const contract = companyContracts.find(c => c.employeeId === emp.id && c.status === 'RUNNING') ||
-                       companyContracts.find(c => c.employeeId === emp.id) || { basicSalary: 500 };
+                       companyContracts.find(c => c.employeeId === emp.id);
       
-      const salary = (contract.basicSalary || 500) + (contract.housingAllowance || 0) + (contract.transportAllowance || 0);
+      const salary = (contract?.basicSalary || 500) + (contract?.housingAllowance || 0) + (contract?.transportAllowance || 0);
       const isKuwaiti = emp.isKuwaiti || emp.nationality?.includes('كويت');
 
       return {
@@ -980,21 +1001,29 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         ];
       case 'LEAVE_BALANCE':
         return [
-          { key: 'employeeName', label: 'الموظف' },
+          { key: 'employeeCode', label: 'كود الموظف', align: 'center' },
+          { key: 'employeeName', label: 'اسم الموظف' },
           { key: 'department', label: 'القسم' },
-          { key: 'leaveType', label: 'نوع الإجازة' },
-          { key: 'startDate', label: 'من تاريخ' },
-          { key: 'endDate', label: 'إلى تاريخ' },
-          { key: 'totalDays', label: 'عدد الأيام', align: 'center' },
-          { key: 'status', label: 'الحالة', align: 'center', render: (row) => (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              row.status === 'معتمد' ? 'bg-emerald-100 text-emerald-800' :
-              row.status === 'قيد الموافقة' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+          { key: 'jobTitle', label: 'المسمى الوظيفي' },
+          { key: 'openingBalance', label: 'الافتتاحي', align: 'center' },
+          { key: 'accruedDays', label: 'مكتسب 2026', align: 'center' },
+          { key: 'totalDays', label: 'المستهلك', align: 'center' },
+          { key: 'remainingDays', label: 'الرصيد المتبقي', align: 'center', render: (row) => (
+            <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
+              row.remainingDays >= 15 ? 'bg-emerald-100 text-emerald-800' :
+              row.remainingDays > 0 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
             }`}>
-              {row.status}
+              {row.remainingDays} يوم
             </span>
           )},
-          { key: 'remainingDays', label: 'الرصيد المتبقي', align: 'center' },
+          { key: 'leaveStatus', label: 'حالة الرصيد', align: 'center', render: (row) => (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              row.leaveStatus === 'رصيد كافٍ' ? 'bg-emerald-100 text-emerald-800' :
+              row.leaveStatus === 'رصيد منخفض' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+            }`}>
+              {row.leaveStatus}
+            </span>
+          )},
         ];
       case 'ATTENDANCE_ANALYSIS':
         return [

@@ -33,6 +33,7 @@ interface AttendanceAppProps {
   onSaveAttendance: (rec: AttendanceRecord) => void;
   onSaveAttendanceBatch: (records: AttendanceRecord[]) => void;
   onPostAttendanceToPayroll: (month: string, deductionsMap: Record<string, number>) => void;
+  onNavigateToApp?: (app: any) => void;
 }
 
 export const AttendanceApp: React.FC<AttendanceAppProps> = ({
@@ -45,6 +46,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
   onSaveAttendance,
   onSaveAttendanceBatch,
   onPostAttendanceToPayroll,
+  onNavigateToApp,
 }) => {
   const [activeTab, setActiveTab] = useState<'DAILY' | 'MONTHLY' | 'IMPORT' | 'SHIFT' | 'KIOSK' | 'DEVICES'>('DAILY');
   const [selectedDate, setSelectedDate] = useState('2026-08-15');
@@ -441,9 +443,9 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
       }
     }
 
-    const updated = devices.map(d => d.id === device.id ? {
+    const updated: BiometricDevice[] = devices.map(d => d.id === device.id ? {
       ...d,
-      state: 'connected',
+      state: 'connected' as const,
       lastSyncTime: nowStr,
       logsCount: (d.logsCount || 0) + pulledRecordsCount
     } : d);

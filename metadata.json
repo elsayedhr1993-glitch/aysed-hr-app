@@ -1,6 +1,6 @@
 {
-  "name": "Remix Aysed S HR 2026 - Odoo Enterprise HRMS Kuwait",
-  "description": "نظام موارد بشرية متكامل بأسلوب أودو إنتربرايز وفق قانون العمل الكويتي (المادة 51 و53) مع إدارة المستندات والأتمتة وحزمة الابتكارات الحصرية (درع المخاطر، المندوب الذكي، البصمة الديناميكية QR، الختم الرقمي، وبوت الواتساب)",
+  "name": "Aysed S HR 2026 - Kuwait",
+  "description": "Professional Odoo-Style HRMS for Kuwait Private Sector (Article 51/53)",
   "requestFramePermissions": [
     "camera",
     "geolocation"

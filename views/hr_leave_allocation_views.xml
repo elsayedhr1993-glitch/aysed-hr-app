@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Leave Type Form View Extension (is_annual, is_unpaid) -->
+    <record id="view_hr_leave_type_form_inherit_accrual" model="ir.ui.view">
+        <field name="name">hr.leave.type.form.inherit.accrual</field>
+        <field name="model">hr.leave.type</field>
+        <field name="inherit_id" ref="hr_holidays.edit_holiday_status_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='requires_allocation']" position="after">
+                <field name="is_annual"/>
+                <field name="is_unpaid"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Custom Allocation Tree View -->
+    <record id="view_hr_leave_allocation_custom_tree" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.custom.tree</field>
+        <field name="model">hr.leave.allocation.custom</field>
+        <field name="arch" type="xml">
+            <tree string="Leave Allocations (FIFO Ledger)" decoration-info="allocation_type == 'accrual'" decoration-success="state == 'approved'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="holiday_status_id"/>
+                <field name="allocation_type"/>
+                <field name="effective_date"/>
+                <field name="expiration_date"/>
+                <field name="number_of_days" sum="Total Allocated"/>
+                <field name="consumed_days" sum="Total Consumed"/>
+                <field name="remaining_days" sum="Total Remaining"/>
+                <field name="state" widget="badge" decoration-success="state == 'approved'" decoration-warning="state == 'draft'" decoration-danger="state == 'expired'"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Custom Allocation Form View -->
+    <record id="view_hr_leave_allocation_custom_form" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.custom.form</field>
+        <field name="model">hr.leave.allocation.custom</field>
+        <field name="arch" type="xml">
+            <form string="Leave Allocation (FIFO)">
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,approved,expired"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" placeholder="مثال: رصيد افتتاحي 2025 أو استحقاق شهري"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="holiday_status_id"/>
+                            <field name="allocation_type"/>
+                            <field name="accrual_year"/>
+                        </group>
+                        <group>
+                            <field name="effective_date"/>
+                            <field name="expiration_date"/>
+                            <field name="number_of_days"/>
+                            <field name="consumed_days"/>
+                            <field name="remaining_days" class="oe_subtotal_footer_separator"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Custom Allocation Action & Menu -->
+    <record id="action_hr_leave_allocation_custom" model="ir.actions.act_window">
+        <field name="name">تخصيصات الأرصدة (FIFO Allocations)</field>
+        <field name="res_model">hr.leave.allocation.custom</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                سجلات تخصيص أرصدة الإجازات السنوية والاستحقاق الشهري الآلي بنظام الوارد أولاً يخرج أولاً (FIFO).
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_hr_leave_allocation_custom"
+              name="تخصيصات الأرصدة والاستحقاق (FIFO)"
+              parent="hr_holidays.menu_hr_holidays_management"
+              action="action_hr_leave_allocation_custom"
+              sequence="2"/>
+</odoo>

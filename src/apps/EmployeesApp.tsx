@@ -7,7 +7,7 @@ import { validateKuwaitCivilId, parseKuwaitCivilId, formatKWD } from '../utils/k
 import { processAnyDocument } from '../utils/ocrService';
 import { 
   User, Users, CheckCircle, AlertTriangle, FileText, Calendar, Briefcase,
-  Folder, Shield, Plus, Edit2, Trash2, X, Building, Phone, Mail, Award, Search, Check, Eye, Camera, Loader2, Sparkles, LayoutGrid, List, ArrowLeftRight, Filter, Fingerprint, Key, CreditCard, MessageSquare, Send, ShieldCheck, History, Save, RotateCcw
+  Folder, Shield, Plus, Edit2, Trash2, X, Building, Phone, Mail, Award, Search, Check, Eye, Camera, Loader2, Sparkles, LayoutGrid, List, ArrowLeftRight, Filter, Fingerprint, Key, CreditCard, MessageSquare, Send, ShieldCheck, History, Save, RotateCcw, Clock
 } from 'lucide-react';
 
 interface EmployeesAppProps {
@@ -72,9 +72,38 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   const [showPurgeModal, setShowPurgeModal] = useState<boolean>(false);
   const [purgeConfirmText, setPurgeConfirmText] = useState<string>('');
 
-  const activeCompId = activeCompany?.id || 'comp-1';
+  const activeCompId = activeCompany?.id || '';
   const companyEmps = (employees || []).filter(e => e.companyId === activeCompId);
   const softDeletedEmps = companyEmps.filter(e => e.isDeleted);
+
+  // Local interactive search state
+  const [localSearchTerm, setLocalSearchTerm] = useState<string>(searchTerm || '');
+
+  useEffect(() => {
+    if (searchTerm !== undefined) {
+      setLocalSearchTerm(searchTerm);
+    }
+  }, [searchTerm]);
+
+  // Compute effective job titles (from props or auto-derived from employees & standard catalog)
+  const effectiveJobTitles = React.useMemo(() => {
+    const map = new Map<string, JobTitle>();
+    (jobTitles || []).forEach(jt => {
+      if (jt.titleName) map.set(jt.titleName.trim(), jt);
+    });
+    // Add any missing job titles found in current employees
+    companyEmps.forEach(emp => {
+      if (emp.jobTitle && emp.jobTitle.trim() && !map.has(emp.jobTitle.trim())) {
+        map.set(emp.jobTitle.trim(), {
+          id: `jt-emp-${emp.id}`,
+          titleName: emp.jobTitle.trim(),
+          departmentName: emp.department || 'عام',
+          description: 'مسمى وظيفي مستخدم في شؤون الموظفين'
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [jobTitles, companyEmps]);
 
   // Odoo Search Facets & Filters State
   const [odooFilter, setOdooFilter] = useState<'ALL' | 'ACTIVE' | 'ON_LEAVE' | 'ARCHIVED'>('ALL');
@@ -111,13 +140,15 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       if (emp.isDeleted) return false;
     }
 
-    const sTerm = (searchTerm || '').trim().toLowerCase();
+    const sTerm = (localSearchTerm || '').trim().toLowerCase();
     const matchesSearch = !sTerm ||
       (emp.fullNameAr && emp.fullNameAr.toLowerCase().includes(sTerm)) ||
       (emp.fullNameEn && emp.fullNameEn.toLowerCase().includes(sTerm)) ||
       (emp.civilId && emp.civilId.includes(sTerm)) ||
       (emp.employeeCode && emp.employeeCode.toLowerCase().includes(sTerm)) ||
-      (emp.jobTitle && emp.jobTitle.toLowerCase().includes(sTerm));
+      (emp.jobTitle && emp.jobTitle.toLowerCase().includes(sTerm)) ||
+      (emp.department && emp.department.toLowerCase().includes(sTerm)) ||
+      (emp.phone && emp.phone.includes(sTerm));
 
     if (!matchesSearch) return false;
 
@@ -233,7 +264,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
         nationality: scannedData.nationality || prev?.nationality || 'كويتي',
         civilIdExpiry: scannedData.expiryDate || prev?.civilIdExpiry || '',
         dob: parsedDob || prev?.dob || '',
-        gender: parsedGender || prev?.gender || 'MALE',
+        gender: (parsedGender as 'MALE' | 'FEMALE') || prev?.gender || 'MALE',
         passportNo: scannedData.passportNo || prev?.passportNo || '',
         jobTitle: scannedData.jobTitle || prev?.jobTitle || '',
       }));
@@ -383,10 +414,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
           <button
             onClick={() => setIsJobTitlesModalOpen(true)}
-            className="bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 shadow-xs flex items-center gap-1.5 transition"
+            className="bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 shadow-xs flex items-center gap-1.5 transition cursor-pointer"
           >
             <Briefcase className="w-4 h-4 text-[#714B67]" />
-            <span>شجرة المسميات ({jobTitles.length})</span>
+            <span>شجرة المسميات ({effectiveJobTitles.length})</span>
           </button>
 
           <button
@@ -402,15 +433,20 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       {/* Search & Filter Bar */}
       <div className="bg-white rounded-xl border border-slate-200 mb-6 shadow-xs p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 px-3 py-1.5">
+          <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 px-3 py-1.5 focus-within:border-[#714B67] transition">
             <Search className="w-4 h-4 text-slate-400 mr-2" />
             <input
               type="text"
-              placeholder="البحث السريع (الاسم، الكود، الرقم المدني)..."
-              value={searchTerm}
-              readOnly
-              className="bg-transparent outline-none text-xs w-60 text-slate-700"
+              placeholder="البحث السريع (الاسم، الكود، الرقم المدني، المسمى)..."
+              value={localSearchTerm}
+              onChange={(e) => setLocalSearchTerm(e.target.value)}
+              className="bg-transparent outline-none text-xs w-64 text-slate-700 placeholder:text-slate-400"
             />
+            {localSearchTerm && (
+              <button onClick={() => setLocalSearchTerm('')} className="text-slate-400 hover:text-slate-600 p-0.5">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           <div className="relative">
@@ -662,6 +698,212 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               </label>
             </div>
 
+            {/* Odoo Smart Buttons (Stat Buttons / oe_button_box) */}
+            {editingEmp.id && employees.some(e => e.id === editingEmp.id) && (
+              <div className="bg-slate-100/90 border-b border-slate-200 px-6 py-2.5">
+                <div className="text-[11px] font-bold text-slate-500 mb-1.5 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span>الربط الديناميكي لسجلات الموظف (Odoo Smart Buttons):</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                  {/* 1. Contract */}
+                  {(() => {
+                    const empContracts = contracts.filter(c => c.employeeId === editingEmp.id);
+                    const activeC = empContracts.find(c => c.status === 'RUNNING') || empContracts[0];
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingEmp(null);
+                          if (onNavigateToApp) onNavigateToApp('CONTRACTS');
+                        }}
+                        className="bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                        title="الانتقال إلى عقود العمل والبدلات"
+                      >
+                        <div className="flex items-center justify-between text-slate-400 group-hover:text-purple-600 mb-1">
+                          <FileText className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-100 px-1 rounded">
+                            {empContracts.length}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-800 group-hover:text-purple-700 truncate">
+                          {activeC ? `${activeC.basicSalary} د.ك` : 'العقد'}
+                        </div>
+                        <div className="text-[9px] text-slate-400 truncate">عقود العمل</div>
+                      </button>
+                    );
+                  })()}
+
+                  {/* 2. Leaves */}
+                  {(() => {
+                    const empLeaves = leaves.filter(l => l.employeeId === editingEmp.id);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onSelectEmployeeForLeaves && editingEmp.id) {
+                            onSelectEmployeeForLeaves(editingEmp.id);
+                          }
+                          setEditingEmp(null);
+                          if (onNavigateToApp) onNavigateToApp('LEAVES');
+                        }}
+                        className="bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                        title="الانتقال إلى سجل الإجازات والرصيد"
+                      >
+                        <div className="flex items-center justify-between text-slate-400 group-hover:text-emerald-600 mb-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-1 rounded">
+                            {empLeaves.length}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-800 group-hover:text-emerald-700 truncate">
+                          الإجازات
+                        </div>
+                        <div className="text-[9px] text-slate-400 truncate">الأرصدة والطلبات</div>
+                      </button>
+                    );
+                  })()}
+
+                  {/* 3. Attendance */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEmp(null);
+                      if (onNavigateToApp) onNavigateToApp('ATTENDANCE');
+                    }}
+                    className="bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                    title="الانتقال إلى سجل البصمة والدوام"
+                  >
+                    <div className="flex items-center justify-between text-slate-400 group-hover:text-blue-600 mb-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-100 px-1 rounded">
+                        دوام
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-blue-700 truncate">
+                      البصمة
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate">سجل الحضور</div>
+                  </button>
+
+                  {/* 4. Payroll */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEmp(null);
+                      if (onNavigateToApp) onNavigateToApp('PAYROLL');
+                    }}
+                    className="bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                    title="الانتقال إلى مسيرات الرواتب"
+                  >
+                    <div className="flex items-center justify-between text-slate-400 group-hover:text-amber-600 mb-1">
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-100 px-1 rounded">
+                        WPS
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-amber-700 truncate">
+                      الرواتب
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate">المسيرات والتحويل</div>
+                  </button>
+
+                  {/* 5. Custody & Loans */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEmp(null);
+                      if (onNavigateToApp) onNavigateToApp('CUSTODY_LOANS');
+                    }}
+                    className="bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                    title="الانتقال إلى العهد والسلف والأقساط"
+                  >
+                    <div className="flex items-center justify-between text-slate-400 group-hover:text-indigo-600 mb-1">
+                      <Briefcase className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-100 px-1 rounded">
+                        عهد
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-indigo-700 truncate">
+                      العهد والسلف
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate">الأقساط والمعدات</div>
+                  </button>
+
+                  {/* 6. End of Service */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEmp(null);
+                      if (onNavigateToApp) onNavigateToApp('EOS');
+                    }}
+                    className="bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                    title="الانتقال إلى حاسبة مكافأة نهاية الخدمة"
+                  >
+                    <div className="flex items-center justify-between text-slate-400 group-hover:text-rose-600 mb-1">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-mono font-bold text-rose-700 bg-rose-100 px-1 rounded">
+                        م. 51
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-rose-700 truncate">
+                      نهاية الخدمة
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate">حاسبة المستحقات</div>
+                  </button>
+
+                  {/* 7. Documents */}
+                  {(() => {
+                    const empDocs = documents.filter(d => d.employeeId === editingEmp.id);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingEmp(null);
+                          if (onNavigateToApp) onNavigateToApp('DOCUMENTS');
+                        }}
+                        className="bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                        title="الانتقال إلى أرشيف مستندات الموظف"
+                      >
+                        <div className="flex items-center justify-between text-slate-400 group-hover:text-teal-600 mb-1">
+                          <Folder className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-mono font-bold text-teal-700 bg-teal-100 px-1 rounded">
+                            {empDocs.length}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-800 group-hover:text-teal-700 truncate">
+                          المستندات
+                        </div>
+                        <div className="text-[9px] text-slate-400 truncate">الأرشيف والـ OCR</div>
+                      </button>
+                    );
+                  })()}
+
+                  {/* 8. Commencement */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEmp(null);
+                      if (onNavigateToApp) onNavigateToApp('COMMENCEMENT');
+                    }}
+                    className="bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-xl p-2 text-right transition group cursor-pointer shadow-2xs flex flex-col justify-between"
+                    title="الانتقال إلى إقرار مباشرة العمل"
+                  >
+                    <div className="flex items-center justify-between text-slate-400 group-hover:text-sky-600 mb-1">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-mono font-bold text-sky-700 bg-sky-100 px-1 rounded">
+                        مباشرة
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-800 group-hover:text-sky-700 truncate">
+                      المباشرة
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate">استلام العمل</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Modal Tabs */}
             <div className="flex border-b border-slate-200 bg-slate-50 px-6 gap-2">
               {[
@@ -905,13 +1147,15 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">رصيد الإجازات الافتتاحي (أيام)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ آخر ترحيل واستحقاق شهري (lastAccrualDate)</label>
                     <input
-                      type="number"
-                      value={editingEmp.carriedOverLeave2025 ?? 0}
-                      onChange={(e) => setEditingEmp({ ...editingEmp, carriedOverLeave2025: Number(e.target.value) })}
+                      type="text"
+                      value={editingEmp.lastAccrualDate || ''}
+                      onChange={(e) => setEditingEmp({ ...editingEmp, lastAccrualDate: e.target.value })}
+                      placeholder="YYYY-MM (مثال: 2026-08)"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">يمنع محرك الإجازات الآلي الترحيل المكرر في نفس الشهر</p>
                   </div>
                 </div>
               )}
@@ -1046,11 +1290,26 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               </div>
 
               <div className="space-y-2">
-                {jobTitles.map(jt => (
-                  <div key={jt.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="font-bold text-xs text-slate-800">{jt.titleName}</span>
+                <div className="text-[11px] font-bold text-slate-500 mb-1">
+                  المسميات المعتمدة في النظام ({effectiveJobTitles.length})
+                </div>
+                {effectiveJobTitles.map(jt => (
+                  <div key={jt.id} className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 transition">
+                    <div>
+                      <span className="font-bold text-xs text-slate-800">{jt.titleName}</span>
+                      {jt.departmentName && (
+                        <span className="text-[10px] text-slate-500 mr-2">({jt.departmentName})</span>
+                      )}
+                    </div>
                     {onDeleteJobTitle && (
-                      <button onClick={() => onDeleteJobTitle(jt.id)} className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition">
+                      <button 
+                        onClick={() => {
+                          onDeleteJobTitle(jt.id);
+                          toast.success(`تم إزالة المسمى الوظيفي: ${jt.titleName}`);
+                        }} 
+                        className="text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition cursor-pointer"
+                        title="حذف المسمى"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}

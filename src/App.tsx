@@ -11,6 +11,8 @@ import { AysedAICopilot } from './components/AysedAICopilot';
 import { OdooFieldInspector } from './components/OdooFieldInspector';
 import { AppRouter } from './routes';
 import { QuickNotificationModal } from './components/QuickNotificationModal';
+import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
+import { SuperAdminPortal } from './pages/SuperAdminPortal';
 
 import { 
   Company, Employee, Contract, LeaveRequest, 
@@ -23,158 +25,26 @@ import { initialCompanies, initialDepartments, initialJobTitles, initialEmployee
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { generateSmartNotifications } from './utils/notificationsEngine';
 import toast, { Toaster } from 'react-hot-toast';
-import { auth, db, cleanFirestoreData } from './lib/firebase';
-import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { auth, db, cleanFirestoreData, isTenantPurged } from './lib/firebase';
+import { doc, setDoc, deleteDoc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData } from './utils/persistentStorage';
 import { calculateUnpaidLeaveDeductionRule, computeFinalPayslipSalary } from './services/salaryRulesService';
+import { ensureDefaultLeaveTypes } from './services/seedLeaveTypes';
+import { supabase } from './lib/supabase';
+import { HRProvider, useHR } from './context/HRContext';
+import { EmployeeProvider, StoreContext, useStoreContext, useEmployeeContext } from './context/EmployeeContext';
+import { LeaveService, runAutomatedLeaveAccrual, getAccrualMonthNameAr } from './services/leaveService';
+export { HRProvider, useHR, EmployeeProvider, StoreContext, useStoreContext, useEmployeeContext, LeaveService };
 
-export default function App() {
+function MainActionManager() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [userCompanyId, setUserCompanyId] = useState('');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-
-  useEffect(() => {
-    toast.dismiss();
-  }, []);
+  const [portalViewMode, setPortalViewMode] = useState<'superadmin' | 'apps'>('superadmin');
   
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setIsAuthenticated(true);
-        setCurrentUserEmail(user.email || '');
-        const userEmailLower = (user.email || '').toLowerCase();
-        if (userEmailLower === 'admin@aysed.com' || userEmailLower === 'elsayedhr1993@gmail.com') {
-          setCurrentUserRole('SUPER_ADMIN');
-          setCurrentApp('SAAS_ADMIN');
-          
-          // Sync upgrade to Firestore automatically (similar to Odoo env.cr.commit())
-          try {
-            setDoc(doc(db, 'users', user.uid), {
-              email: userEmailLower,
-              role: 'SUPER_ADMIN',
-              timezone: 'Asia/Kuwait'
-            }, { merge: true });
-          } catch(e) {}
-        } else {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            if (userDoc.exists()) {
-              const data = userDoc.data();
-              const role = data.role || 'COMPANY_ADMIN';
-              setCurrentUserRole(role);
-              if (role === 'EMPLOYEE') {
-                setCurrentApp('ATTENDANCE');
-              } else {
-                setCurrentApp(null);
-              }
-              if (data.companyId) {
-                setUserCompanyId(data.companyId);
-                localStorage.setItem('activeCompanyId', data.companyId);
-              }
-            } else {
-               setCurrentUserRole('COMPANY_ADMIN');
-               setCurrentApp(null);
-            }
-          } catch(e) {
-            console.error("Error fetching user data", e);
-            setCurrentUserRole('COMPANY_ADMIN');
-            setCurrentApp(null);
-          }
-        }
-      } else {
-        setIsAuthenticated(false);
-        setCurrentUserEmail('');
-        setCurrentUserRole('');
-        setUserCompanyId('');
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Toggle aysed_owner class on body based on Super Admin role
-  useEffect(() => {
-    if (currentUserRole === 'SUPER_ADMIN') {
-      document.body.classList.add('aysed_owner');
-    } else {
-      document.body.classList.remove('aysed_owner');
-    }
-  }, [currentUserRole]);
-
-  const [activeCompany, setActiveCompany] = useState<Company>(() => {
-    const saved = localStorage.getItem('activeCompanyId');
-    const existingCompanies = getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, initialCompanies, MANARA_STORAGE_KEYS.TENANTS);
-    if (saved) {
-      const found = existingCompanies.find(c => c.id === saved) || null;
-      if (found) return found;
-    }
-    return existingCompanies.length > 0 ? existingCompanies[0] : null as any;
-  });
-  
-  const [companies, setCompanies] = useState<Company[]>(() => 
-    getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, initialCompanies, MANARA_STORAGE_KEYS.TENANTS)
-  );
-
-  // Keep activeCompany up to date with the companies list
-  useEffect(() => {
-    if (companies.length > 0) {
-      setActiveCompany(prev => {
-        const targetId = userCompanyId || localStorage.getItem('activeCompanyId') || prev?.id;
-        const found = companies.find(c => c.id === targetId);
-        if (found) {
-          return JSON.stringify(prev) !== JSON.stringify(found) ? found : prev;
-        }
-        if (!userCompanyId && (!prev || companies[0].id !== prev?.id)) {
-          localStorage.setItem('activeCompanyId', companies[0].id);
-          return companies[0];
-        }
-        return prev;
-      });
-    }
-  }, [companies, userCompanyId]);
-
-  // Save activeCompanyId when it changes
-  useEffect(() => {
-    if (activeCompany?.id) {
-      localStorage.setItem('activeCompanyId', activeCompany.id);
-    }
-  }, [activeCompany?.id]);
-
-  // action_switch_context: Switches active company in user session and reloads state with isolated company data
-  const actionSwitchContext = async (companyOrId: Company | string) => {
-    const targetComp = typeof companyOrId === 'string' 
-      ? companies.find(c => c.id === companyOrId) 
-      : companyOrId;
-
-    if (!targetComp) return;
-
-    setActiveCompany(targetComp);
-    localStorage.setItem('activeCompanyId', targetComp.id);
-
-    if (auth.currentUser) {
-      try {
-        await setDoc(doc(db, 'users', auth.currentUser.uid), cleanFirestoreData({
-          company_id: targetComp.id,
-          companyId: targetComp.id,
-          updated_at: new Date().toISOString()
-        }), { merge: true });
-      } catch (err) {
-        console.error('Error writing company_id to user session:', err);
-      }
-    }
-
-    toast.success(`تم تغيير سياق الشركة للمدير بنجاح: ${targetComp.nameAr || targetComp.name}`);
-  };
-
-  // Expose action_switch_context on window for Odoo action client calls
-  useEffect(() => {
-    (window as any).action_switch_context = (companyId: string) => actionSwitchContext(companyId);
-    return () => {
-      delete (window as any).action_switch_context;
-    };
-  }, [companies]);
   // Primary State Controller: Single state variable to navigate screens without conflict
   const [currentApp, setCurrentApp] = useState<string | null>(null);
   const activeApp = currentApp || 'LAUNCHER';
@@ -183,19 +53,91 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
+  const [companies, setCompanies] = useState<Company[]>(() => {
+    try {
+      const savedReg = localStorage.getItem('registered_companies_v1');
+      const map = new Map<string, Company>();
+      initialCompanies.forEach(c => {
+        if (!isTenantPurged(c.id) && !isTenantPurged(c.nameAr) && !isTenantPurged(c.nameEn)) {
+          map.set(c.id, c);
+        }
+      });
+      if (savedReg) {
+        const parsed = JSON.parse(savedReg);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed.forEach((c: any) => {
+            if (c && c.id && !isTenantPurged(c.id) && !isTenantPurged(c.nameAr) && !isTenantPurged(c.nameEn)) {
+              const existing = map.get(c.id);
+              if (existing) {
+                map.set(c.id, { ...existing, ...c });
+              } else {
+                map.set(c.id, c);
+              }
+            }
+          });
+        }
+      }
+      const list = Array.from(map.values());
+      return list.length > 0 ? list : [initialCompanies[0]];
+    } catch (e) {}
+    return initialCompanies.filter(c => !isTenantPurged(c.id) && !isTenantPurged(c.nameAr));
+  });
+
+  useEffect(() => {
+    const handleCompaniesChanged = (e: any) => {
+      setCompanies(prev => {
+        const remaining = prev.filter(c => !isTenantPurged(c.id) && !isTenantPurged(c.nameAr) && !isTenantPurged(c.nameEn));
+        return remaining.length > 0 ? remaining : [initialCompanies[0]];
+      });
+    };
+    window.addEventListener('aysed_companies_changed', handleCompaniesChanged);
+    return () => window.removeEventListener('aysed_companies_changed', handleCompaniesChanged);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('registered_companies_v1', JSON.stringify(companies));
+    } catch (e) {}
+    setPersistentData(MANARA_STORAGE_KEYS.COMPANIES, companies, MANARA_STORAGE_KEYS.TENANTS);
+  }, [companies]);
+
+  const [activeCompany, setActiveCompany] = useState<Company>(() => {
+    const saved = localStorage.getItem('activeCompanyId');
+    const existingCompanies = getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, initialCompanies, MANARA_STORAGE_KEYS.TENANTS);
+    if (saved && saved !== 'comp-super-admin') {
+      const found = existingCompanies.find(c => c.id === saved) || null;
+      if (found) return found;
+    }
+    const nonAdminComps = existingCompanies.filter(c => c.id !== 'comp-super-admin');
+    if (nonAdminComps.length > 0) return nonAdminComps[0];
+    return existingCompanies.length > 0 ? existingCompanies[0] : null as any;
+  });
+
   // Data state with persistent localStorage initialization
-  const [employees, setEmployees] = useState<Employee[]>(() => 
-    getPersistentData<Employee[]>(MANARA_STORAGE_KEYS.EMPLOYEES, initialEmployees)
-  );
+  const [employees, setEmployees] = useState<Employee[]>(() => {
+    const loaded = getPersistentData<Employee[]>(MANARA_STORAGE_KEYS.EMPLOYEES, initialEmployees);
+    const map = new Map<string, Employee>();
+    initialEmployees.forEach(e => map.set(e.id, e));
+    (loaded || []).forEach(e => {
+      if (e && e.id) map.set(e.id, e);
+    });
+    return Array.from(map.values());
+  });
   const [jobTitles, setJobTitles] = useState<JobTitle[]>(() => 
     getPersistentData<JobTitle[]>(MANARA_STORAGE_KEYS.JOB_TITLES, initialJobTitles)
   );
   const [departments, setDepartments] = useState<Department[]>(() => 
     getPersistentData<Department[]>(MANARA_STORAGE_KEYS.DEPARTMENTS, initialDepartments)
   );
-  const [contracts, setContracts] = useState<Contract[]>(() => 
-    getPersistentData<Contract[]>(MANARA_STORAGE_KEYS.CONTRACTS, initialContracts)
-  );
+  const [contracts, setContracts] = useState<Contract[]>(() => {
+    const loaded = getPersistentData<Contract[]>(MANARA_STORAGE_KEYS.CONTRACTS, initialContracts);
+    const map = new Map<string, Contract>();
+    initialContracts.forEach(c => map.set(c.id, c));
+    (loaded || []).forEach(c => {
+      if (c && c.id) map.set(c.id, c);
+    });
+    return Array.from(map.values());
+  });
   const [leaves, setLeaves] = useState<LeaveRequest[]>(() => 
     getPersistentData<LeaveRequest[]>(MANARA_STORAGE_KEYS.LEAVES, [])
   );
@@ -241,9 +183,10 @@ export default function App() {
   const [commencements, setCommencements] = useState<EmploymentCommencement[]>(() => 
     getPersistentData<EmploymentCommencement[]>(MANARA_STORAGE_KEYS.COMMENCEMENTS, [])
   );
-  const [subscriptions, setSubscriptions] = useState<CompanySubscription[]>(() => 
-    getPersistentData<CompanySubscription[]>(MANARA_STORAGE_KEYS.SUBSCRIPTIONS, [])
-  );
+  const [subscriptions, setSubscriptions] = useState<CompanySubscription[]>(() => {
+    const loaded = getPersistentData<CompanySubscription[]>(MANARA_STORAGE_KEYS.SUBSCRIPTIONS, []);
+    return loaded;
+  });
   
   // Automated Employee Notifications State
   const [employeeNotifications, setEmployeeNotifications] = useState<EmployeeNotification[]>(() => 
@@ -252,6 +195,249 @@ export default function App() {
   const [dailyMovements, setDailyMovements] = useState<DailyMovement[]>(() => 
     getPersistentData<DailyMovement[]>(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, [])
   );
+
+  // Quick Notification Modal State
+  const [isQuickNotifModalOpen, setIsQuickNotifModalOpen] = useState(false);
+  const [quickNotifEmp, setQuickNotifEmp] = useState<Employee | null>(null);
+  const [quickNotifTrigger, setQuickNotifTrigger] = useState<any>('HR_ACTION_REQUIRED');
+  const [quickNotifData, setQuickNotifData] = useState<any>(null);
+
+  // UI state
+  const [bgTheme, setBgTheme] = useState('tech');
+  const [motionEnabled, setMotionEnabled] = useState(true);
+  const [viewMode, setViewMode] = useState<'grid'|'list'>('grid');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterTab, setFilterTab] = useState('ALL');
+  const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
+  const [selectedEmpForForm, setSelectedEmpForForm] = useState<Employee | null>(null);
+  const [selectedEmployeeForLeavesFilter, setSelectedEmployeeForLeavesFilter] = useState<string | null>(null);
+  const [isInspectorActive, setIsInspectorActive] = useState<boolean>(false);
+
+  useEffect(() => {
+    toast.dismiss();
+    ensureDefaultLeaveTypes(supabase);
+  }, []);
+  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        setCurrentUserEmail(user.email || '');
+        const userEmailLower = (user.email || '').toLowerCase();
+        if (userEmailLower === 'admin@aysed.com' || userEmailLower === 'elsayedhr1993@gmail.com') {
+          setCurrentUserRole('SUPER_ADMIN');
+          setPortalViewMode('superadmin');
+          setCurrentApp(null);
+          
+          // Sync upgrade to Firestore automatically (similar to Odoo env.cr.commit())
+          try {
+            setDoc(doc(db, 'users', user.uid), {
+              email: userEmailLower,
+              role: 'SUPER_ADMIN',
+              timezone: 'Asia/Kuwait'
+            }, { merge: true });
+          } catch(e) {}
+        } else {
+          try {
+            let foundCompanyId = '';
+            let assignedRole = 'COMPANY_ADMIN';
+
+            // 1. Direct tenant resolution from email / phone credentials
+            if (userEmailLower.includes('666968182') || userEmailLower.includes('elite')) {
+              foundCompanyId = 'comp-elite';
+            } else if (userEmailLower.includes('66968180') || userEmailLower.includes('fanar')) {
+              foundCompanyId = 'comp-fanar';
+            } else if (userEmailLower.includes('almanar') || userEmailLower.includes('manar') || userEmailLower.includes('99112233')) {
+              foundCompanyId = 'comp-almanar';
+            }
+
+            // 2. Check Firestore userDoc
+            if (!foundCompanyId) {
+              const userDoc = await getDoc(doc(db, 'users', user.uid));
+              if (userDoc.exists()) {
+                const data = userDoc.data();
+                assignedRole = data.role || 'COMPANY_ADMIN';
+                if (data.companyId && data.companyId !== 'comp-super-admin') {
+                  foundCompanyId = data.companyId;
+                }
+              }
+            }
+
+            // 3. Check subscriptions collection by email
+            if (!foundCompanyId) {
+              try {
+                const subsSnap = await getDocs(collection(db, 'subscriptions'));
+                subsSnap.forEach(subDoc => {
+                  const subData = subDoc.data();
+                  if ((subData.email || '').toLowerCase() === userEmailLower && subData.companyId && subData.companyId !== 'comp-super-admin') {
+                    foundCompanyId = subData.companyId;
+                  }
+                });
+              } catch (err) {}
+            }
+
+            // 4. Check local subscriptions
+            if (!foundCompanyId) {
+              const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+              const matchedSub = localSubs.find((s: any) => (s.email || '').toLowerCase() === userEmailLower);
+              if (matchedSub && matchedSub.companyId && matchedSub.companyId !== 'comp-super-admin') {
+                foundCompanyId = matchedSub.companyId;
+              }
+            }
+
+            setCurrentUserRole(assignedRole);
+            if (assignedRole === 'SUPER_ADMIN') {
+              setPortalViewMode('superadmin');
+              setCurrentApp(null);
+            } else {
+              setPortalViewMode('apps');
+              if (assignedRole === 'EMPLOYEE') {
+                setCurrentApp('ATTENDANCE');
+              } else {
+                setCurrentApp(null);
+              }
+            }
+
+            if (foundCompanyId) {
+              setUserCompanyId(foundCompanyId);
+              localStorage.setItem('activeCompanyId', foundCompanyId);
+              const foundCompObj = companies.find(c => c.id === foundCompanyId) || initialCompanies.find(c => c.id === foundCompanyId);
+              if (foundCompObj) {
+                setActiveCompany(foundCompObj);
+                setCompanies(prev => prev.some(c => c.id === foundCompObj.id) ? prev : [...prev, foundCompObj]);
+              }
+              setDoc(doc(db, 'users', user.uid), {
+                email: userEmailLower,
+                role: assignedRole,
+                companyId: foundCompanyId,
+                lastLogin: new Date().toISOString()
+              }, { merge: true }).catch(() => {});
+            } else {
+              // Assign a dedicated new unique company ID for this new company admin
+              const newCompId = 'comp-' + Date.now();
+              const newCompName = (user.email || 'شركة جديدة').split('@')[0];
+              foundCompanyId = newCompId;
+              setUserCompanyId(foundCompanyId);
+              localStorage.setItem('activeCompanyId', foundCompanyId);
+
+              // Create company record in Firestore & local storage
+              const newCompanyDoc = {
+                id: newCompId,
+                nameAr: `شركة ${newCompName}`,
+                nameEn: `${newCompName} Company`,
+                isActive: true,
+                industry: 'عام',
+                subscriptionPlan: 'Monthly',
+                settings: {}
+              };
+              setDoc(doc(db, 'companies', newCompId), newCompanyDoc).catch(() => {});
+              setActiveCompany(newCompanyDoc as any);
+              
+              setDoc(doc(db, 'users', user.uid), {
+                email: userEmailLower,
+                role: 'COMPANY_ADMIN',
+                companyId: foundCompanyId,
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+              }, { merge: true }).catch(() => {});
+            }
+          } catch(e) {
+            console.error("Error fetching user data", e);
+            setCurrentUserRole('COMPANY_ADMIN');
+            setPortalViewMode('apps');
+            setCurrentApp(null);
+          }
+        }
+      } else {
+        setIsAuthenticated(false);
+        setCurrentUserEmail('');
+        setCurrentUserRole('');
+        setUserCompanyId('');
+        setPortalViewMode('superadmin');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Toggle aysed_owner class on body based on Super Admin role
+  useEffect(() => {
+    if (currentUserRole === 'SUPER_ADMIN') {
+      document.body.classList.add('aysed_owner');
+    } else {
+      document.body.classList.remove('aysed_owner');
+    }
+  }, [currentUserRole]);
+
+  // Keep activeCompany up to date with the companies list
+  useEffect(() => {
+    if (companies.length > 0) {
+      setActiveCompany(prev => {
+        if (currentUserRole === 'SUPER_ADMIN') {
+          const adminComp = companies.find(c => c.id === 'comp-super-admin') || companies[0];
+          const storedId = localStorage.getItem('activeCompanyId');
+          // If stored company exists and was explicitly set, find it; otherwise default to adminComp
+          if (storedId) {
+            const found = companies.find(c => c.id === storedId);
+            if (found) return found;
+          }
+          localStorage.setItem('activeCompanyId', adminComp.id);
+          return adminComp;
+        }
+
+        const targetId = userCompanyId || (currentUserRole === 'SUPER_ADMIN' ? localStorage.getItem('activeCompanyId') : null) || prev?.id;
+        const found = companies.find(c => c.id === targetId) || initialCompanies.find(c => c.id === targetId);
+        if (found) {
+          return JSON.stringify(prev) !== JSON.stringify(found) ? found : prev;
+        }
+        if (!userCompanyId && (!prev || companies[0].id !== prev?.id)) {
+          localStorage.setItem('activeCompanyId', companies[0].id);
+          return companies[0];
+        }
+        return prev;
+      });
+    }
+  }, [companies, userCompanyId, currentUserRole]);
+
+  // Save activeCompanyId when it changes
+  useEffect(() => {
+    if (activeCompany?.id) {
+      localStorage.setItem('activeCompanyId', activeCompany.id);
+    }
+  }, [activeCompany?.id]);
+
+  // action_switch_context: Switches active company in user session and reloads state with isolated company data
+  const actionSwitchContext = async (companyOrId: Company | string) => {
+    const targetComp = typeof companyOrId === 'string' 
+      ? companies.find(c => c.id === companyOrId) 
+      : companyOrId;
+
+    if (!targetComp) return;
+
+    setActiveCompany(targetComp);
+    localStorage.setItem('activeCompanyId', targetComp.id);
+
+    if (auth.currentUser) {
+      try {
+        await setDoc(doc(db, 'users', auth.currentUser.uid), cleanFirestoreData({
+          company_id: targetComp.id,
+          companyId: targetComp.id,
+          updated_at: new Date().toISOString()
+        }), { merge: true });
+      } catch (err) {
+        console.error('Error writing company_id to user session:', err);
+      }
+    }
+
+    toast.success(`تم تغيير سياق الشركة للمدير بنجاح: ${targetComp.nameAr || targetComp.name}`);
+  };
+
+  // Expose action_switch_context on window for Odoo action client calls
+  useEffect(() => {
+    (window as any).action_switch_context = (companyId: string) => actionSwitchContext(companyId);
+    return () => {
+      delete (window as any).action_switch_context;
+    };
+  }, [companies]);
 
   // Auto-sync all entity states to localStorage whenever updated
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, employees); }, [employees]);
@@ -280,10 +466,10 @@ export default function App() {
 
   // ضمان جلب البيانات وعدم فراغها أبداً (Fallback Seeding)
   useEffect(() => {
-    if (!employees || employees.length === 0) {
+    if (!employees || employees.length < 19) {
       setEmployees(initialEmployees);
     }
-    if (!contracts || contracts.length === 0) {
+    if (!contracts || contracts.length < 19) {
       setContracts(initialContracts);
     }
     if (!departments || departments.length === 0) {
@@ -294,42 +480,38 @@ export default function App() {
     }
   }, []);
 
-  // الاستحقاق الآلي الكامل في الخلفية (Odoo Automated Accrual Engine)
+  // Automated Monthly Leave Accrual Engine (محرك الاستحقاق والترحيل الآلي لرصيد الإجازات)
+  // Adds 2.5 days to each active employee's leave balance and prevents duplicate runs via lastAccrualDate check
   React.useEffect(() => {
-    const checkAndApplyAccrual = () => {
-      const today = new Date();
-      // مفتاح الشهر الحالي (مثال: "2026-08")
-      const currentMonthKey = today.toISOString().slice(0, 7);
-      const lastProcessedMonth = localStorage.getItem('odoo_last_accrual_month');
+    if (!employees || employees.length === 0) return;
 
-      // إذا بدأ شهر جديد (أو اليوم تاريخ 1 فما فوق في شهر لم يتم احتسابه بعد)
-      if (lastProcessedMonth !== currentMonthKey) {
-        setEmployees((prevEmployees: any[]) =>
-          prevEmployees.map((emp) => {
-            // استحقاق 2.5 يوم لكل موظف على رأس عمله
-            const currentBalance = Number(emp.leaveBalance ?? 30);
-            return {
-              ...emp,
-              leaveBalance: +(currentBalance + 2.5).toFixed(2),
-              lastAccrualMonth: currentMonthKey
-            };
-          })
+    const accrualStatus = LeaveService.checkAccrualStatus(employees);
+    if (accrualStatus.pendingCount > 0) {
+      const result = LeaveService.processMonthlyLeaveAccrual(employees);
+      if (result.hasRun && result.accruedCount > 0) {
+        setEmployees(result.updatedEmployees);
+        setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, result.updatedEmployees);
+        
+        // Sync to Firestore for accrued employees
+        result.updatedEmployees.forEach(emp => {
+          const log = result.logs.find(l => l.employeeId === emp.id && l.status === 'ACCRUED');
+          if (log) {
+            try {
+              setDoc(doc(db, "employees", emp.id), cleanFirestoreData(emp), { merge: true });
+            } catch (err) {
+              console.error("Firestore sync notice for leave accrual:", err);
+            }
+          }
+        });
+
+        const monthName = getAccrualMonthNameAr();
+        toast.success(
+          `✨ تم ترحيل واستحقاق رصيد الإجازات الشهري التلقائي (+2.5 يوم) لـ ${result.accruedCount} موظف لشهر ${monthName}`,
+          { id: 'automated-leave-accrual-toast', duration: 5000 }
         );
-
-        // حفظ الشهر الحالي لمنع تكرار الإضافة
-        localStorage.setItem('odoo_last_accrual_month', currentMonthKey);
       }
-    };
-
-    // تشغيل الفحص الآلي فوراً عند فتح النظام
-    checkAndApplyAccrual();
-  }, []);
-
-  // Quick Notification Modal State
-  const [isQuickNotifModalOpen, setIsQuickNotifModalOpen] = useState(false);
-  const [quickNotifEmp, setQuickNotifEmp] = useState<Employee | null>(null);
-  const [quickNotifTrigger, setQuickNotifTrigger] = useState<any>('HR_ACTION_REQUIRED');
-  const [quickNotifData, setQuickNotifData] = useState<any>(null);
+    }
+  }, [employees?.length]);
 
   const handleOpenNotificationModal = (emp?: Employee | null, trigger: any = 'HR_ACTION_REQUIRED', data?: any) => {
     setQuickNotifEmp(emp || employees[0] || null);
@@ -355,18 +537,10 @@ export default function App() {
     toast.success('تم مسح جميع سجلات الإشعارات');
   };
 
-  const visibleCompanies = currentUserRole === 'SUPER_ADMIN' ? companies : (activeCompany ? [activeCompany] : (userCompanyId ? companies.filter(c => c.id === userCompanyId) : companies));
-
-  // UI state
-  const [bgTheme, setBgTheme] = useState('tech');
-  const [motionEnabled, setMotionEnabled] = useState(true);
-  const [viewMode, setViewMode] = useState<'grid'|'list'>('grid');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterTab, setFilterTab] = useState('ALL');
-  const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
-  const [selectedEmpForForm, setSelectedEmpForForm] = useState<Employee | null>(null);
-  const [selectedEmployeeForLeavesFilter, setSelectedEmployeeForLeavesFilter] = useState<string | null>(null);
-  const [isInspectorActive, setIsInspectorActive] = useState<boolean>(false);
+  const adminWorkspaceComp = companies.find(c => c.id === 'comp-super-admin') || companies[0];
+  const visibleCompanies = currentUserRole === 'SUPER_ADMIN'
+    ? companies 
+    : (activeCompany ? [activeCompany] : (userCompanyId ? companies.filter(c => c.id === userCompanyId) : companies));
 
   // Clean up legacy un-scoped shared cache keys for strict multi-tenancy
   useEffect(() => {
@@ -401,9 +575,11 @@ export default function App() {
     setCurrentUserEmail(email);
     if (emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com') {
       setCurrentUserRole('SUPER_ADMIN');
-      setCurrentApp('SAAS_ADMIN');
+      setPortalViewMode('superadmin');
+      setCurrentApp(null);
     } else {
       setCurrentUserRole('COMPANY_ADMIN');
+      setPortalViewMode('apps');
       setCurrentApp(null);
     }
     setIsAuthenticated(true);
@@ -436,7 +612,7 @@ export default function App() {
     }
   };
 
-  const handlePurgeSystemData = () => {
+  const handlePurgeSystemData = async () => {
     // Only basic clean for UI preview
     setEmployees([]);
     setContracts([]);
@@ -656,6 +832,44 @@ export default function App() {
       setPersistentData(MANARA_STORAGE_KEYS.LEAVES, updated);
       return updated;
     });
+
+    // If approved, automatically sync attendance days to ON_LEAVE
+    if (lv.status === 'APPROVED' && lv.leaveType !== 'HOURLY_PERMISSION') {
+      try {
+        const start = new Date(lv.startDate);
+        const end = new Date(lv.endDate);
+        const newAttRecords: AttendanceRecord[] = [];
+        
+        let curr = new Date(start);
+        while (curr <= end) {
+          const dateStr = curr.toISOString().split('T')[0];
+          newAttRecords.push({
+            id: `att-${lv.employeeId}-${dateStr}`,
+            employeeId: lv.employeeId,
+            companyId: lv.companyId || activeCompany?.id || 'comp-1',
+            date: dateStr,
+            checkIn: '—',
+            checkOut: '—',
+            workHours: 0,
+            overtimeHours: 0,
+            status: 'ON_LEAVE',
+            latenessMinutes: 0,
+          });
+          curr.setDate(curr.getDate() + 1);
+        }
+
+        setAttendance(prev => {
+          const map = new Map(prev.map(a => [a.id, a]));
+          newAttRecords.forEach(r => map.set(r.id, r));
+          const updated = Array.from(map.values());
+          setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, updated);
+          return updated;
+        });
+      } catch (err) {
+        console.error("Attendance sync notice:", err);
+      }
+    }
+
     try {
       await setDoc(doc(db, "leaves", lv.id), cleanFirestoreData(lv));
       toast.success("تم تسجيل طلب الإجازة بنجاح");
@@ -673,6 +887,43 @@ export default function App() {
       setPersistentData(MANARA_STORAGE_KEYS.LEAVES, updated);
       return updated;
     });
+
+    if (targetLeave && status === 'APPROVED' && targetLeave.leaveType !== 'HOURLY_PERMISSION') {
+      try {
+        const start = new Date(targetLeave.startDate);
+        const end = new Date(targetLeave.endDate);
+        const newAttRecords: AttendanceRecord[] = [];
+        
+        let curr = new Date(start);
+        while (curr <= end) {
+          const dateStr = curr.toISOString().split('T')[0];
+          newAttRecords.push({
+            id: `att-${targetLeave.employeeId}-${dateStr}`,
+            employeeId: targetLeave.employeeId,
+            companyId: targetLeave.companyId || activeCompany?.id || 'comp-1',
+            date: dateStr,
+            checkIn: '—',
+            checkOut: '—',
+            workHours: 0,
+            overtimeHours: 0,
+            status: 'ON_LEAVE',
+            latenessMinutes: 0,
+          });
+          curr.setDate(curr.getDate() + 1);
+        }
+
+        setAttendance(prev => {
+          const map = new Map(prev.map(a => [a.id, a]));
+          newAttRecords.forEach(r => map.set(r.id, r));
+          const updated = Array.from(map.values());
+          setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, updated);
+          return updated;
+        });
+      } catch (err) {
+        console.error("Attendance sync notice:", err);
+      }
+    }
+
     try {
       await setDoc(doc(db, "leaves", id), cleanFirestoreData({ status, hrNote: note }), { merge: true });
     } catch (e) {
@@ -682,7 +933,7 @@ export default function App() {
       const emp = employees.find(e => e.id === targetLeave.employeeId);
       if (status === 'APPROVED') {
         if (emp) {
-          toast.success(`تم اعتماد إجازة ${emp.fullNameAr} (${targetLeave.totalDays} يوم) وتم خصمها من الرصيد`);
+          toast.success(`تم اعتماد إجازة ${emp.fullNameAr} (${targetLeave.totalDays} يوم) وتم خصمها من الرصيد ومزامنة سجل الدوام`);
         }
       } else if (status === 'REJECTED') {
         if (wasApproved && emp) {
@@ -1075,9 +1326,63 @@ export default function App() {
       if(idx>=0){ const c=[...prev]; c[idx]=sub; return c; }
       return [sub, ...prev];
     });
+
+    // Update matching company in companies state
+    setCompanies(prev => {
+      const updated = prev.map(comp => {
+        if (comp.id === sub.companyId || (sub.companyName && (comp.nameAr === sub.companyName || comp.nameEn === sub.companyName))) {
+          const compUpdated = {
+            ...comp,
+            nameAr: sub.companyName || comp.nameAr,
+            nameEn: sub.companyName || comp.nameEn,
+            email: sub.email || comp.email,
+            phone: sub.phone || comp.phone,
+            planType: sub.planType || comp.planType,
+          };
+          setDoc(doc(db, "companies", comp.id), cleanFirestoreData(compUpdated), { merge: true }).catch(console.error);
+          return compUpdated;
+        }
+        return comp;
+      });
+      try {
+        localStorage.setItem('registered_companies_v1', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
     try {
-      await setDoc(doc(db, "subscriptions", sub.id), cleanFirestoreData(sub));
-      toast.success("تم حفظ الاشتراك في قاعدة البيانات");
+      await setDoc(doc(db, "subscriptions", sub.id), cleanFirestoreData(sub), { merge: true });
+      
+      // Update subscription_requests in Firestore if exists
+      try {
+        const reqSnap = await getDocs(collection(db, 'subscription_requests'));
+        reqSnap.forEach(async (d) => {
+          const data = d.data();
+          if (d.id === sub.id || (data.companyName && data.companyName.toLowerCase() === (sub.companyName || '').toLowerCase())) {
+            await setDoc(doc(db, 'subscription_requests', d.id), {
+              companyName: sub.companyName,
+              requesterName: sub.ownerName,
+              email: sub.email,
+              phone: sub.phone,
+              planType: sub.planType,
+              status: sub.status,
+              state: sub.status
+            }, { merge: true });
+          }
+        });
+      } catch (e) {}
+
+      // Update localStorage
+      try {
+        const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+        const updatedLocal = localSubs.map((s: any) => (s.id === sub.id || s.companyName === sub.companyName) ? { ...s, ...sub } : s);
+        if (!updatedLocal.some((s: any) => s.id === sub.id)) {
+          updatedLocal.push(sub);
+        }
+        localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(updatedLocal));
+      } catch (e) {}
+
+      toast.success("تم حفظ وتحديث بيانات حساب الاشتراك بنجاح");
     } catch(e) {
       console.error(e);
       toast.error("حدث خطأ أثناء حفظ الاشتراك");
@@ -1094,7 +1399,7 @@ export default function App() {
     const thisMonthAttendance = attendance.filter(a => a.date.startsWith(month));
     
     employees.filter(e => !e.isDeleted).forEach(emp => {
-      const contract = contracts.find(c => c.employeeId === emp.id && c.status === 'ACTIVE');
+      const contract = contracts.find(c => c.employeeId === emp.id && (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE'));
       if (!contract) return;
       
       const basic = contract.basicSalary;
@@ -1103,15 +1408,31 @@ export default function App() {
       const empAtt = thisMonthAttendance.filter(a => a.employeeId === emp.id);
       const absentDays = empAtt.filter(a => a.status === 'ABSENT').length;
       
+      // Calculate unpaid leave days (UNPAID leave type or excess unpaid days)
+      const empMonthLeaves = leaves.filter(
+        l => !l.isHistorical && l.employeeId === emp.id && (l.status === 'APPROVED' || (l.status as any) === 'VALIDATED') &&
+        (l.startDate.startsWith(month) || l.endDate.startsWith(month))
+      );
+      
+      const unpaidLeaveDays = empMonthLeaves.reduce((sum, l) => {
+        if (l.leaveType === 'UNPAID') return sum + (l.totalDays || 0);
+        if (l.excessDays && l.excessDays > 0) return sum + l.excessDays;
+        return sum;
+      }, 0);
+
+      const totalUnpaidDays = absentDays + unpaidLeaveDays;
+
       // Apply Kuwait Law rule (basic / 26 * unpaidDays) via salaryRulesService
       const payslipCalc = computeFinalPayslipSalary({
         basicWage: basic,
         allowances: totalAllowances,
-        unpaidDays: absentDays,
+        unpaidDays: totalUnpaidDays,
       });
       
+      const dailyWage = basic / 26;
+      const unpaidLeaveDeduction = parseFloat((unpaidLeaveDays * dailyWage).toFixed(3));
+      const absenceDeduction = parseFloat((absentDays * dailyWage).toFixed(3));
       const gross = basic + totalAllowances;
-      const deductionAmount = payslipCalc.deductions;
       
       newPayslips.push({
         id: 'pay-' + month + '-' + emp.id,
@@ -1121,8 +1442,9 @@ export default function App() {
         basicSalary: basic,
         allowances: totalAllowances,
         grossSalary: gross,
-        latenessDeduction: deductionAmount,
-        unpaidLeaveDeduction: deductionAmount,
+        latenessDeduction: absenceDeduction,
+        unpaidLeaveDeduction: unpaidLeaveDeduction,
+        unpaidLeaveDays: unpaidLeaveDays,
         otherDeductions: 0,
         netSalary: payslipCalc.netSalary,
         paymentStatus: 'DRAFT'
@@ -1230,23 +1552,98 @@ export default function App() {
     return emp ? emp.companyId === activeCompanyId : true;
   });
 
+  // 1. Isolated Fullscreen Standalone Route for Super Admin (fixed inset-0 z-[9999] isolation)
+  if (currentUserRole === 'SUPER_ADMIN' && portalViewMode === 'superadmin') {
+    return (
+      <main className="w-full min-h-screen bg-[#f4f7f6] aysed-isolated-admin-portal select-none" dir="rtl">
+        <Toaster position="top-right" />
+        <SuperAdminPortal 
+          onSwitchToApps={() => {
+            const adminComp = companies.find(c => c.id === 'comp-super-admin') || companies[0];
+            setActiveCompany(adminComp);
+            setPortalViewMode('apps');
+          }}
+          currentUserEmail={currentUserEmail}
+          onLogout={handleLogout}
+          onImpersonateCompany={(companyName) => {
+            let found = companies.find(c => 
+              (c.nameAr && c.nameAr.toLowerCase().includes(companyName.toLowerCase())) || 
+              (c.name && c.name.toLowerCase().includes(companyName.toLowerCase())) || 
+              companyName.toLowerCase().includes((c.nameAr || '').toLowerCase()) ||
+              companyName.toLowerCase().includes((c.name || '').toLowerCase())
+            );
+
+            if (!found) {
+              try {
+                const savedSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+                const sub = savedSubs.find((s: any) => (s.companyName || s.name || '').toLowerCase().includes(companyName.toLowerCase()));
+                if (sub) {
+                  const newComp: Company = {
+                    id: `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    nameAr: sub.companyName || sub.name,
+                    nameEn: sub.companyName || sub.name,
+                    commercialRegNo: sub.commercialRegNo || `REG-${Math.floor(1000 + Math.random() * 9000)}`,
+                    civilIdCompany: sub.civilIdCompany || '999999999999',
+                    bankName: 'بنك الكويت الوطني (NBK)',
+                    iban: `KW12NBKW${Math.floor(1000000000000000 + Math.random() * 9000000000000000)}`,
+                    wsiCode: `WSI-${Math.floor(1000 + Math.random() * 9000)}`,
+                    currency: 'KWD',
+                    status: 'active',
+                    email: sub.email || `${sub.phone || '999'}@aysedhr.com`
+                  };
+                  setCompanies(prev => [...prev, newComp]);
+                  found = newComp;
+                }
+              } catch (e) {}
+            }
+
+            if (!found) {
+              const fallbackComp: Company = {
+                id: `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                nameAr: companyName,
+                nameEn: companyName,
+                commercialRegNo: `REG-${Math.floor(1000 + Math.random() * 9000)}`,
+                civilIdCompany: '999999999999',
+                bankName: 'بنك الكويت الوطني (NBK)',
+                iban: `KW12NBKW${Math.floor(1000000000000000 + Math.random() * 9000000000000000)}`,
+                wsiCode: `WSI-${Math.floor(1000 + Math.random() * 9000)}`,
+                currency: 'KWD',
+                status: 'active',
+                email: `${companyName.replace(/\s+/g, '')}@aysedhr.com`
+              };
+              setCompanies(prev => [...prev, fallbackComp]);
+              found = fallbackComp;
+            }
+
+            if (found) {
+              actionSwitchContext(found);
+            }
+            setPortalViewMode('apps');
+          }}
+        />
+      </main>
+    );
+  }
+
+  // 2. Standard Odoo Workspace (HR Apps)
   return (
-    <div className="flex h-screen bg-[#F8F9FA] text-gray-800 odoo-scrollbar">
-      <BackgroundRenderer theme={bgTheme} motionEnabled={motionEnabled} />
+    <div className="aysed-main-layout flex h-screen w-full overflow-hidden font-['Tajawal'] bg-[#F8F9FA] text-gray-800 odoo-scrollbar relative aysed-standard-odoo-view" dir="rtl">
+      <BackgroundRenderer theme={bgTheme as any} motionEnabled={motionEnabled} />
       <Toaster position="top-right" />
 
       {currentApp !== null && (
         <OdooSidebar 
           isOpen={isSidebarOpen} 
           activeApp={currentApp as any} 
-          onNavigate={(app) => setCurrentApp(app === 'LAUNCHER' || app === 'APP_LAUNCHER' ? null : app)} 
-          onNavigateApp={(app) => setCurrentApp(app === 'LAUNCHER' || app === 'APP_LAUNCHER' ? null : app)}
+          onNavigate={(app) => setCurrentApp(app === 'APP_LAUNCHER' || (app as string) === 'LAUNCHER' ? null : app)} 
+          onNavigateApp={(app) => setCurrentApp(app === 'APP_LAUNCHER' || (app as string) === 'LAUNCHER' ? null : app)}
           currentUserRole={currentUserRole}
+          currentUserEmail={currentUserEmail}
           onLogout={handleLogout}
         />
       )}
 
-      <div className={`flex-1 flex flex-col h-screen overflow-hidden relative z-10 transition-all duration-300 ${isSidebarOpen && currentApp !== null ? 'mr-[250px] w-[calc(100%-250px)]' : 'w-full'}`}>
+      <div className={`flex-1 flex flex-col h-screen overflow-hidden relative z-10 transition-all duration-300 ${isSidebarOpen && currentApp !== null ? 'mr-[260px] w-[calc(100%-260px)]' : 'w-full'}`}>
         <OdooTopBar 
           activeApp={currentApp as any}
           currentApp={currentApp}
@@ -1256,6 +1653,8 @@ export default function App() {
           onCloseApp={() => setCurrentApp(null)}
           onNavigateToApp={(app) => setCurrentApp(app === 'LAUNCHER' || app === 'APP_LAUNCHER' ? null : app)}
           currentUserEmail={currentUserEmail}
+          currentUserRole={currentUserRole}
+          onOpenAdmin={() => setPortalViewMode('superadmin')}
           onLogout={handleLogout}
           onOpenProfile={() => setIsProfileModalOpen(true)}
           searchTerm={searchTerm}
@@ -1294,7 +1693,7 @@ export default function App() {
 
         <SmartNotificationsBanner 
           notifications={notifications} 
-          onNavigateToApp={(app) => setCurrentApp(app === 'LAUNCHER' || app === 'APP_LAUNCHER' ? null : app)} 
+          onNavigateToApp={(app) => setCurrentApp(app === 'APP_LAUNCHER' || (app as string) === 'LAUNCHER' ? null : app)} 
           employees={employees} 
         />
 
@@ -1408,13 +1807,36 @@ export default function App() {
               handleSaveCompany={async (c) => {
                 setCompanies(prev => {
                   const exists = prev.some(comp => comp.id === c.id);
-                  if (exists) return prev.map(comp => comp.id === c.id ? c : comp);
-                  return [...prev, c];
+                  const updated = exists ? prev.map(comp => comp.id === c.id ? { ...comp, ...c } : comp) : [...prev, c];
+                  try {
+                    localStorage.setItem('registered_companies_v1', JSON.stringify(updated));
+                  } catch(e) {}
+                  return updated;
                 });
-                setActiveCompany(c);
+                if (activeCompany?.id === c.id) {
+                  setActiveCompany(c);
+                }
                 try {
-                  await setDoc(doc(db, "companies", c.id), cleanFirestoreData(c));
-                  toast.success("تم حفظ بيانات الشركة بنجاح");
+                  await setDoc(doc(db, "companies", c.id), cleanFirestoreData(c), { merge: true });
+                  
+                  // Also update matching subscription if exists
+                  setSubscriptions(prev => {
+                    return prev.map(sub => {
+                      if (sub.companyId === c.id || sub.companyName === c.nameAr || sub.companyName === c.nameEn) {
+                        const updatedSub = {
+                          ...sub,
+                          companyName: c.nameAr || sub.companyName,
+                          email: c.email || sub.email,
+                          phone: c.phone || sub.phone,
+                        };
+                        setDoc(doc(db, "subscriptions", sub.id), cleanFirestoreData(updatedSub), { merge: true }).catch(console.error);
+                        return updatedSub;
+                      }
+                      return sub;
+                    });
+                  });
+
+                  toast.success("تم حفظ بيانات الشركة بنجاح في قاعدة البيانات");
                 } catch(e) {
                   console.error(e);
                   toast.error("خطأ في حفظ بيانات الشركة");
@@ -1443,6 +1865,7 @@ export default function App() {
               setBgTheme={setBgTheme}
               motionEnabled={motionEnabled}
               setMotionEnabled={setMotionEnabled}
+              onLogout={handleLogout}
             />
           </div>
         </main>
@@ -1470,4 +1893,14 @@ export default function App() {
     </div>
   );
 }
+
+export const App: React.FC = () => {
+  return (
+    <HRProvider>
+      <MainActionManager />
+    </HRProvider>
+  );
+};
+
+export default App;
 

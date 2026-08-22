@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Employee, Contract, LeaveRequest, AttendanceRecord, DocumentItem } from '../../types';
 import { ReportCategory } from '../../apps/ReportsApp';
+import { get_aysed_official_balance, getGlobalOpeningBalance, getGlobalAccrued2026 } from '../../utils/kuwaitLaw';
 
 interface OdooScopeBarProps {
   employees: Employee[];
@@ -316,14 +317,14 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
                     <span className="text-[10px] text-slate-400 block">الراتب الأساسي</span>
                     <strong className="text-xs font-mono text-white">
-                      {(selectedContract?.basicSalary || selectedEmployee.basicSalary || 0).toLocaleString('en-US', { minimumFractionDigits: 3 })} د.ك
+                      {(selectedContract?.basicSalary || 0).toLocaleString('en-US', { minimumFractionDigits: 3 })} د.ك
                     </strong>
                   </div>
 
                   <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
                     <span className="text-[10px] text-slate-400 block">إجمالي البدلات</span>
                     <strong className="text-xs font-mono text-white">
-                      {(selectedContract ? (selectedContract.housingAllowance + selectedContract.transportAllowance + selectedContract.otherAllowances) : 0).toLocaleString('en-US', { minimumFractionDigits: 3 })} د.ك
+                      {(selectedContract ? (selectedContract.housingAllowance + selectedContract.transportAllowance + (selectedContract.otherAllowance || 0)) : 0).toLocaleString('en-US', { minimumFractionDigits: 3 })} د.ك
                     </strong>
                   </div>
 
@@ -331,40 +332,55 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                     <span className="text-[10px] text-emerald-400 block">صافي التحويل البنكي</span>
                     <strong className="text-sm font-mono text-amber-300 font-black">
                       {(() => {
-                        const basic = selectedContract?.basicSalary || selectedEmployee.basicSalary || 0;
-                        const allowances = selectedContract ? (selectedContract.housingAllowance + selectedContract.transportAllowance + selectedContract.otherAllowances) : 0;
+                        const basic = selectedContract?.basicSalary || 0;
+                        const allowances = selectedContract ? (selectedContract.housingAllowance + selectedContract.transportAllowance + (selectedContract.otherAllowance || 0)) : 0;
                         const gross = basic + allowances;
-                        const isKuwaiti = selectedEmployee.isKuwaiti || selectedEmployee.nationality?.includes('كويت');
-                        const pifss = isKuwaiti ? Math.min(gross, 3000) * 0.115 : 0;
-                        return (gross - pifss).toLocaleString('en-US', { minimumFractionDigits: 3 });
+                        return (gross).toLocaleString('en-US', { minimumFractionDigits: 3 });
                       })()} د.ك
                     </strong>
                   </div>
                 </div>
               )}
 
-              {activeCategory === 'LEAVE_BALANCE' && (
-                <div className="flex items-center gap-2">
-                  <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
-                    <span className="text-[10px] text-slate-400 block">الاستحقاق السنوي</span>
-                    <strong className="text-xs font-mono text-white">30 يوم</strong>
-                  </div>
+              {activeCategory === 'LEAVE_BALANCE' && (() => {
+                const opening = getGlobalOpeningBalance(selectedEmployee);
+                const accrued = getGlobalAccrued2026(selectedEmployee);
+                const taken = leaves
+                  .filter(l => !l.isHistorical && l.employeeId === selectedEmployee.id && (l.status === 'APPROVED' || (l.status as any) === 'VALIDATED') && l.leaveType === 'ANNUAL')
+                  .reduce((a, b) => a + (b.totalDays || 0), 0);
+                const remaining = (opening + accrued) - taken;
 
-                  <div className="bg-rose-950/70 border border-rose-800/50 px-3 py-2 rounded-xl text-center">
-                    <span className="text-[10px] text-rose-300 block">الأيام المستهلكة</span>
-                    <strong className="text-xs font-mono text-rose-200">
-                      {leaves.filter(l => l.employeeId === selectedEmployee.id && l.status === 'APPROVED').reduce((a, b) => a + b.daysCount, 0)} يوم
-                    </strong>
-                  </div>
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
+                      <span className="text-[10px] text-slate-400 block">الافتتاحي + المكتسب</span>
+                      <strong className="text-xs font-mono text-white">{(opening + accrued).toFixed(1)} يوم</strong>
+                    </div>
 
-                  <div className="bg-emerald-950/80 border border-emerald-700/60 px-3.5 py-2 rounded-xl text-center">
-                    <span className="text-[10px] text-emerald-400 block">الرصيد المتبقي</span>
-                    <strong className="text-sm font-mono text-emerald-300 font-bold">
-                      {selectedEmployee.leaveBalance || 21} يوم
-                    </strong>
+                    <div className="bg-rose-950/70 border border-rose-800/50 px-3 py-2 rounded-xl text-center">
+                      <span className="text-[10px] text-rose-300 block">الأيام المستهلكة</span>
+                      <strong className="text-xs font-mono text-rose-200">
+                        {taken.toFixed(1)} يوم
+                      </strong>
+                    </div>
+
+                    <div className={`px-3.5 py-2 rounded-xl text-center border ${
+                      remaining < 0 
+                        ? 'bg-rose-950/90 border-rose-600 text-rose-300' 
+                        : remaining === 0 
+                          ? 'bg-slate-800 border-slate-600 text-slate-300' 
+                          : remaining < 5 
+                            ? 'bg-amber-950/80 border-amber-600 text-amber-300' 
+                            : 'bg-emerald-950/80 border-emerald-700/60 text-emerald-300'
+                    }`}>
+                      <span className="text-[10px] block opacity-80">صافي الرصيد المتبقي</span>
+                      <strong className="text-sm font-mono font-bold">
+                        {remaining.toFixed(1)} يوم {remaining === 0 ? '(مصفّر)' : ''}
+                      </strong>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {activeCategory === 'ATTENDANCE_ANALYSIS' && (
                 <div className="flex items-center gap-2">
@@ -378,7 +394,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
                     <span className="text-[10px] text-slate-400 block">الساعات الفعلية</span>
                     <strong className="text-xs font-mono text-white">
-                      {attendance.filter(a => a.employeeId === selectedEmployee.id).reduce((a, b) => a + (b.workingHours || 8), 0) || 176} س
+                      {attendance.filter(a => a.employeeId === selectedEmployee.id).reduce((a, b) => a + (b.workHours || 8), 0) || 176} س
                     </strong>
                   </div>
 

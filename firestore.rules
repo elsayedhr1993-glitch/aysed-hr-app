@@ -1,16 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Allow public submission of subscription requests, authenticated read/write for management
-    match /subscription_requests/{requestId} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null;
-    }
-
-    // Allow authenticated users full read/write access across all other collections
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }

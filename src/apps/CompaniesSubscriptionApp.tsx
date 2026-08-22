@@ -6,7 +6,7 @@ import {
 import { CompanySubscription } from '../types';
 import toast from 'react-hot-toast';
 import { doc, setDoc, deleteDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
-import { db, cleanFirestoreData, auth } from '../lib/firebase';
+import { db, cleanFirestoreData, auth, provisionTenantAuth, purgeTenantCascading, isTenantPurged } from '../lib/firebase';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
 
@@ -109,6 +109,9 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
   }
 
   const filteredSubscriptions = (subscriptions || []).filter(sub => {
+    if (isTenantPurged(sub.id) || isTenantPurged(sub.companyName) || isTenantPurged(sub.companyId) || isTenantPurged(sub.email)) {
+      return false;
+    }
     const matchesSearch = 
       sub.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sub.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -135,9 +138,40 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
       snap.forEach(d => {
         reqs.push({ id: d.id, ...d.data() } as SubscriptionRequest);
       });
+      // Also load from localStorage fallback
+      const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+      localSubs.forEach((ls: any) => {
+        if (!reqs.some(r => r.id === ls.id || r.companyName === ls.companyName)) {
+          reqs.push({
+            id: ls.id || 'sub-' + Math.random(),
+            requesterName: ls.requesterName || ls.name,
+            companyName: ls.companyName || ls.name,
+            phone: ls.phone,
+            empCount: ls.empCount || ls.employee_count,
+            planType: ls.planType || ls.sector,
+            status: ls.status || 'new',
+            createdAt: ls.createdAt
+          });
+        }
+      });
       setPendingRequests(reqs);
-    } catch (e) {
-      console.error('Error fetching requests', e);
+    } catch (e: any) {
+      if (!e?.message?.includes('Missing or insufficient permissions')) {
+        console.warn('Error fetching requests:', e?.message || e);
+      }
+      // Fallback to localStorage
+      const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+      const reqs: SubscriptionRequest[] = localSubs.map((ls: any) => ({
+        id: ls.id || 'sub-' + Math.random(),
+        requesterName: ls.requesterName || ls.name,
+        companyName: ls.companyName || ls.name,
+        phone: ls.phone,
+        empCount: ls.empCount || ls.employee_count,
+        planType: ls.planType || ls.sector,
+        status: ls.status || 'new',
+        createdAt: ls.createdAt
+      }));
+      setPendingRequests(reqs);
     }
   };
 
@@ -186,7 +220,16 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
       });
 
       // 4. Update request status
-      await updateDoc(doc(db, 'subscription_requests', req.id), { status: 'approved' });
+      try {
+        await setDoc(doc(db, 'subscription_requests', req.id), { status: 'approved' }, { merge: true });
+      } catch (fbErr) {
+        console.warn('Firestore update warn:', fbErr);
+      }
+      
+      // Update local storage status
+      const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+      const updatedLocal = localSubs.map((s: any) => s.id === req.id ? { ...s, status: 'approved' } : s);
+      localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(updatedLocal));
       
             const adminEmail = currentUserEmail || 'elsayedhr1993@gmail.com';
       let emailSent = false;
@@ -224,7 +267,16 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
   const handleRejectRequest = async (reqId: string) => {
     if (true) {
       try {
-        await updateDoc(doc(db, 'subscription_requests', reqId), { status: 'rejected' });
+        try {
+          await setDoc(doc(db, 'subscription_requests', reqId), { status: 'rejected' }, { merge: true });
+        } catch (fbErr) {
+          console.warn('Firestore reject warn:', fbErr);
+        }
+        
+        const localSubs = JSON.parse(localStorage.getItem('aysed_saved_subscriptions') || '[]');
+        const updatedLocal = localSubs.map((s: any) => s.id === reqId ? { ...s, status: 'rejected' } : s);
+        localStorage.setItem('aysed_saved_subscriptions', JSON.stringify(updatedLocal));
+
         toast.success("تم رفض الطلب");
         fetchRequests();
       } catch (err) {
@@ -272,10 +324,56 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
     }
 
     try {
-      const cleaned = cleanFirestoreData(editingSub) as CompanySubscription;
-      await setDoc(doc(db, 'subscriptions', cleaned.id), cleaned);
+      const compId = editingSub.companyId || `comp-${Date.now()}`;
+      const email = (editingSub.email || `${editingSub.companyName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || Date.now()}@aysedhr.com`).trim().toLowerCase();
+      const updatedSub: CompanySubscription = {
+        ...editingSub,
+        companyId: compId,
+        email
+      };
+
+      const cleaned = cleanFirestoreData(updatedSub) as CompanySubscription;
+      await setDoc(doc(db, 'subscriptions', cleaned.id), cleaned, { merge: true });
+
+      // Create / update companies document with exact schema
+      const companyDocData = {
+        companyId: compId,
+        id: compId,
+        companyName: updatedSub.companyName.trim(),
+        nameAr: updatedSub.companyName.trim(),
+        nameEn: updatedSub.companyName.trim(),
+        adminEmail: email,
+        email: email,
+        ownerName: updatedSub.ownerName || updatedSub.companyName,
+        plan: updatedSub.planType || 'active',
+        planType: updatedSub.planType || 'active',
+        status: updatedSub.status === 'active' ? 'active' : 'suspended',
+        state: updatedSub.status === 'active' ? 'active' : 'suspended',
+        isActive: updatedSub.status === 'active',
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'companies', compId), cleanFirestoreData(companyDocData), { merge: true });
+
+      // If this is a new company creation with an email, provision auth safely
+      if (email.includes('@')) {
+        try {
+          const creds = JSON.parse(localStorage.getItem('aysed_company_credentials') || '{}');
+          const pass = creds[email]?.password || ('Aysed2026#' + Math.random().toString(36).slice(-6, -1) + '!');
+          await provisionTenantAuth({
+            email,
+            password: pass,
+            companyName: updatedSub.companyName.trim(),
+            companyId: compId,
+            ownerName: updatedSub.ownerName || updatedSub.companyName,
+            planType: updatedSub.planType
+          });
+        } catch (authErr) {
+          console.warn('Provision tenant notice:', authErr);
+        }
+      }
+
       onUpdateSubscription(cleaned);
-      toast.success("تم حفظ اشتراك الشركة بنجاح في قاعدة البيانات السحابية (Odoo Subscriptions)");
+      toast.success("تم حفظ اشتراك الشركة بنجاح في قاعدة البيانات السحابية (Firestore)");
       setIsModalOpen(false);
       setEditingSub(null);
     } catch (err) {
@@ -314,33 +412,21 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
 
   const handleDelete = async (id: string) => {
     const sub = subscriptions.find(s => s.id === id);
-    if (true) {
+    if (!sub) return;
+    if (window.confirm(`هل أنت متأكد من رغبتك في حذف منشأة (${sub.companyName}) وحذف كافة بياناتها المرتبطة نهائياً؟`)) {
       try {
-        await deleteDoc(doc(db, 'subscriptions', id));
-        if (sub && sub.companyId) {
-          try {
-            await deleteDoc(doc(db, 'companies', sub.companyId));
-          } catch(e) {}
-        }
-        try {
-          await deleteDoc(doc(db, 'companies', id));
-        } catch(e) {}
-        
-        if (sub && sub.companyName) {
-          const compsSnap = await getDocs(collection(db, 'companies'));
-          for (const d of compsSnap.docs) {
-            const data = d.data();
-            if (data.nameAr === sub.companyName || data.nameEn === sub.companyName) {
-              await deleteDoc(doc(db, 'companies', d.id));
-            }
-          }
-        }
+        await purgeTenantCascading({
+          id: sub.id,
+          name: sub.companyName,
+          email: sub.email,
+          companyId: sub.companyId || sub.id
+        });
 
         if (onDeleteSubscription) onDeleteSubscription(id);
-        toast.success("تم حذف الاشتراك والشركة نهائياً بنجاح");
-      } catch (err) {
+        toast.success(`تم حذف منشأة (${sub.companyName}) وكافة سجلاتها نهائياً بنجاح`);
+      } catch (err: any) {
         console.error(err);
-        toast.error("فشل حذف الاشتراك");
+        toast.error("فشل حذف الاشتراك: " + (err.message || ''));
       }
     }
   };
@@ -584,15 +670,15 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
         </button>
       </div>
 
-      {/* Kanban View */}
+      {/* Kanban View - Odoo Enterprise Kanban Style */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 o_kanban_mobile">
           {filteredSubscriptions.map((sub) => {
             const isActive = sub.status === 'active';
             return (
               <div 
                 key={sub.id}
-                className={`bg-white/95 backdrop-blur-md rounded-2xl border transition-all shadow-sm hover:shadow-md overflow-hidden flex flex-col justify-between ${
+                className={`bg-white/95 backdrop-blur-md rounded-2xl border transition-all shadow-sm hover:shadow-md overflow-hidden flex flex-col justify-between oe_kanban_global_click ${
                   isActive ? 'border-purple-200' : 'border-rose-200 bg-rose-50/10'
                 }`}
               >
@@ -600,11 +686,11 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                   {/* Card Header */}
                   <div className="p-5 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg border border-purple-200 shadow-inner">
+                      <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg border border-purple-200 shadow-inner o_kanban_image">
                         <Building2 className="w-6 h-6 text-[#714B67]" />
                       </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">{sub.companyName}</h3>
+                      <div className="oe_kanban_details">
+                        <h3 className="font-bold text-slate-900 text-sm o_kanban_record_title">{sub.companyName}</h3>
                         <p className="text-[11px] text-slate-400 font-mono">{sub.email}</p>
                       </div>
                     </div>
@@ -661,12 +747,15 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
 
                     {onImpersonateCompany && (
                       <button
+                        name="action_switch_to_this_company"
+                        type="button"
+                        data-type="object"
                         onClick={() => onImpersonateCompany(sub.companyName)}
-                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[11px] font-bold flex items-center gap-1 transition shadow-sm cursor-pointer border border-indigo-200"
-                        title="الدعم الفني / Impersonate"
+                        className="btn btn-primary btn-sm px-3 py-1.5 bg-[#714B67] hover:bg-[#5e3f55] text-white rounded-xl text-[11px] font-bold flex items-center gap-1 transition shadow-sm cursor-pointer"
+                        title="إدارة الشركة / Action Switch"
                       >
                         <Building2 className="w-3.5 h-3.5" />
-                        <span>دخول الشركة</span>
+                        <span>إدارة الشركة</span>
                       </button>
                     )}
 
