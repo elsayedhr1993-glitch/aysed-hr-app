@@ -147,8 +147,7 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
           onAddLeave={onAddLeave}
           onIssueDocument={onIssueDocument}
           onAddAuditLog={onAddAuditLog}
-        />
-      ) : (
+        />) : (
         <>
           {/* Filters Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -226,8 +225,7 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
                   <History className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                   <p className="font-bold text-slate-600">لا توجد عمليات مسجلة مطابقة لفلاتر البحث الحالية</p>
                 </td>
-              </tr>
-            ) : (
+              </tr>) : (
               paginatedLogs.map((log, idx) => (
                 <tr key={log.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                   <td className="p-3 font-mono text-slate-600 font-bold">
@@ -237,8 +235,7 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
                   <td className="p-3">{getActionBadge(log.action)}</td>
                   <td className="p-3 font-bold text-slate-700 font-mono">{log.entity}</td>
                   <td className="p-3 text-slate-800 leading-relaxed">{log.details}</td>
-                </tr>
-              ))
+                </tr>))
             )}
           </tbody>
         </table>
@@ -268,11 +265,8 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
                 <ArrowLeft className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
-        )}
+          </div>)}
       </div>
-        </>
-      )}
-    </div>
-  );
+        </>)}
+    </div>);
 };

@@ -48,12 +48,509 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
   onPostAttendanceToPayroll,
   onNavigateToApp,
 }) => {
-  const [activeTab, setActiveTab] = useState<'DAILY' | 'MONTHLY' | 'IMPORT' | 'SHIFT' | 'KIOSK' | 'DEVICES'>('DAILY');
-  const [selectedDate, setSelectedDate] = useState('2026-08-15');
+  const [activeTab, setActiveTab] = useState<'DAILY' | 'MONTHLY' | 'IMPORT' | 'SHIFT' | 'KIOSK' | 'DEVICES' | 'LIVE_SYNC'>('DAILY');
+  const todayIsoDate = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayIsoDate || '2026-08-23');
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PRESENT' | 'LATE' | 'ABSENT' | 'ON_LEAVE'>('ALL');
   const [selectedBranch, setSelectedBranch] = useState('الكل');
+
+  // Live Sync Tab State (Attendance Management ZKTeco Bridge)
+  const [livePunches, setLivePunches] = useState<any[]>([]);
+  const [testPunchEmpCode, setTestPunchEmpCode] = useState('');
+  const [testPunchType, setTestPunchType] = useState<'IN' | 'OUT'>('IN');
+  const [isSendingTestPunch, setIsSendingTestPunch] = useState(false);
+
+  const fetchLivePunches = async () => {
+    try {
+      const res = await fetch(`/api/attendance/live-logs?companyId=${activeCompany?.id || 'comp-1'}`);
+      const data = await res.json();
+      if (data.success && data.punches) {
+        setLivePunches(data.punches);
+
+        // Automatically map incoming live punches to employee attendance records
+        data.punches.forEach((p: any) => {
+          const emp = (companyEmps || []).find(e => 
+            (e.employeeCode && String(e.employeeCode).trim() === String(p.employeeCode).trim()) ||
+            (e.biometricId && String(e.biometricId).trim() === String(p.employeeCode).trim()) ||
+            (e.badgeId && String(e.badgeId).trim() === String(p.employeeCode).trim()) ||
+            (e.id && String(e.id).trim() === String(p.employeeCode).trim())
+          );
+          if (emp) {
+            const punchDate = p.date || todayIsoDate;
+            const punchTime = p.time || '08:00';
+            const existingRec = (attendanceRecords || []).find(r => r.employeeId === emp.id && r.date === punchDate);
+
+            const updatedRec: AttendanceRecord = {
+              id: existingRec?.id || `att-live-${emp.id}-${punchDate}`,
+              employeeId: emp.id,
+              companyId: activeCompany?.id || 'comp-1',
+              date: punchDate,
+              checkIn: p.type === 'IN' ? punchTime : (existingRec?.checkIn || '08:00'),
+              checkOut: p.type === 'OUT' ? punchTime : existingRec?.checkOut,
+              workHours: existingRec?.workHours || 8,
+              overtimeHours: existingRec?.overtimeHours || 0,
+              status: 'PRESENT',
+              latenessMinutes: existingRec?.latenessMinutes || 0,
+            };
+            onSaveAttendance(updatedRec);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch live punches', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLivePunches();
+    const interval = setInterval(fetchLivePunches, 5000);
+    return () => clearInterval(interval);
+  }, [activeCompany?.id]);
+
+  const handleDownloadSyncAgentScript = () => {
+    const host = window.location.origin;
+    const scriptContent = `# ==============================================================================
+# ZKTECO ATTENDANCE MANAGEMENT (att2000.mdb) AUTO SYNC AGENT
+# نظام الكويت للرواتب وإدارة الحضور - برنامج الربط اللحظي الآلي
+# ==============================================================================
+import time
+import requests
+import os
+import sys
+
+API_URL = "${host}/api/attendance/live-push"
+COMPANY_ID = "${activeCompany?.id || 'comp-1'}"
+
+DB_PATHS = [
+    r"D:\\ATT2000\\att2000.mdb",
+    r"C:\\ATT2000\\att2000.mdb",
+    r"C:\\Program Files (x86)\\Att\\att2000.mdb",
+    r"C:\\Program Files\\Att\\att2000.mdb",
+    r"C:\\Att\\att2000.mdb",
+    os.path.join(os.getcwd(), "att2000.mdb")
+]
+
+def find_database():
+    for path in DB_PATHS:
+        if os.path.exists(path):
+            return path
+    return None
+
+def fetch_logs_pyodbc(db_file, last_synced_time):
+    import pyodbc
+    drivers = [
+        'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=' + db_file + ';',
+        'DRIVER={Microsoft Access Driver (*.mdb)};DBQ=' + db_file + ';',
+        'DRIVER={Driver do Microsoft Access (*.mdb)};DBQ=' + db_file + ';',
+    ]
+    for conn_str in drivers:
+        try:
+            conn = pyodbc.connect(conn_str, timeout=5)
+            cursor = conn.cursor()
+            query = """
+                SELECT USERINFO.Badgenumber, CHECKINOUT.CHECKTIME, CHECKINOUT.CHECKTYPE
+                FROM CHECKINOUT
+                INNER JOIN USERINFO ON CHECKINOUT.USERID = USERINFO.USERID
+                WHERE CHECKINOUT.CHECKTIME > ?
+                ORDER BY CHECKINOUT.CHECKTIME ASC
+            """
+            cursor.execute(query, (last_synced_time,))
+            rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return [(r[0], str(r[1]), r[2]) for r in rows]
+        except Exception as e:
+            continue
+    raise Exception("pyodbc drivers failed")
+
+def fetch_logs_win32com(db_file, last_synced_time):
+    import win32com.client
+    conn = win32com.client.Dispatch("ADODB.Connection")
+    providers = [
+        f"Provider=Microsoft.Jet.OLEDB.4.0;Data Source={db_file};User Id=admin;Password=;",
+        f"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={db_file};",
+    ]
+    connected = False
+    for p in providers:
+        try:
+            conn.Open(p)
+            connected = True
+            break
+        except:
+            continue
+
+    if not connected:
+        raise Exception("win32com OLEDB providers failed")
+
+    rs = win32com.client.Dispatch("ADODB.Recordset")
+    query = f"""
+        SELECT USERINFO.Badgenumber, CHECKINOUT.CHECKTIME, CHECKINOUT.CHECKTYPE
+        FROM CHECKINOUT
+        INNER JOIN USERINFO ON CHECKINOUT.USERID = USERINFO.USERID
+        WHERE CHECKINOUT.CHECKTIME > #{last_synced_time}#
+        ORDER BY CHECKINOUT.CHECKTIME ASC
+    """
+    rs.Open(query, conn)
+    rows = []
+    while not rs.EOF:
+        badge = rs.Fields("Badgenumber").Value
+        checktime = rs.Fields("CHECKTIME").Value
+        checktype = rs.Fields("CHECKTYPE").Value
+        rows.append((badge, str(checktime), checktype))
+        rs.MoveNext()
+    rs.Close()
+    conn.Close()
+    return rows
+
+def fetch_logs_syswow64_cscript(db_file, last_synced_time):
+    import subprocess
+    import json
+    import tempfile
+
+    vbs_code = f'''
+Dim conn, rs
+Set conn = CreateObject("ADODB.Connection")
+conn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source={db_file};"
+
+Set rs = CreateObject("ADODB.Recordset")
+sql = "SELECT USERINFO.Badgenumber, CHECKINOUT.CHECKTIME, CHECKINOUT.CHECKTYPE " & _
+      "FROM CHECKINOUT INNER JOIN USERINFO ON CHECKINOUT.USERID = USERINFO.USERID " & _
+      "WHERE CHECKINOUT.CHECKTIME > #{last_synced_time}# ORDER BY CHECKINOUT.CHECKTIME ASC"
+rs.Open sql, conn
+
+WScript.Echo "["
+Dim first
+first = True
+Do Until rs.EOF
+    If Not first Then WScript.Echo ","
+    first = False
+    Dim badge, ttime, ttype
+    badge = Replace(rs.Fields("Badgenumber").Value & "", """", "")
+    ttime = Replace(rs.Fields("CHECKTIME").Value & "", """", "")
+    ttype = Replace(rs.Fields("CHECKTYPE").Value & "", """", "")
+    WScript.Echo "{{\\"badge\\":\\"" & badge & "\\", \\"time\\":\\"" & ttime & "\\", \\"type\\":\\"" & ttype & "\\"}}"
+    rs.MoveNext
+Loop
+WScript.Echo "]"
+
+rs.Close
+conn.Close
+'''
+    vbs_file = os.path.join(tempfile.gettempdir(), "zk_read_mdb.vbs")
+    with open(vbs_file, "w", encoding="utf-8") as f:
+        f.write(vbs_code)
+
+    cscript_path = r"C:\Windows\SysWOW64\cscript.exe"
+    if not os.path.exists(cscript_path):
+        cscript_path = "cscript.exe"
+
+    res = subprocess.run([cscript_path, "//Nologo", vbs_file], capture_output=True, text=True)
+    if res.returncode == 0 and res.stdout.strip():
+        data = json.loads(res.stdout.strip())
+        return [(item["badge"], item["time"], item["type"]) for item in data]
+    return []
+
+def get_attendance_rows(db_file, last_synced_time):
+    # Try native Windows 32-bit cscript first (works on ALL Windows machines with built-in Jet 4.0)
+    try:
+        rows = fetch_logs_syswow64_cscript(db_file, last_synced_time)
+        if rows:
+            return rows
+    except Exception:
+        pass
+
+    # Try pyodbc
+    try:
+        return fetch_logs_pyodbc(db_file, last_synced_time)
+    except Exception:
+        pass
+    
+    # Try win32com ADODB
+    try:
+        return fetch_logs_win32com(db_file, last_synced_time)
+    except Exception as e:
+        raise Exception(f"تعذر الاتصال بقاعدة البيانات att2000.mdb ({e})")
+
+def main():
+    print("==========================================================")
+    print("   برنامج الربط اللحظي الآلي للبصمات - ZKTECO LIVE AGENT")
+    print("==========================================================")
+    
+    db_file = find_database()
+    if not db_file:
+        print("[!] لم يتم العثور على قاعدة البيانات att2000.mdb تلقائياً.")
+        db_file = input("يرجى إدخال المسار الكامل لملف att2000.mdb: ").strip('"')
+    
+    print(f"[+] تم العثور على قاعدة البيانات: {db_file}")
+    print(f"[+] رابط سيرفر نظام الحضور: {API_URL}")
+    print("[+] السكربت يعمل الآن في الخلفية ويسحب البصمات فور حدوثها كل 30 ثانية...")
+    print("==========================================================")
+
+    last_synced_time = "2020-01-01 00:00:00"
+
+    while True:
+        try:
+            rows = get_attendance_rows(db_file, last_synced_time)
+            
+            if rows:
+                print(f"[+] تم اكتشاف {len(rows)} بصمة جديدة! جاري الترحيل...")
+                punches = []
+                for badge_no, check_time, check_type in rows:
+                    punch_type = "OUT" if str(check_type).upper() in ["O", "1"] else "IN"
+                    time_str = str(check_time)
+                    punches.append({
+                        "employeeCode": str(badge_no),
+                        "timestamp": time_str,
+                        "type": punch_type,
+                        "deviceSn": "ATT2000-MDB"
+                    })
+                    if time_str > last_synced_time:
+                        last_synced_time = time_str
+                
+                response = requests.post(API_URL, json={
+                    "companyId": COMPANY_ID,
+                    "punches": punches
+                }, timeout=10)
+                
+                if response.status_code == 200:
+                    print(f"[✓] تم ترحيل البصمات بنجاح! {response.json().get('message')}")
+                else:
+                    print(f"[X] خطأ في الاستجابة من السيرفر: {response.status_code}")
+            
+        except Exception as e:
+            print(f"[!] تنبيه أثناء المزامنة: {e}")
+        
+        time.sleep(30)
+
+if __name__ == "__main__":
+    main()
+`;
+
+    const blob = new Blob([scriptContent], { type: 'text/x-python;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zk_attendance_sync.py';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadVbsScript = () => {
+    const host = window.location.origin;
+    const vbsContent = `' ==============================================================================
+' ZKTECO ATTENDANCE MANAGEMENT (att2000.mdb) NATIVE AUTO SYNC AGENT FOR WINDOWS
+' ==============================================================================
+Dim dbFile, apiUrl, companyId, lastSyncedTime
+apiUrl = "${host}/api/attendance/live-push"
+companyId = "${activeCompany?.id || 'comp-1'}"
+lastSyncedTime = "2020-01-01 00:00:00"
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+Dim paths(5)
+paths(0) = "D:\\ATT2000\\att2000.mdb"
+paths(1) = "C:\\ATT2000\\att2000.mdb"
+paths(2) = "C:\\Program Files (x86)\\Att\\att2000.mdb"
+paths(3) = "C:\\Program Files\\Att\\att2000.mdb"
+paths(4) = "C:\\Att\\att2000.mdb"
+
+dbFile = ""
+For Each p In paths
+    If fso.FileExists(p) Then
+        dbFile = p
+        Exit For
+    End If
+Next
+
+If dbFile = "" Then
+    WScript.Echo "[!] لم يتم العثور على قاعدة البيانات att2000.mdb تلقائياً في D:\\ATT2000"
+    WScript.Quit
+End If
+
+WScript.Echo "=========================================================="
+WScript.Echo "   ZKTECO LIVE AGENT - برنامج الربط اللحظي الآلي المباشر"
+WScript.Echo "=========================================================="
+WScript.Echo "[+] تم العثور على قاعدة البيانات: " & dbFile
+WScript.Echo "[+] رابط سيرفر الحضور: " & apiUrl
+WScript.Echo "[+] السكربت يعمل الآن في الخلفية ويسحب البصمات كل 15 ثانية..."
+WScript.Echo "=========================================================="
+
+Do While True
+    On Error Resume Next
+    
+    Set conn = CreateObject("ADODB.Connection")
+    conn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=" & dbFile & ";"
+    
+    If Err.Number <> 0 Then
+        WScript.Echo "[!] تنبيه اتصال قاعدة البيانات: " & Err.Description
+        Err.Clear
+    Else
+        Set rs = CreateObject("ADODB.Recordset")
+        sql = "SELECT USERINFO.Badgenumber, CHECKINOUT.CHECKTIME, CHECKINOUT.CHECKTYPE " & _
+              "FROM CHECKINOUT INNER JOIN USERINFO ON CHECKINOUT.USERID = USERINFO.USERID " & _
+              "WHERE CHECKINOUT.CHECKTIME > #" & lastSyncedTime & "# ORDER BY CHECKINOUT.CHECKTIME ASC"
+        rs.Open sql, conn
+        
+        If Not rs.EOF Then
+            Dim jsonBody, count
+            count = 0
+            jsonBody = "{""companyId"":""" & companyId & """,""punches"":["
+            
+            Dim firstRec
+            firstRec = True
+            
+            Do Until rs.EOF
+                If Not firstRec Then jsonBody = jsonBody & ","
+                firstRec = False
+                
+                Dim bNo, cTime, cType, pType
+                bNo = Trim(rs.Fields("Badgenumber").Value & "")
+                cTime = Trim(rs.Fields("CHECKTIME").Value & "")
+                cType = UCase(Trim(rs.Fields("CHECKTYPE").Value & ""))
+                
+                If cType = "O" Or cType = "1" Then
+                    pType = "OUT"
+                Else
+                    pType = "IN"
+                End If
+                
+                jsonBody = jsonBody & "{""employeeCode"":""" & bNo & """,""timestamp"":""" & cTime & """,""type"":""" & pType & """}"
+                count = count + 1
+                lastSyncedTime = cTime
+                rs.MoveNext
+            Loop
+            jsonBody = jsonBody & "]}"
+            
+            rs.Close
+            
+            WScript.Echo "[+] تم اكتشاف " & count & " بصمة جديدة! جاري الترحيل المباشر..."
+            
+            Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+            http.open "POST", apiUrl, False
+            http.setRequestHeader "Content-Type", "application/json"
+            http.send jsonBody
+            
+            If http.status = 200 Then
+                WScript.Echo "[OK] تم ترحيل البصمات بنجاح إلى النظام!"
+            Else
+                WScript.Echo "[X] خطأ استجابة من السيرفر: " & http.status
+            End If
+            Set http = Nothing
+        End If
+        
+        conn.Close
+    End If
+    
+    Set rs = Nothing
+    Set conn = Nothing
+    
+    WScript.Sleep 15000
+Loop
+`;
+    const blob = new Blob([vbsContent], { type: 'text/vbscript;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zk_attendance_sync.vbs';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadBatFile = () => {
+    const batContent = `@echo off
+title ZKTeco Attendance Auto Sync Agent
+cd /d "%~dp0"
+echo =========================================================
+echo   ZKTeco Live Attendance Sync Agent (Native Windows)
+echo =========================================================
+
+set CSCRIPT="%SystemRoot%\\SysWOW64\\cscript.exe"
+if not exist %CSCRIPT% set CSCRIPT="cscript.exe"
+
+if exist "zk_attendance_sync.vbs" (
+    echo [+] تشغيل مشغل البصمات الويندوز المباشر (VBScript Agent)...
+    %CSCRIPT% //Nologo "zk_attendance_sync.vbs"
+) else if exist "%~dp0zk_attendance_sync.vbs" (
+    echo [+] تشغيل مشغل البصمات الويندوز المباشر (VBScript Agent)...
+    %CSCRIPT% //Nologo "%~dp0zk_attendance_sync.vbs"
+) else if exist "D:\\ATT2000\\zk_attendance_sync.vbs" (
+    echo [+] تشغيل مشغل البصمات الويندوز المباشر (VBScript Agent)...
+    %CSCRIPT% //Nologo "D:\\ATT2000\\zk_attendance_sync.vbs"
+) else if exist "zk_attendance_sync.py" (
+    echo [+] تشغيل سكربت بايثون...
+    python zk_attendance_sync.py
+) else (
+    echo [!] لم يتم العثور على zk_attendance_sync.vbs أو zk_attendance_sync.py
+    echo يرجى تحميل الملفات ووضعها في مجلد D:\\ATT2000
+)
+pause
+`;
+    const blob = new Blob([batContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'run_zk_sync.bat';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSendTestLivePunch = async () => {
+    if (!testPunchEmpCode) {
+      alert('يرجى اختيار الموظف أولاً للإرسال التجريبي');
+      return;
+    }
+    setIsSendingTestPunch(true);
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+      const res = await fetch('/api/attendance/live-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: activeCompany?.id || 'comp-1',
+          punches: [{
+            employeeCode: testPunchEmpCode,
+            timestamp: `${dateStr} ${timeStr}`,
+            type: testPunchType,
+            deviceSn: 'TEST-SIMULATOR'
+          }]
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        const emp = (companyEmps || []).find(e => e.employeeCode === testPunchEmpCode || e.id === testPunchEmpCode);
+        if (emp) {
+          const rec: AttendanceRecord = {
+            id: `att-live-${emp.id}-${dateStr}`,
+            employeeId: emp.id,
+            companyId: activeCompany?.id || 'comp-1',
+            date: dateStr,
+            checkIn: testPunchType === 'IN' ? timeStr : '08:00',
+            checkOut: testPunchType === 'OUT' ? timeStr : undefined,
+            workHours: 8,
+            overtimeHours: 0,
+            status: 'PRESENT',
+            latenessMinutes: 0,
+          };
+          onSaveAttendance(rec);
+        }
+
+        alert('تم إرسال وترحيل البصمة التجريبية بنجاح إلى قاعدة البيانات بالنظام!');
+        fetchLivePunches();
+      } else {
+        alert('تعذر إرسال البصمة: ' + (data.error || 'خطأ غير معروف'));
+      }
+    } catch (err: any) {
+      alert('حدث خطأ أثناء الاتصال بالخادم: ' + err.message);
+    } finally {
+      setIsSendingTestPunch(false);
+    }
+  };
 
   // Biometric Devices State - Live Supabase & Storage backed (hr.biometric.device model)
   const [devices, setDevices] = useState<BiometricDevice[]>(() => {
@@ -171,15 +668,34 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
     companyEmps = (employees || []).filter(e => !e.isDeleted);
   }
 
-  // Daily Filtered Attendance
-  const companyDailyAttendance = (attendance || []).filter(a => {
-    if (a.companyId !== (activeCompany?.id || 'comp-1') || a.date !== selectedDate) return false;
+  // Daily Filtered Attendance - Includes ALL company employees for full visibility
+  const allEmpsDailyAttendance = companyEmps.map(emp => {
+    const existingRec = (attendance || []).find(
+      a => a.companyId === (activeCompany?.id || 'comp-1') && a.employeeId === emp.id && a.date === selectedDate
+    );
+    if (existingRec) return existingRec;
+
+    return {
+      id: `virtual-${emp.id}-${selectedDate}`,
+      employeeId: emp.id,
+      companyId: activeCompany?.id || 'comp-1',
+      date: selectedDate,
+      checkIn: undefined,
+      checkOut: undefined,
+      workHours: 0,
+      overtimeHours: 0,
+      status: 'ABSENT' as const,
+      latenessMinutes: 0,
+    };
+  });
+
+  const companyDailyAttendance = allEmpsDailyAttendance.filter(a => {
     if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
     if (searchTerm) {
       const emp = (employees || []).find(e => e.id === a.employeeId);
       const name = emp ? emp.fullNameAr : '';
       const code = emp ? emp.employeeCode : '';
-      return name.includes(searchTerm) || code.includes(searchTerm);
+      return (name && name.includes(searchTerm)) || (code && code.includes(searchTerm));
     }
     return true;
   });
@@ -565,9 +1081,10 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
     alert('تم فحص الاتصال بجميع أجهزة البصمة المسجلة بنجاح.');
   };
 
-  const presentCount = companyDailyAttendance.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length;
-  const lateCount = companyDailyAttendance.filter(a => a.status === 'LATE').length;
+  const presentCount = companyDailyAttendance.filter(a => !!a.checkIn).length;
+  const lateCount = companyDailyAttendance.filter(a => a.status === 'LATE' && !!a.checkIn).length;
   const earlyCount = companyDailyAttendance.filter(a => a.earlyLeaveMinutes && a.earlyLeaveMinutes > 0).length;
+  const absentCount = companyDailyAttendance.filter(a => !a.checkIn).length;
 
   return (
     <div className="min-h-screen bg-[#f4f7f9] text-slate-700 font-sans text-xs" dir="rtl">
@@ -605,6 +1122,13 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 className={`px-3 py-1.5 rounded-md transition ${activeTab === 'MONTHLY' ? 'bg-[#00838f] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 التقرير الشهري والخصومات
+              </button>
+              <button
+                onClick={() => setActiveTab('LIVE_SYNC')}
+                className={`px-3 py-1.5 rounded-md transition flex items-center gap-1.5 ${activeTab === 'LIVE_SYNC' ? 'bg-[#00838f] text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'}`}
+              >
+                <Wifi className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>ربط برنامج البصمة المباشر (ZKTeco Live)</span>
               </button>
               <button
                 onClick={() => setActiveTab('DEVICES')}
@@ -649,15 +1173,13 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 className="bg-[#714B67] hover:bg-[#5a3a52] text-white font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
               >
                 <Plus className="w-4 h-4" /> إضافة جهاز بصمة جديد
-              </button>
-            ) : (
+              </button>) : (
               <button 
                 onClick={() => setShowManualModal(true)}
                 className="bg-[#00838f] hover:bg-[#006978] text-white font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-all"
               >
                 <Plus className="w-4 h-4" /> تسجيل حركة يدوي
-              </button>
-            )}
+              </button>)}
           </div>
         </div>
       </div>
@@ -671,8 +1193,8 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 font-semibold mb-1">إجمالي الحضور اليوم</p>
-                  <h3 className="text-2xl font-black text-slate-800">{presentCount || companyDailyAttendance.length} <span className="text-xs font-normal text-slate-400">موظف</span></h3>
+                  <p className="text-slate-400 font-semibold mb-1">الموظفون الحاضرون</p>
+                  <h3 className="text-2xl font-black text-emerald-700">{presentCount} <span className="text-xs font-normal text-slate-400">/ {companyEmps.length} موظف</span></h3>
                 </div>
                 <div className="w-11 h-11 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                   <UserCheck className="w-6 h-6" />
@@ -691,8 +1213,8 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
 
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 font-semibold mb-1">الانصراف المبكر</p>
-                  <h3 className="text-2xl font-black text-rose-600">{earlyCount} <span className="text-xs font-normal text-slate-400">موظف</span></h3>
+                  <p className="text-slate-400 font-semibold mb-1">لم يبصم / غياب اليوم</p>
+                  <h3 className="text-2xl font-black text-rose-600">{absentCount} <span className="text-xs font-normal text-slate-400">موظف</span></h3>
                 </div>
                 <div className="w-11 h-11 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
                   <AlertTriangle className="w-6 h-6" />
@@ -701,8 +1223,10 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
 
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 font-semibold mb-1">نسبة الانضباط العام</p>
-                  <h3 className="text-2xl font-black text-[#00838f]">96.8%</h3>
+                  <p className="text-slate-400 font-semibold mb-1">نسبة الحضور العام</p>
+                  <h3 className="text-2xl font-black text-[#00838f]">
+                    {companyEmps.length > 0 ? Math.round((presentCount / companyEmps.length) * 100) : 100}%
+                  </h3>
                 </div>
                 <div className="w-11 h-11 rounded-lg bg-cyan-50 text-[#00838f] flex items-center justify-center">
                   <CheckCircle2 className="w-6 h-6" />
@@ -741,7 +1265,16 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-500 font-bold mb-1 text-[11px]">تحديد التاريخ</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-slate-500 font-bold text-[11px]">تحديد التاريخ</label>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDate(todayIsoDate)}
+                      className="text-[10px] font-bold text-[#00838f] hover:underline"
+                    >
+                      تاريخ اليوم ({todayIsoDate})
+                    </button>
+                  </div>
                   <input 
                     type="date" 
                     value={selectedDate}
@@ -794,8 +1327,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                         <td colSpan={12} className="p-10 text-center text-slate-400">
                           لا توجد سجلات حضور مسجلة لهذا التاريخ ({selectedDate}). يمكنك استيراد ملف البصمة أو تسجيل حركة يدوياً.
                         </td>
-                      </tr>
-                    ) : (
+                      </tr>) : (
                       companyDailyAttendance.map((rec, i) => {
                         const emp = employees.find(e => e.id === rec.employeeId);
                         return (
@@ -845,24 +1377,20 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                             </td>
 
                             <td className="p-3.5 text-center">
-                              {rec.status === 'PRESENT' && (
+                              {rec.checkIn && rec.status === 'PRESENT' && (
                                 <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
                                   حاضر
-                                </span>
-                              )}
-                              {rec.status === 'LATE' && (
+                                </span>)}
+                              {rec.checkIn && rec.status === 'LATE' && (
                                 <span className="bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
                                   متأخر
-                                </span>
-                              )}
-                              {rec.status === 'ABSENT' && (
-                                <span className="bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
-                                  غياب
-                                </span>
-                              )}
+                                </span>)}
+                              {!rec.checkIn && (
+                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
+                                  لم يبصم / غياب
+                                </span>)}
                             </td>
-                          </tr>
-                        );
+                          </tr>);
                       })
                     )}
                   </tbody>
@@ -879,8 +1407,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 </div>
               </div>
             </div>
-          </>
-        )}
+          </>)}
 
         {/* TAB 2: MONTHLY REPORT & DEDUCTIONS */}
         {activeTab === 'MONTHLY' && (
@@ -950,14 +1477,12 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                         <td className="p-3 text-center font-mono font-bold text-rose-600">{stats.absentDays}</td>
                         <td className="p-3 text-center font-mono text-slate-600">{stats.latenessMinutes} د</td>
                         <td className="p-3 text-center font-mono font-bold text-rose-700 dir-ltr">{formatKWD(stats.totalDeductionKwd)}</td>
-                      </tr>
-                    );
+                      </tr>);
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          </div>)}
 
         {/* TAB 3: IMPORT BIOMETRIC FILE (ZKTeco / Odoo) */}
         {activeTab === 'IMPORT' && (
@@ -1008,8 +1533,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
               <div className="text-center py-6 text-slate-600 font-bold flex items-center justify-center gap-2">
                 <RefreshCw className="w-5 h-5 animate-spin text-[#00838f]" />
                 <span>جاري معالجة وقراءة بصمات الموظفين ومطابقتها...</span>
-              </div>
-            )}
+              </div>)}
 
             {parseResult && (
               <div className="space-y-4 pt-4 border-t border-slate-200">
@@ -1022,8 +1546,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                     {parseResult?.unmatchedBadgeIds && parseResult.unmatchedBadgeIds.length > 0 && (
                       <span className="px-2.5 py-1 bg-amber-50 text-amber-700 rounded text-[11px] font-bold">
                         {parseResult.unmatchedBadgeIds.length} بصمة غير مربوطة
-                      </span>
-                    )}
+                      </span>)}
                   </div>
                 </div>
 
@@ -1054,8 +1577,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                             <td className="p-2.5 text-center">
                               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">جاهز للحفظ</span>
                             </td>
-                          </tr>
-                        );
+                          </tr>);
                       })}
                     </tbody>
                   </table>
@@ -1069,10 +1591,8 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                     <CheckCircle2 className="w-4 h-4" /> تأكيد واعتماد الاستيراد إلى سجلات الشركة
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              </div>)}
+          </div>)}
 
         {/* TAB 4: SHIFT CONFIGURATION & KUWAIT RULES */}
         {activeTab === 'SHIFT' && (
@@ -1150,8 +1670,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 حفظ إعدادات الوردية
               </button>
             </div>
-          </div>
-        )}
+          </div>)}
 
         {/* TAB 5: KIOSK MODE */}
         {activeTab === 'KIOSK' && (
@@ -1172,8 +1691,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 العودة لسجلات الحضور
               </button>
             </div>
-          </div>
-        )}
+          </div>)}
 
       </div>
 
@@ -1202,8 +1720,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmps.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -1259,8 +1776,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
               </button>
             </div>
           </form>
-        </div>
-      )}
+        </div>)}
 
 
       {/* TAB 1: DAILY LOGS */}
@@ -1350,8 +1866,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                       <p className="font-bold text-slate-600">لا توجد سجلات حضور مسجلة لهذا اليوم ({selectedDate})</p>
                       <p className="text-[11px]">يمكنك رفع ملف أجهزة البصمة أو إضافة تسجيل يدوي من الأعلى.</p>
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   companyDailyAttendance.map((att, idx) => {
                     const emp = employees.find(e => e.id === att.employeeId);
                     return (
@@ -1361,10 +1876,8 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                           {emp?.biometricId || emp?.badgeId ? (
                             <span className="bg-purple-100 text-purple-900 border border-purple-200 px-1.5 py-0.5 rounded font-bold text-[11px]">
                               {emp.biometricId || emp.badgeId}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
+                            </span>) : (
+                            <span className="text-slate-300">—</span>)}
                         </td>
                         <td className="p-3 font-bold text-slate-900">{emp ? emp.fullNameAr : 'غير معرف'}</td>
                         <td className="p-3 text-slate-600">{emp?.department || '—'}</td>
@@ -1376,25 +1889,20 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                                   <span className="text-emerald-700" title="دخول">← {p.in}</span>
                                   <span className="text-slate-300">|</span>
                                   <span className="text-rose-700" title="خروج">→ {p.out}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
+                                </div>))}
+                            </div>) : (
                             <div className="flex gap-2">
                               <span className="bg-blue-50/40 rounded px-2 text-emerald-700">← {att.checkIn || '—'}</span>
                               <span className="bg-blue-50/40 rounded px-2 text-rose-700">→ {att.checkOut || '—'}</span>
-                            </div>
-                          )}
+                            </div>)}
                         </td>
                         <td className="p-3 font-mono text-slate-800">{att.workHours} ساعة</td>
                         <td className="p-3 font-mono font-bold">
                           {att.latenessMinutes > 0 ? (
                             <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
                               {att.latenessMinutes} دقيقة
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">لا يوجد</span>
-                          )}
+                            </span>) : (
+                            <span className="text-slate-400">لا يوجد</span>)}
                         </td>
                         <td className="p-3 font-mono text-emerald-700 font-bold">
                           {att.overtimeHours > 0 ? `${att.overtimeHours} س` : '—'}
@@ -1411,15 +1919,13 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                              att.status === 'ON_LEAVE' ? 'في إجازة رسمية' : 'حاضر في الموعد'}
                           </span>
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* TAB 2: MONTHLY REPORT & PAYROLL SYNC */}
       {activeTab === 'MONTHLY' && (
@@ -1503,14 +2009,12 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                       <td className="p-3 font-mono font-black text-purple-900 bg-purple-50/60 dir-ltr">
                         {formatKWD(stats.totalDeductionKwd)}
                       </td>
-                    </tr>
-                  );
+                    </tr>);
                 })}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* TAB 3: IMPORT BIOMETRIC FILE */}
       {activeTab === 'IMPORT' && (
@@ -1572,8 +2076,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 <div className="flex items-center justify-center gap-2 text-xs font-bold text-[#714B67] animate-pulse pt-2">
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>جاري معالجة ومطابقة بصمات الموظفين...</span>
-                </div>
-              )}
+                </div>)}
             </div>
           </div>
 
@@ -1610,8 +2113,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                       💡 يمكنك الدخول إلى شجرة الموظفين وتعيين هذا الكود في حقل <strong>"معرف جهاز البصمة / Badge ID"</strong> لأي موظف لتتم المطابقة آلياً 100%.
                     </p>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {/* Preview Grid */}
               <div className="overflow-x-auto rounded-lg border border-slate-200">
@@ -1639,10 +2141,8 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                             {emp?.biometricId || emp?.badgeId ? (
                               <span className="bg-purple-100 text-purple-900 border border-purple-200 px-1.5 py-0.5 rounded font-bold text-[10px]">
                                 {emp.biometricId || emp.badgeId}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
+                              </span>) : (
+                              <span className="text-slate-300">—</span>)}
                           </td>
                           <td className="p-2.5 font-bold text-slate-900">{emp ? emp.fullNameAr : 'غير مطبوع'}</td>
                           <td className="p-2.5 font-mono text-slate-700">{rec.date}</td>
@@ -1653,15 +2153,12 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                                   <div key={i} className="flex gap-1">
                                     <span className="text-emerald-700">← {p.in}</span>
                                     <span className="text-rose-700">→ {p.out}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
+                                  </div>))}
+                              </div>) : (
                               <div className="flex gap-2 text-xs">
                                 <span className="text-emerald-700">← {rec.checkIn}</span>
                                 <span className="text-rose-700">→ {rec.checkOut}</span>
-                              </div>
-                            )}
+                              </div>)}
                           </td>
                           <td className="p-2.5 font-mono">{rec.workHours} س</td>
                           <td className="p-2.5 font-mono text-rose-600 font-bold">
@@ -1674,16 +2171,13 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                               {rec.status === 'LATE' ? 'تأخير' : 'في الموعد'}
                             </span>
                           </td>
-                        </tr>
-                      );
+                        </tr>);
                     })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            </div>)}
+        </div>)}
 
       {/* TAB 4: SHIFT CONFIGURATION & ODOO CRON SYNC */}
       {activeTab === 'SHIFT' && (
@@ -1790,8 +2284,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
               حفظ إعدادات الوردية والربط
             </button>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* TAB 5: BIOMETRIC DEVICES MANAGEMENT (hr.biometric.device / Odoo Enterprise Tree & Form) */}
       {activeTab === 'DEVICES' && (
@@ -1910,8 +2403,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
             <div className="bg-purple-50 border border-purple-200 text-purple-900 px-4 py-3 rounded-xl text-xs flex items-center gap-2 animate-pulse">
               <RefreshCw className="w-4 h-4 animate-spin text-[#714B67]" />
               <span>جاري مزامنة أجهزة البصمة من قاعدة البيانات...</span>
-            </div>
-          )}
+            </div>)}
 
           {deviceFetchError && (
             <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-xs flex items-center justify-between gap-2">
@@ -1920,8 +2412,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                 <span>{deviceFetchError}</span>
               </div>
               <span className="text-[10px] font-mono bg-amber-100 text-amber-800 px-2 py-0.5 rounded">الوضع الآمن (Offline Fallback)</span>
-            </div>
-          )}
+            </div>)}
 
           {/* Odoo Tree View Table (view_biometric_device_tree) */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -1984,8 +2475,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                           </button>
                         </div>
                       </td>
-                    </tr>
-                  ) : (
+                    </tr>) : (
                     devices.map((device, idx) => (
                     <tr 
                       key={device.id} 
@@ -1998,8 +2488,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                           <span>{device.name}</span>
                         </div>
                         {device.notes && (
-                          <p className="text-[11px] text-slate-400 mt-0.5 max-w-xs truncate">{device.notes}</p>
-                        )}
+                          <p className="text-[11px] text-slate-400 mt-0.5 max-w-xs truncate">{device.notes}</p>)}
                       </td>
 
                       {/* IP Address */}
@@ -2031,20 +2520,17 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                             <span>متصل (Connected)</span>
-                          </span>
-                        )}
+                          </span>)}
                         {device.state === 'draft' && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                             <span className="w-2 h-2 rounded-full bg-slate-400"></span>
                             <span>جديد (Draft)</span>
-                          </span>
-                        )}
+                          </span>)}
                         {device.state === 'error' && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                             <span className="w-2 h-2 rounded-full bg-rose-500"></span>
                             <span>خطأ في الاتصال (Error)</span>
-                          </span>
-                        )}
+                          </span>)}
                       </td>
 
                       {/* Last Sync */}
@@ -2105,8 +2591,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
                           </button>
                         </div>
                       </td>
-                    </tr>
-                  )))}
+                    </tr>)))}
                 </tbody>
               </table>
             </div>
@@ -2211,6 +2696,305 @@ class HrBiometricDevice(models.Model):
             </div>
           </div>
 
+        </div>)}
+
+      {/* TAB: LIVE_SYNC (ربط برنامج Attendance Management المباشر) */}
+      {activeTab === 'LIVE_SYNC' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-[#1e3a4c] to-[#00838f] text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[11px] font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>سيرفر الاستقبال المباشر يعمل 100%</span>
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-white/10 text-white rounded-full text-[11px]">ZKTeco & Attendance Management</span>
+                </div>
+                <h2 className="text-xl font-black flex items-center gap-2">
+                  <Wifi className="w-6 h-6 text-emerald-300" />
+                  <span>ربط برنامج البصمة (Attendance Management) ومزامنة الحركات المباشرة</span>
+                </h2>
+                <p className="text-slate-200 text-xs max-w-2xl leading-relaxed">
+                  يمكنك الآن ترحيل بصمات الدخول والخروج آلياً من برنامج Attendance Management المنسوخ على جهازك الشخصي أو من أجهزة ZKTeco مباشرة إلى نظام الموارد البشرية والرواتب فور حدوثها دون الحاجة لتصدير ملفات إكسل!
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownloadVbsScript}
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl shadow-md transition flex items-center gap-1.5 text-xs"
+                  title="السكربت المباشر للويندوز - يعمل تلقائياً وبدون أي برامج إضافية"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>1. سكربت الويندوز (zk_attendance_sync.vbs)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadBatFile}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow-md transition flex items-center gap-1.5 text-xs"
+                  title="ملف التشغيل التلقائي بضغطة زر"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>2. ملف التشغيل (run_zk_sync.bat)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadSyncAgentScript}
+                  className="px-4 py-2.5 bg-cyan-700 hover:bg-cyan-800 text-white font-black rounded-xl shadow-md transition flex items-center gap-1.5 text-xs"
+                  title="سكربت بايثون للمطورين"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>3. سكربت بايثون (zk_attendance_sync.py)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Webhook & Integration Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* API Webhook Details */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                  <Code className="w-4 h-4 text-[#00838f]" />
+                  <span>عنوان Webhook API لاستقبال البصمات (Live Push Endpoint)</span>
+                </h3>
+                <span className="px-2 py-0.5 bg-cyan-50 text-[#00838f] text-[10px] font-bold rounded">POST REST API</span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-600 block">رابط السيرفر المباشر:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/api/attendance/live-push`}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 font-mono font-bold text-slate-800 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/api/attendance/live-push`);
+                      alert('تم نسخ رابط الـ Webhook بنجاح!');
+                    }}
+                    className="px-3 py-2 bg-[#00838f] text-white rounded-lg font-bold hover:bg-[#006978] transition text-xs shrink-0"
+                  >
+                    نسخ الرابط
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                <p className="font-bold text-slate-800">💡 نموذج البيانات المقبولة (JSON Payload):</p>
+                <pre className="font-mono text-[10px] bg-slate-900 text-emerald-400 p-2 rounded-lg leading-relaxed overflow-x-auto">
+{`{
+  "companyId": "${activeCompany?.id || 'comp-1'}",
+  "punches": [
+    {
+      "employeeCode": "101",
+      "timestamp": "2026-08-23 08:00:00",
+      "type": "IN",
+      "deviceSn": "ZK-MAIN"
+    }
+  ]
+}`}
+                </pre>
+              </div>
+            </div>
+
+            {/* Quick Test / Manual Live Punch Push Simulator */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-600 animate-pulse" />
+                  <span>اختبار وتجربة إرسال بصمة تجريبية فورية (Live Test)</span>
+                </h3>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded">Live Test</span>
+              </div>
+
+              <p className="text-slate-500 text-[11px]">
+                جرب إرسال بصمة مباشرة الآن لاختبار وصول البيانات لحظياً إلى جدول الحضور والرواتب:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">الموظف:</label>
+                  <select
+                    value={testPunchEmpCode}
+                    onChange={(e) => setTestPunchEmpCode(e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg p-2 font-bold bg-white text-slate-800"
+                  >
+                    <option value="">اختر الموظف...</option>
+                    {(companyEmps || []).map(emp => (
+                      <option key={emp.id} value={emp.employeeCode || emp.id}>
+                        {emp.fullNameAr} ({emp.employeeCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">نوع الحركة:</label>
+                  <select
+                    value={testPunchType}
+                    onChange={(e) => setTestPunchType(e.target.value as 'IN' | 'OUT')}
+                    className="w-full border border-slate-300 rounded-lg p-2 font-bold bg-white text-slate-800"
+                  >
+                    <option value="IN">دخول (CHECKIN 🟢)</option>
+                    <option value="OUT">خروج (CHECKOUT 🔴)</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendTestLivePunch}
+                disabled={isSendingTestPunch}
+                className="w-full py-2.5 bg-[#00838f] hover:bg-[#006978] text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-xs cursor-pointer"
+              >
+                <Activity className={`w-4 h-4 ${isSendingTestPunch ? 'animate-spin' : ''}`} />
+                <span>{isSendingTestPunch ? 'جاري إرسال البصمة...' : 'إرسال بصمة تجريبية فورية الآن'}</span>
+              </button>
+
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-[11px] flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>عند الضغط، يتم إنشاء سجل بصمة حقيقي وترحيله تلقائياً لسجلات الحضور اليومية.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Script Download & Setup Instructions */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-[#714B67]" />
+                  <span>خطوات ربط برنامج Attendance Management (ZKTeco) على جهاز الكمبيوتر</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  يتصل البرنامج الآلي بقاعدة بيانات <code className="font-mono font-bold text-purple-900 bg-purple-50 px-1 rounded">att2000.mdb</code> ويرسل البصمات الجديدة أولاً بأول.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadSyncAgentScript}
+                  className="px-3.5 py-1.5 bg-[#714B67] hover:bg-[#5a3a52] text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تحميل ملف Python (zk_attendance_sync.py)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadBatFile}
+                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold rounded-lg text-xs flex items-center gap-1.5 transition"
+                >
+                  <Code className="w-3.5 h-3.5 text-[#714B67]" />
+                  <span>تحميل ملف التشغيل (run_zk_sync.bat)</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="w-6 h-6 rounded-full bg-purple-100 text-[#714B67] font-black flex items-center justify-center text-xs">1</div>
+                <h4 className="font-bold text-slate-900">تحميل السكربت المساعد</h4>
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  اضغط على زر "تحميل ملف Python" أو "ملف التشغيل" لحفظ برنامج الربط على كمبيوتر العمل الموجود عليه برنامج البصمة.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="w-6 h-6 rounded-full bg-purple-100 text-[#714B67] font-black flex items-center justify-center text-xs">2</div>
+                <h4 className="font-bold text-slate-900">تشغيل البرنامج</h4>
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  افتح الملف <code className="font-mono text-slate-800">run_zk_sync.bat</code>. سيقوم تلقائياً بالتعرف على قاعدة البيانات <code className="font-mono text-purple-900">att2000.mdb</code> ومراقبة البصمات الجديدة كل 30 ثانية.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="w-6 h-6 rounded-full bg-purple-100 text-[#714B67] font-black flex items-center justify-center text-xs">3</div>
+                <h4 className="font-bold text-slate-900">المزامنة التلقائية اللحظية</h4>
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  بمجرد أن يبصم أي موظف على ماكينة البصمة وتنسحب إلى برنامج Attendance Management، تظهر البصمة فوراً بالنظام هنا!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Incoming Punches Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-3 p-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#00838f]" />
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">سجل البصمات الواردة لحظياً (Live Realtime Punch Stream)</h3>
+                  <p className="text-slate-500 text-[11px]">يتم تحديث البصمات المباشرة فور ورودها من السكربت أو الأجهزة المربوطة</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchLivePunches}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition text-xs flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-[#00838f]" />
+                <span>تحديث السجل</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-100/80 font-bold text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">كود الموظف</th>
+                    <th className="p-3">اسم الموظف المطابق</th>
+                    <th className="p-3">تاريخ الحركة</th>
+                    <th className="p-3">وقت البصمة</th>
+                    <th className="p-3">نوع البصمة</th>
+                    <th className="p-3">مصدر البصمة</th>
+                    <th className="p-3">وقت الاستقبال بالخادم</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono">
+                  {livePunches.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400 font-sans">
+                        لا توجد حركات بصمة لحظية جديدة تم إرسالها مؤخراً. قم بتجربة إرسال بصمة تجريبية من النموذج أعلاه أو تشغيل السكربت.
+                      </td>
+                    </tr>
+                  ) : (
+                    livePunches.map((p) => {
+                      const emp = (companyEmps || []).find(e => e.employeeCode === p.employeeCode || e.biometricId === p.employeeCode || e.badgeId === p.employeeCode);
+                      return (
+                        <tr key={p.id} className="hover:bg-cyan-50/50 transition">
+                          <td className="p-3 font-bold text-purple-900">#{p.employeeCode}</td>
+                          <td className="p-3 font-sans font-bold text-slate-900">{emp ? emp.fullNameAr : 'غير معرف / كود جديد'}</td>
+                          <td className="p-3 text-slate-700">{p.date}</td>
+                          <td className="p-3 font-bold text-blue-700">{p.time}</td>
+                          <td className="p-3 font-sans">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              p.type === 'IN' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {p.type === 'IN' ? 'دخول 🟢' : 'خروج 🔴'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-slate-500 text-[11px] font-sans">{p.deviceSn}</td>
+                          <td className="p-3 text-slate-400 text-[10px]">{new Date(p.receivedAt).toLocaleTimeString('ar-KW')}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2374,8 +3158,7 @@ class HrBiometricDevice(models.Model):
               </button>
             </div>
           </form>
-        </div>
-      )}
+        </div>)}
 
       {/* TEST RESULT DIAGNOSTIC MODAL */}
       {testResultModal && (
@@ -2445,8 +3228,7 @@ class HrBiometricDevice(models.Model):
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* PRINTABLE REPORT MODAL */}
       {showPrintModal && (
@@ -2515,8 +3297,7 @@ class HrBiometricDevice(models.Model):
                         <td className="p-2 font-mono border-l border-slate-300">{stats.absentDays}</td>
                         <td className="p-2 font-mono border-l border-slate-300">{stats.latenessMinutes}</td>
                         <td className="p-2 font-mono font-bold dir-ltr">{formatKWD(stats.totalDeductionKwd)}</td>
-                      </tr>
-                    );
+                      </tr>);
                   })}
                 </tbody>
               </table>
@@ -2538,8 +3319,7 @@ class HrBiometricDevice(models.Model):
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* MANUAL RECORD MODAL */}
       {showManualModal && (
@@ -2566,8 +3346,7 @@ class HrBiometricDevice(models.Model):
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmps.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -2623,8 +3402,6 @@ class HrBiometricDevice(models.Model):
               </button>
             </div>
           </form>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

@@ -99,25 +99,21 @@ export const BackgroundRenderer: React.FC<BackgroundRendererProps> = ({ theme, m
               className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-90 transition-opacity duration-700"
             >
               <source src="https://assets.mixkit.co/videos/preview/mixkit-forest-stream-in-the-sunlight-529-large.mp4" type="video/mp4" />
-            </video>
-          )}
-        </>
-      )}
+            </video>)}
+        </>)}
 
       {/* 2. Digital Network Theme */}
       {theme === 'DIGITAL_NETWORK' && (
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#2d1b28] to-slate-950">
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-85" />
-        </div>
-      )}
+        </div>)}
 
       {/* 3. Flowing Gradient Aurora Theme */}
       {theme === 'FLOWING_GRADIENT' && (
         <div className={`absolute inset-0 bg-gradient-to-br from-indigo-950 via-[#45233c] to-slate-900 ${motionEnabled ? 'animate-pulse' : ''} duration-10000`}>
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-ping duration-7000"></div>
           <div className="absolute bottom-1/4 right-1/4 w-[30rem] h-[30rem] bg-indigo-600/15 rounded-full blur-3xl"></div>
-        </div>
-      )}
+        </div>)}
 
       {/* 4. Geometric Waves Theme */}
       {theme === 'GEOMETRIC_WAVES' && (
@@ -126,16 +122,13 @@ export const BackgroundRenderer: React.FC<BackgroundRendererProps> = ({ theme, m
             <path fill="#714B67" fillOpacity="0.4" d="M0,320L48,341.3C96,363,192,405,288,394.7C384,384,480,320,576,293.3C672,267,768,277,864,298.7C960,320,1056,352,1152,341.3C1248,331,1344,277,1392,250.7L1440,224L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
             <path fill="#3b2035" fillOpacity="0.6" d="M0,192L48,208C96,224,192,256,288,245.3C384,235,480,181,576,160C672,139,768,149,864,181.3C960,213,1056,267,1152,272C1248,277,1344,235,1392,213.3L1440,192L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
           </svg>
-        </div>
-      )}
+        </div>)}
 
       {/* 5. Static Clean Theme */}
       {theme === 'STATIC' && (
-        <div className="absolute inset-0 bg-slate-900"></div>
-      )}
+        <div className="absolute inset-0 bg-slate-900"></div>)}
 
       {/* Frosted Soft Overlay for Glassmorphism readability */}
       <div className="absolute inset-0 bg-gradient-to-b from-white/35 to-slate-50/55 backdrop-blur-[3px]"></div>
-    </div>
-  );
+    </div>);
 };

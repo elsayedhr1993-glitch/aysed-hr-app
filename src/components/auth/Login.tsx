@@ -65,8 +65,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onRequestTrial }) => {
           <div className="mx-8 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-700 text-xs">
             <AlertCircle size={16} className="shrink-0" />
             <span>{errorMessage}</span>
-          </div>
-        )}
+          </div>)}
 
         {/* نموذج الدخول */}
         <form onSubmit={handleLogin} className="p-8 space-y-4" autoComplete="off">
@@ -139,8 +138,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onRequestTrial }) => {
         </div>
 
       </div>
-    </div>
-  );
+    </div>);
 };
 
 export default Login;

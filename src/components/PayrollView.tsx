@@ -22,8 +22,7 @@ export const PayrollView: React.FC = () => {
       <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-3" />
         <p className="text-gray-500 font-medium">جاري احتساب مسير الرواتب وقراءة البيانات الحية...</p>
-      </div>
-    );
+      </div>);
   }
 
   return (
@@ -110,12 +109,10 @@ export const PayrollView: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-3.5 px-4 font-black text-emerald-600">{formatKWD(netPay)}</td>
-                </tr>
-              );
+                </tr>);
             })}
           </tbody>
         </table>
       </div>
-    </div>
-  );
+    </div>);
 };

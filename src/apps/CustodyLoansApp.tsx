@@ -315,8 +315,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
             >
               <Plus className="w-4 h-4" />
               <span>تسليم عهدة جديدة</span>
-            </button>
-          )}
+            </button>)}
 
           {activeTab === 'LOANS' && (
             <button
@@ -325,8 +324,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
             >
               <Plus className="w-4 h-4" />
               <span>طلب سلفة جديدة</span>
-            </button>
-          )}
+            </button>)}
 
           {activeTab === 'WARNINGS' && (
             <button
@@ -335,8 +333,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
             >
               <AlertTriangle className="w-4 h-4" />
               <span>إصدار إنذار جزائي</span>
-            </button>
-          )}
+            </button>)}
 
           {activeTab === 'NOTES' && (
             <button
@@ -345,8 +342,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
             >
               <Plus className="w-4 h-4" />
               <span>إضافة ملاحظة إدارية</span>
-            </button>
-          )}
+            </button>)}
         </div>
       </div>
 
@@ -473,8 +469,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>تسليم عهدة جديدة الآن</span>
                 </button>
-              </div>
-            ) : viewMode === 'KANBAN' ? (
+              </div>) : viewMode === 'KANBAN' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredCustodies.map(cust => {
                   const emp = employees.find(e => e.id === cust.employeeId);
@@ -509,8 +504,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                            <div className="flex items-center justify-between">
                              <span className="text-slate-400">تاريخ الانتهاء:</span>
                              <span className="font-mono font-bold text-amber-600">{cust.expiryDate}</span>
-                           </div>
-                        )}
+                           </div>)}
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">القيمة التقديرية:</span>
                           <span className="font-bold text-emerald-700 font-mono">{formatKWD(cust.valueKwd)}</span>
@@ -519,8 +513,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                           <div className="flex items-center justify-between text-[11px]">
                             <span className="text-slate-400">الرقم التسلسلي (S/N):</span>
                             <span className="font-mono bg-slate-50 px-1 rounded">{cust.serialNumber}</span>
-                          </div>
-                        )}
+                          </div>)}
                       </div>
 
                       <div className="pt-2 border-t flex items-center justify-between text-xs">
@@ -551,11 +544,9 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                           </button>
                         </div>
                       </div>
-                    </div>
-                  );
+                    </div>);
                 })}
-              </div>
-            ) : (
+              </div>) : (
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                 <table className="w-full text-right border-collapse text-xs">
                   <thead>
@@ -612,15 +603,12 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                               </button>
                             </div>
                           </td>
-                        </tr>
-                      );
+                        </tr>);
                     })}
                   </tbody>
                 </table>
-              </div>
-            )}
-          </div>
-        )}
+              </div>)}
+          </div>)}
 
         {/* ==================== TAB 2: LOANS & ADVANCES ==================== */}
         {activeTab === 'LOANS' && (
@@ -637,8 +625,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>تقديم طلب سلفة جديدة</span>
                 </button>
-              </div>
-            ) : (
+              </div>) : (
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                 <table className="w-full text-right border-collapse text-xs">
                   <thead>
@@ -714,15 +701,12 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                               </button>
                             </div>
                           </td>
-                        </tr>
-                      );
+                        </tr>);
                     })}
                   </tbody>
                 </table>
-              </div>
-            )}
-          </div>
-        )}
+              </div>)}
+          </div>)}
 
         {/* ==================== TAB 3: WARNINGS & DISCIPLINE ==================== */}
         {activeTab === 'WARNINGS' && (
@@ -739,8 +723,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>إصدار إنذار جزائي جديد</span>
                 </button>
-              </div>
-            ) : (
+              </div>) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredWarnings.map(wrn => {
                   const emp = employees.find(e => e.id === wrn.employeeId);
@@ -774,8 +757,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                           <div className="flex justify-between text-rose-700 font-bold">
                             <span>الجزاء الخصمي:</span>
                             <span>خصم {wrn.deductionDays} أيام من الراتب</span>
-                          </div>
-                        ) : null}
+                          </div>) : null}
                         <div className="text-[10px] text-slate-400 font-serif">
                           {wrn.legalArticleNote}
                         </div>
@@ -807,13 +789,10 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                           </button>
                         </div>
                       </div>
-                    </div>
-                  );
+                    </div>);
                 })}
-              </div>
-            )}
-          </div>
-        )}
+              </div>)}
+          </div>)}
 
         {/* ==================== TAB 4: NOTES & EVALUATIONS ==================== */}
         {activeTab === 'NOTES' && (
@@ -830,8 +809,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>إضافة ملاحظة جديدة</span>
                 </button>
-              </div>
-            ) : (
+              </div>) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredNotes.map(note => {
                   const emp = employees.find(e => e.id === note.employeeId);
@@ -848,8 +826,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                         {note.isConfidential && (
                           <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
                             سري للغاية
-                          </span>
-                        )}
+                          </span>)}
                       </div>
 
                       <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap">
@@ -877,13 +854,10 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                           </button>
                         </div>
                       </div>
-                    </div>
-                  );
+                    </div>);
                 })}
-              </div>
-            )}
-          </div>
-        )}
+              </div>)}
+          </div>)}
       </div>
 
       {/* ==================== CUSTODY MODAL ==================== */}
@@ -910,8 +884,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -1015,8 +988,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* ==================== LOAN MODAL ==================== */}
       {isLoanModalOpen && editingLoan && (
@@ -1042,8 +1014,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -1133,8 +1104,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* ==================== WARNING MODAL ==================== */}
       {isWarningModalOpen && editingWarning && (
@@ -1160,8 +1130,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -1230,8 +1199,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* ==================== NOTE MODAL ==================== */}
       {isNoteModalOpen && editingNote && (
@@ -1257,8 +1225,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -1316,8 +1283,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* ==================== DELETE CONFIRMATION MODAL ==================== */}
       {deleteConfirmTarget && (
@@ -1358,8 +1324,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* ==================== PRINTABLE RECEIPT MODAL ==================== */}
       {printableRecord && (
@@ -1408,8 +1373,7 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                   <div><span className="text-slate-400">اسم العهدة:</span> <strong>{printableRecord.data.itemName}</strong></div>
                   <div><span className="text-slate-400">الرقم التسلسلي S/N:</span> <strong className="font-mono">{printableRecord.data.serialNumber || '—'}</strong></div>
                   <div><span className="text-slate-400">القيمة التقديرية:</span> <strong className="font-mono text-emerald-700">{formatKWD(printableRecord.data.valueKwd)}</strong></div>
-                </div>
-              )}
+                </div>)}
 
               {printableRecord.type === 'WARNING' && (
                 <div className="space-y-2 pt-2 border-t">
@@ -1417,17 +1381,14 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
                   <div><span className="text-slate-400">موضوع المخالفة:</span> <strong>{printableRecord.data.subject}</strong></div>
                   <div><span className="text-slate-400">تفاصيل الواقعة:</span> <p className="bg-white p-2 rounded border border-slate-200 text-slate-700 mt-1">{printableRecord.data.violationDetails}</p></div>
                   <div className="text-[11px] text-rose-700 font-bold">{printableRecord.data.legalArticleNote}</div>
-                </div>
-              )}
+                </div>)}
             </div>
 
             {/* Legal Acknowledgment Statement */}
             <div className="text-xs text-slate-600 leading-relaxed bg-amber-50/60 p-4 rounded-xl border border-amber-200">
               {printableRecord.type === 'CUSTODY' ? (
-                <span>أقر أنا الموظف المذكور أعلاه باستلام العهدة المبينة بآلية سليمة، وأتعهد بالحفاظ عليها وإعادتها فور طلب إدارة الشركة أو عند انتهاء علاقة العمل.</span>
-              ) : (
-                <span>يتوجب على الموظف الالتزام التام بالقوانين واللوائح التنفيذية للشركة لعدم التعرض للجزاءات الأشد وفقاً لأحكام قانون العمل الكويتي رقم 6 لسنة 2010.</span>
-              )}
+                <span>أقر أنا الموظف المذكور أعلاه باستلام العهدة المبينة بآلية سليمة، وأتعهد بالحفاظ عليها وإعادتها فور طلب إدارة الشركة أو عند انتهاء علاقة العمل.</span>) : (
+                <span>يتوجب على الموظف الالتزام التام بالقوانين واللوائح التنفيذية للشركة لعدم التعرض للجزاءات الأشد وفقاً لأحكام قانون العمل الكويتي رقم 6 لسنة 2010.</span>)}
             </div>
 
             {/* Signatures & Seal */}
@@ -1459,8 +1420,6 @@ export const CustodyLoansApp: React.FC<CustodyLoansAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

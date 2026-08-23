@@ -213,12 +213,12 @@ export function buildEmployeeBaselineAllocations(
   const result: HrLeaveAllocation[] = [...currentEmpAllocations];
 
   const openingVal = getGlobalOpeningBalance(emp);
-  const hasOpeningAlloc = result.some(a => a.allocationType === 'regular' && (a.name?.includes('2025') || a.name?.includes('افتتاحي') || a.dateFrom?.startsWith('2025') || is2026Joined));
+  const hasOpeningAlloc = result.some(a => a.allocationType === 'regular' && (a.name?.includes('2025') || a.name?.includes('افتتاحي') || a.dateFrom?.startsWith('2025') || (is2026Joined && openingVal <= 0)));
 
   if (!hasOpeningAlloc) {
     result.unshift({
       id: `alloc-open-${emp.id}-2025`,
-      name: is2026Joined ? 'رصيد افتتاحي (موظف جديد 2026)' : 'رصيد إجازات افتتاحي مرحل من 2025 (Regular Opening Balance)',
+      name: (is2026Joined && openingVal <= 0) ? 'رصيد افتتاحي (موظف جديد 2026)' : 'رصيد إجازات افتتاحي مرحل من 2025 (Regular Opening Balance)',
       employeeId: emp.id,
       companyId: emp.companyId || 'comp-1',
       leaveType: 'ANNUAL',
@@ -226,16 +226,21 @@ export function buildEmployeeBaselineAllocations(
       numberOfDays: openingVal,
       consumedDays: 0,
       remainingDays: openingVal,
-      dateFrom: is2026Joined ? (emp.joinDate || '2026-06-01') : '2025-12-31',
+      dateFrom: (is2026Joined && openingVal <= 0) ? (emp.joinDate || '2026-06-01') : '2025-12-31',
       state: 'validate',
-      notes: is2026Joined ? 'رصيد افتتاحي للموظفين الجدد خلال 2026 (0 يوم)' : 'رصيد مرحل معتمد من نهاية عام 2025',
+      notes: (is2026Joined && openingVal <= 0) ? 'رصيد افتتاحي للموظفين الجدد خلال 2026 (0 يوم)' : `رصيد مرحل معتمد من نهاية عام 2025 (${openingVal} يوم)`,
       createdAt: '2026-01-01T00:00:00.000Z'
     });
   } else {
-    // If 2026 joined, ensure regular opening allocation is 0 days
+    // Ensure regular opening allocation reflects openingVal if openingVal > 0
     result.forEach(a => {
       if (a.allocationType === 'regular') {
-        if (is2026Joined) {
+        if (openingVal > 0) {
+          if (a.numberOfDays === 0 || a.numberOfDays === undefined) {
+            a.numberOfDays = openingVal;
+            a.remainingDays = Math.max(0, openingVal - (a.consumedDays || 0));
+          }
+        } else if (is2026Joined) {
           a.numberOfDays = 0;
           a.remainingDays = 0;
         }
@@ -327,7 +332,7 @@ export function runAutomatedLeaveAccrual(
 
     if ((!eligibility.isEligible || hasAllocationForMonth) && !force) {
       skippedCount++;
-      const currentBalance = Number(emp.openingLeaveBalance ?? emp.carriedOverLeave2025 ?? 0);
+      const currentBalance = Number((emp as any).carriedOverLeave2025 ?? (emp as any).carriedOverBalance ?? 0);
       logs.push({
         employeeId: emp.id,
         employeeCode: emp.employeeCode,
@@ -344,7 +349,7 @@ export function runAutomatedLeaveAccrual(
     }
 
     // Process Accrual (+2.5 Days)
-    const prevBalance = Number(emp.openingLeaveBalance ?? emp.carriedOverLeave2025 ?? 0);
+    const prevBalance = Number((emp as any).carriedOverLeave2025 ?? (emp as any).carriedOverBalance ?? 0);
     const newBalance = Number((prevBalance + LEAVE_ACCRUAL_RATE_PER_MONTH).toFixed(2));
     accruedCount++;
 
@@ -394,8 +399,8 @@ export function runAutomatedLeaveAccrual(
 
     return {
       ...emp,
-      openingLeaveBalance: newBalance,
-      carriedOverLeave2025: newBalance,
+      
+      // carriedOverLeave2025: newBalance,
       paid_days_remaining: emp.paid_days_remaining !== undefined ? emp.paid_days_remaining + LEAVE_ACCRUAL_RATE_PER_MONTH : undefined,
       lastAccrualDate: targetMonthKey,
       accrualHistory: updatedHistory
@@ -535,7 +540,7 @@ export class LeaveService {
 
     const targetMonthKey = getAccrualMonthKey(asOfDate);
     const monthNameAr = getAccrualMonthNameAr(asOfDate);
-    const prevBalance = Number(targetEmp.openingLeaveBalance ?? targetEmp.carriedOverLeave2025 ?? 0);
+    const prevBalance = Number((targetEmp as any).carriedOverLeave2025 ?? (targetEmp as any).carriedOverBalance ?? 0);
     const newBalance = Number((prevBalance + LEAVE_ACCRUAL_RATE_PER_MONTH).toFixed(2));
     const nowIso = asOfDate.toISOString();
 
@@ -569,8 +574,8 @@ export class LeaveService {
       if (e.id !== employeeId) return e;
       return {
         ...e,
-        openingLeaveBalance: newBalance,
-        carriedOverLeave2025: newBalance,
+        
+        // carriedOverLeave2025: newBalance,
         paid_days_remaining: e.paid_days_remaining !== undefined ? e.paid_days_remaining + LEAVE_ACCRUAL_RATE_PER_MONTH : undefined,
         lastAccrualDate: targetMonthKey,
         accrualHistory: [...(e.accrualHistory || []), newHistoryEntry]

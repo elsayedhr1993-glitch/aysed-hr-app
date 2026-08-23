@@ -3,6 +3,8 @@ import { LeavesApp } from '../apps/LeavesApp';
 import { LeaveRequest, Employee, Company, ViewMode, Contract, AttendanceRecord } from '../types';
 
 export interface LeaveManagementProps {
+  autoOpenNewLeaveForEmpId?: string | null;
+  onClearAutoOpenLeave?: () => void;
   leaves: LeaveRequest[];
   employees: Employee[];
   contracts?: Contract[];

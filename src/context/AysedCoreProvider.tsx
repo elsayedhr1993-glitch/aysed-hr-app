@@ -87,8 +87,7 @@ export const AysedCoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         body { font-family: 'Tajawal', sans-serif; background-color: #f8f9fa; }
       `}</style>
       {children}
-    </AysedContext.Provider>
-  );
+    </AysedContext.Provider>);
 };
 
 // هوك (Hook) لاستدعاء النظام في أي صفحة

@@ -121,8 +121,7 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
             {activeMeasures.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label} {m.unit ? `(${m.unit})` : ''}
-              </option>
-            ))}
+              </option>))}
           </select>
         </div>
       </div>
@@ -133,8 +132,7 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
           <div className="h-80 flex flex-col items-center justify-center text-slate-400">
             <BarChart3 className="w-12 h-12 stroke-1 text-slate-300 mb-2" />
             <p className="text-xs font-bold">لا توجد بيانات متاحة للرسم البياني</p>
-          </div>
-        ) : (
+          </div>) : (
           <div className="h-80 w-full" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               {chartType === 'BAR' ? (
@@ -169,11 +167,9 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
                     radius={[6, 6, 0, 0]} 
                   >
                     {chartData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
                   </Bar>
-                </BarChart>
-              ) : chartType === 'LINE' ? (
+                </BarChart>) : chartType === 'LINE' ? (
                 <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis 
@@ -207,8 +203,7 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
                     dot={{ r: 5, fill: '#714B67', strokeWidth: 2, stroke: '#fff' }} 
                     activeDot={{ r: 8, fill: '#9333ea' }}
                   />
-                </LineChart>
-              ) : (
+                </LineChart>) : (
                 <PieChart>
                   <Tooltip 
                     formatter={formatTooltipValue}
@@ -233,15 +228,12 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
                     label={({ name, percent }) => `${name}: ${(((percent !== undefined && !isNaN(percent)) ? percent : 0) * 100).toFixed(1)}%`}
                   >
                     {chartData.map((_, index) => (
-                      <Cell key={`pie-cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                      <Cell key={`pie-cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
                   </Pie>
                   <Legend />
-                </PieChart>
-              )}
+                </PieChart>)}
             </ResponsiveContainer>
-          </div>
-        )}
+          </div>)}
       </div>
 
       {/* KPI Cards Strip below chart */}
@@ -288,6 +280,5 @@ export const OdooGraphView: React.FC<OdooGraphViewProps> = ({
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

@@ -75,7 +75,7 @@ export const AICopilotApp: React.FC<AICopilotAppProps> = ({
 
   // Context summary to send with each request
   const getContextSummary = () => {
-    const totalSalaries = companyContracts.reduce((acc, c) => acc + (c.basicSalary + c.housingAllowance + c.transportAllowance + c.otherAllowance), 0);
+    const totalSalaries = companyContracts.reduce((acc, c) => acc + ((c.basicSalary || 0) + (c.housingAllowance || 0) + (c.transportAllowance || 0) + (c.otherAllowance || 0)), 0);
     const activeLeavesCount = companyLeaves.filter(l => l.status === 'APPROVED').length;
 
     const empListPreview = companyEmployees.map(e => {
@@ -255,8 +255,7 @@ ${empListPreview}`;
                 <span>اسأل الآن</span>
                 <Sparkles className="w-3 h-3" />
               </div>
-            </button>
-          );
+            </button>);
         })}
       </div>
 
@@ -289,12 +288,10 @@ ${empListPreview}`;
               {msg.role === 'assistant' ? (
                 <div className="w-8 h-8 rounded-full bg-[#714B67] text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
                   <Bot className="w-4 h-4" />
-                </div>
-              ) : (
+                </div>) : (
                 <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
                   <User className="w-4 h-4" />
-                </div>
-              )}
+                </div>)}
 
               <div className={`flex-1 max-w-3xl rounded-2xl p-4 shadow-sm text-xs leading-relaxed ${
                 msg.role === 'user' 
@@ -307,8 +304,7 @@ ${empListPreview}`;
                     {msg.source && (
                       <span className="bg-amber-50 text-amber-800 border border-amber-200 px-1 rounded text-[9px]">
                         {msg.source}
-                      </span>
-                    )}
+                      </span>)}
                   </span>
                   <div className="flex items-center gap-2">
                     <span>{msg.timestamp}</span>
@@ -318,10 +314,8 @@ ${empListPreview}`;
                       title="نسخ النص"
                     >
                       {copiedId === msg.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />) : (
+                        <Copy className="w-3.5 h-3.5" />)}
                     </button>
                   </div>
                 </div>
@@ -340,15 +334,13 @@ ${empListPreview}`;
                         <div key={lIdx} className="flex items-start gap-1.5 my-0.5 pr-2">
                           <span className="text-amber-600 font-bold">•</span>
                           <span>{line.replace(/^[-*]\s+/, '')}</span>
-                        </div>
-                      );
+                        </div>);
                     }
                     return <p key={lIdx} className="my-0.5">{line}</p>;
                   })}
                 </div>
               </div>
-            </div>
-          ))}
+            </div>))}
 
           {loading && (
             <div className="flex gap-3 items-center">
@@ -359,8 +351,7 @@ ${empListPreview}`;
                 <RefreshCw className="w-4 h-4 animate-spin text-[#714B67]" />
                 <span>جاري تحليل الطلب والرجوع لمواد قانون العمل الكويتي وبيانات الشركة...</span>
               </div>
-            </div>
-          )}
+            </div>)}
 
           <div ref={messagesEndRef} />
         </div>
@@ -416,6 +407,5 @@ ${empListPreview}`;
 
       </div>
 
-    </div>
-  );
+    </div>);
 };

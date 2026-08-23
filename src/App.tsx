@@ -51,6 +51,12 @@ function MainActionManager() {
   const setActiveApp = (app: string | null) => setCurrentApp(app === 'LAUNCHER' || app === 'APP_LAUNCHER' ? null : app);
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [autoOpenLeaveForEmpId, setAutoOpenLeaveForEmpId] = useState<string | null>(null);
+  
+  const handleOpenLeaveModal = (empId: string) => {
+    setAutoOpenLeaveForEmpId(empId);
+    setCurrentApp('LEAVES');
+  };
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
 
   const deduplicateCompanies = (list: Company[]): Company[] => {
@@ -610,7 +616,8 @@ function MainActionManager() {
     setJobTitles,
     setCompanies,
     setEmployeeNotifications,
-    setSubscriptions
+    setSubscriptions,
+    setCommencements
   );
 
   const handleLogin = (email: string) => {
@@ -921,7 +928,7 @@ function MainActionManager() {
     }
   };
 
-  const handleUpdateLeaveStatus = async (id: string, status: 'APPROVED' | 'REJECTED', note?: string) => {
+  const handleUpdateLeaveStatus = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING_MANAGER' | 'PENDING_HR' | 'DRAFT', note?: string) => {
     const targetLeave = leaves.find(l => l.id === id);
     const wasApproved = targetLeave && (targetLeave.status === 'APPROVED' || (targetLeave as any).status === 'VALIDATED');
 
@@ -980,7 +987,28 @@ function MainActionManager() {
         }
       } else if (status === 'REJECTED') {
         if (wasApproved && emp) {
-          toast.success(`تم رفض/إلغاء الإجازة ورد ${targetLeave.totalDays} يوم تلقائياً إلى رصيد الموظف ${emp.fullNameAr} (action_refuse)`);
+          const refundedDays = targetLeave.totalDays || 0;
+          const currentBal = Number((emp as any).remaining_leaves ?? (emp as any).paid_days_remaining ?? 30);
+          const updatedBalance = currentBal + refundedDays;
+
+          setEmployees(prev => prev.map(e => e.id === emp.id ? {
+            ...e,
+            remaining_leaves: updatedBalance,
+            leave_balance: updatedBalance,
+            paid_days_remaining: updatedBalance
+          } : e));
+
+          try {
+            await setDoc(doc(db, "employees", emp.id), cleanFirestoreData({
+              remaining_leaves: updatedBalance,
+              leave_balance: updatedBalance,
+              paid_days_remaining: updatedBalance
+            }), { merge: true });
+          } catch (err) {
+            console.error("Error updating employee balance on cancel/reject:", err);
+          }
+
+          toast.success(`تم رفض/إلغاء الإجازة ورد ${refundedDays} يوم تلقائياً إلى رصيد الموظف ${emp.fullNameAr}`);
         } else {
           toast(`تم رفض طلب الإجازة`);
         }
@@ -990,18 +1018,47 @@ function MainActionManager() {
 
   const handleDeleteLeave = async (id: string, force?: boolean): Promise<boolean> => {
     const targetLeave = leaves.find(l => l.id === id);
-    if (targetLeave && (targetLeave.status === 'APPROVED' || (targetLeave as any).status === 'VALIDATED') && !force) {
-      toast.error("لا يمكن حذف إجازة معتمدة مباشرة. يرجى إلغاؤها أولاً لرد الرصيد للموظف.");
-      return false;
-    }
+    const wasApproved = targetLeave && (targetLeave.status === 'APPROVED' || (targetLeave as any).status === 'VALIDATED');
+    
     setLeaves(prev => {
       const updated = prev.filter(l => l.id !== id);
       setPersistentData(MANARA_STORAGE_KEYS.LEAVES, updated);
       return updated;
     });
+
+    if (targetLeave && wasApproved) {
+      const emp = employees.find(e => e.id === targetLeave.employeeId);
+      if (emp) {
+        const refundedDays = targetLeave.totalDays || 0;
+        const currentBal = Number((emp as any).remaining_leaves ?? (emp as any).paid_days_remaining ?? 30);
+        const updatedBalance = currentBal + refundedDays;
+        
+        setEmployees(prev => prev.map(e => e.id === emp.id ? {
+          ...e,
+          remaining_leaves: updatedBalance,
+          leave_balance: updatedBalance,
+          paid_days_remaining: updatedBalance
+        } : e));
+
+        try {
+          await setDoc(doc(db, "employees", emp.id), cleanFirestoreData({
+            remaining_leaves: updatedBalance,
+            leave_balance: updatedBalance,
+            paid_days_remaining: updatedBalance
+          }), { merge: true });
+        } catch (err) {
+          console.error("Error updating employee balance on delete:", err);
+        }
+
+        toast.success(`تم حذف الإجازة المعتمدة ورد ${refundedDays} يوم إلى رصيد الموظف ${emp.fullNameAr}`);
+      }
+    }
+
     try {
       await deleteDoc(doc(db, "leaves", id));
-      toast.success("تم حذف سجل الإجازة نهائياً");
+      if (!targetLeave || !wasApproved) {
+        toast.success("تم حذف سجل الإجازة نهائياً");
+      }
       return true;
     } catch (e) {
       console.error(e);
@@ -1306,6 +1363,22 @@ function MainActionManager() {
     toast.success('تم حذف الحركة اليومية');
   };
 
+  const handleDeleteCommencement = async (id: string) => {
+    setCommencements(prev => {
+      const updated = prev.filter(x => x.id !== id);
+      setPersistentData(MANARA_STORAGE_KEYS.COMMENCEMENTS, updated);
+      return updated;
+    });
+    try {
+      const { deleteDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      await deleteDoc(doc(db, "commencements", id));
+    } catch (e) {
+      console.error("Firestore delete commencement error:", e);
+    }
+    toast.success('تم حذف مباشرة العمل بنجاح');
+  };
+
   const handleSaveCommencement = (c: EmploymentCommencement) => {
     setCommencements(prev => {
       const idx = prev.findIndex(x => x.id === c.id);
@@ -1321,7 +1394,7 @@ function MainActionManager() {
           return {
             ...e,
             status: c.status === 'APPROVED' ? 'ACTIVE' : e.status,
-            joinDate: c.actualJoiningDate || e.joinDate,
+            joinDate: e.joinDate || c.actualJoiningDate,
             resourceCalendarId: c.resourceCalendarId || e.resourceCalendarId,
             workingSchedule: c.workingSchedule || e.workingSchedule,
             workHoursType: c.workHoursType || e.workHoursType,
@@ -1342,7 +1415,7 @@ function MainActionManager() {
         if (cnt.employeeId === c.employeeId) {
           return {
             ...cnt,
-            startDate: c.actualJoiningDate || cnt.startDate,
+            startDate: cnt.startDate || c.actualJoiningDate,
             contractType: c.contractType || cnt.contractType,
             resourceCalendarId: c.resourceCalendarId || cnt.resourceCalendarId,
             workingSchedule: c.workingSchedule || cnt.workingSchedule,
@@ -1531,8 +1604,7 @@ function MainActionManager() {
             </button>
           </div>
         </div>
-      </div>
-    );
+      </div>);
   }
 
   const notifications = generateSmartNotifications(employees, documents, attendance, activeCompanyId);
@@ -1664,8 +1736,7 @@ function MainActionManager() {
             setPortalViewMode('apps');
           }}
         />
-      </main>
-    );
+      </main>);
   }
 
   // 2. Standard Odoo Workspace (HR Apps)
@@ -1683,8 +1754,7 @@ function MainActionManager() {
           currentUserRole={currentUserRole}
           currentUserEmail={currentUserEmail}
           onLogout={handleLogout}
-        />
-      )}
+        />)}
 
       <div className={`flex-1 flex flex-col h-screen overflow-hidden relative z-10 transition-all duration-300 ${isSidebarOpen && currentApp !== null ? 'mr-[260px] w-[calc(100%-260px)]' : 'w-full'}`}>
         <OdooTopBar 
@@ -1743,6 +1813,9 @@ function MainActionManager() {
         <main className="flex-1 overflow-auto">
           <div className="h-full">
             <AppRouter
+              autoOpenLeaveForEmpId={autoOpenLeaveForEmpId}
+              onClearAutoOpenLeave={() => setAutoOpenLeaveForEmpId(null)}
+              onOpenLeaveModal={handleOpenLeaveModal}
               currentApp={currentApp}
               setCurrentApp={setCurrentApp}
               activeApp={activeApp}
@@ -1836,6 +1909,7 @@ function MainActionManager() {
               handleAssignShift={handleAssignShift}
               handleRemoveAssignment={handleRemoveAssignment}
               handleSaveCommencement={handleSaveCommencement}
+              handleDeleteCommencement={handleDeleteCommencement}
               handleUpdateEmployeeStatus={handleUpdateEmployeeStatus}
               handleUpdateSubscription={handleUpdateSubscription}
               handleDeleteSubscription={async (id) => {
@@ -1973,23 +2047,20 @@ function MainActionManager() {
           activeCompany={activeCompany}
           onNotificationSent={handleSendNotification}
           onSendNotification={handleSendNotification}
-        />
-      )}
+        />)}
 
       <UserProfileModal 
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
       />
-    </div>
-  );
+    </div>);
 }
 
 export const App: React.FC = () => {
   return (
     <HRProvider>
       <MainActionManager />
-    </HRProvider>
-  );
+    </HRProvider>);
 };
 
 export default App;

@@ -1,6 +1,7 @@
 // src/components/HolidayWorkManagementView.tsx
 import React, { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { db } from '../lib/firebase';
+import { collection, addDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { calculateHolidayCompensation, approveHolidayWork, WorkOnHolidayRecord } from '../services/holidayWorkService';
 import { Clock, Coins, Calendar, CheckCircle2, AlertCircle, Plus, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -24,19 +25,12 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
   const [submitting, setSubmitting] = useState(false);
 
   const fetchRecords = async () => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('work_on_holidays')
-        .select('*')
-        .order('date', { ascending: false });
-      if (!error && data) {
-        setRecords(data);
-      }
+      const q = query(collection(db, 'work_on_holidays'), orderBy('date', 'desc'));
+      const snap = await getDocs(q);
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WorkOnHolidayRecord[];
+      setRecords(data);
     } catch (e) {
       console.warn('fetchWorkOnHolidays error:', e);
     } finally {
@@ -65,13 +59,7 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
         state: 'draft'
       };
 
-      const { data, error } = await supabase
-        .from('work_on_holidays')
-        .insert(newRec)
-        .select()
-        .single();
-
-      if (error) throw error;
+      await addDoc(collection(db, 'work_on_holidays'), newRec);
 
       toast.success('تم تسجيل العمل في العطلة بنجاح');
       setIsModalOpen(false);
@@ -87,7 +75,7 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
     const emp = employees.find(e => e.id === rec.employeeId);
     const basicWage = emp?.basicSalary || emp?.wage || 500; // default or actual
 
-    const res = await approveHolidayWork(supabase, rec, basicWage);
+    const res = await approveHolidayWork(rec, basicWage);
     if (res.success) {
       toast.success(res.message);
       fetchRecords();
@@ -142,12 +130,10 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
                     {rec.compensationType === 'pay' ? (
                       <span className="bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full text-xs font-bold">
                         بدل نقدي ({calc.cashPayableAmount} د.ك)
-                      </span>
-                    ) : (
+                      </span>) : (
                       <span className="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-bold">
                         يوم بديل ({calc.compensatoryDaysAdded} يوم)
-                      </span>
-                    )}
+                      </span>)}
                   </td>
                   <td className="p-3.5 text-center">
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
@@ -164,19 +150,16 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>اعتماد وترحيل</span>
-                      </button>
-                    )}
+                      </button>)}
                   </td>
-                </tr>
-              );
+                </tr>);
             })}
           </tbody>
         </table>
         {records.length === 0 && !loading && (
           <div className="p-12 text-center text-slate-400 italic text-sm">
             لا توجد سجلات عمل في العطلات والجمع حالياً.
-          </div>
-        )}
+          </div>)}
       </div>
 
       {/* Modal تسجيل جديد */}
@@ -194,8 +177,7 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
                   required
                 >
                   {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr || emp.name}</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr || emp.name}</option>))}
                 </select>
               </div>
 
@@ -266,8 +248,6 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
               </div>
             </form>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

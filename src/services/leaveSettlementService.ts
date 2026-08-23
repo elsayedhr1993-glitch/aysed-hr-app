@@ -48,18 +48,28 @@ export interface LeaveValidationResponse {
 
 export interface AysedSettlementOutput {
   aysed_carried_over: number;
+  aysed_opening_balance: number;
   aysed_accrued_2026: number;
+  aysed_total_available: number;
   aysed_unpaid_days: number;
   aysed_paid_days: number;
   aysed_daily_wage: number;
+  aysed_leave_cash: number;
+  aysed_ticket_allowance: number;
+  aysed_allowances: number;
+  aysed_deductions: number;
   aysed_net_payable: number;
 }
 
 export interface AysedLeaveEngineInput {
   carriedOver: number;
+  0?: number;
   accrued: number;
   requestedDays: number;
   monthlyWage: number;
+  ticketAllowance?: number;
+  allowances?: number;
+  deductions?: number;
 }
 
 /**
@@ -181,21 +191,34 @@ export function processLeaveSettlement(input: LeaveRequestInput): LeaveSettlemen
  * 5. حسابات تسوية متوافقة مع واجهة LeaveClearanceDocument
  */
 export function calculateAysedLeaveSettlement(input: AysedLeaveEngineInput): AysedSettlementOutput {
-  const totalAvailable = (input.carriedOver || 0) + computeAccrual2026('2026-01-01');
+  const carriedOver = input.carriedOver || 0;
+  
+  const accrued = input.accrued !== undefined ? input.accrued : computeAccrual2026('2026-01-01');
+  const totalAvailable = Number((carriedOver + accrued).toFixed(2));
+
   const paidDays = Math.min(totalAvailable, input.requestedDays);
   const unpaidDays = Math.max(0, input.requestedDays - totalAvailable);
-  const carriedOverUsed = Math.min(input.carriedOver || 0, input.requestedDays);
-  const accruedUsed = Math.max(0, paidDays - carriedOverUsed);
 
   const dailyWage = calculateKuwaitDailyRate(input.monthlyWage);
-  const netPayable = Number((paidDays * dailyWage).toFixed(3));
+  const leaveCash = Number((paidDays * dailyWage).toFixed(3));
+  const ticket = input.ticketAllowance || 0;
+  const allowances = input.allowances || 0;
+  const deductions = input.deductions || 0;
+
+  const netPayable = Number((leaveCash + ticket + allowances - deductions).toFixed(3));
 
   return {
-    aysed_carried_over: input.carriedOver || 0,
-    aysed_accrued_2026: accruedUsed,
+    aysed_carried_over: carriedOver,
+    aysed_opening_balance: 0,
+    aysed_accrued_2026: accrued,
+    aysed_total_available: totalAvailable,
     aysed_unpaid_days: Number(unpaidDays.toFixed(2)),
     aysed_paid_days: Number(paidDays.toFixed(2)),
     aysed_daily_wage: Number(dailyWage.toFixed(3)),
+    aysed_leave_cash: leaveCash,
+    aysed_ticket_allowance: ticket,
+    aysed_allowances: allowances,
+    aysed_deductions: deductions,
     aysed_net_payable: netPayable,
   };
 }

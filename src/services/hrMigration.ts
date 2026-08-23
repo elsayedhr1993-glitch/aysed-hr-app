@@ -26,8 +26,8 @@ export const syncAllEmployeeBalances = async (
       for (const emp of localEmployees) {
         const updatedEmp: Employee = {
           ...emp,
-          openingLeaveBalance: carriedOver,
-          carriedOverLeave2025: carriedOver,
+          
+          // carriedOverLeave2025: carriedOver,
           paid_days_remaining: totalBalance,
         };
         if (onSaveEmployee) {

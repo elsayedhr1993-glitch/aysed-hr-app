@@ -132,12 +132,10 @@ export const KuwaitHolidaysApp: React.FC<KuwaitHolidaysAppProps> = ({ employees,
                         </span>
                       </td>
                       <td className="p-4 text-emerald-600 font-medium">+200% أجر إضافي في حال العمل</td>
-                    </tr>
-                  ))}
+                    </tr>))}
                 </tbody>
               </table>
-            </div>
-          ) : (
+            </div>) : (
             /* Odoo Calendar Grid View Placeholder */
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
               <div className="py-12">
@@ -153,13 +151,11 @@ export const KuwaitHolidaysApp: React.FC<KuwaitHolidaysAppProps> = ({ employees,
                      {Array.from({length: 31}).map((_, i) => (
                        <div key={i} className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${(i+1 === 25 || i+1 === 26) ? 'bg-emerald-100 text-emerald-700' : (i%7===5 || i%7===6) ? 'bg-slate-50 text-slate-400' : 'hover:bg-slate-100 text-slate-700 cursor-pointer'}`}>
                          {i + 1}
-                       </div>
-                     ))}
+                       </div>))}
                    </div>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
         </div>
 
         {/* Smart Leave Balance Side Card */}
@@ -174,11 +170,11 @@ export const KuwaitHolidaysApp: React.FC<KuwaitHolidaysAppProps> = ({ employees,
               {employees.slice(0, 5).map(emp => {
                 // Calculate rough balance for display
                 const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status === 'APPROVED');
-                const usedAnnual = empLeaves.filter(l => l.leaveType === 'ANNUAL').reduce((sum, l) => sum + l.totalDays, 0);
+                const usedAnnual = empLeaves.filter(l => l.leaveType === 'ANNUAL').reduce((sum, l) => sum + (l.totalDays || 0), 0);
                 const totalAnnual = 30; // standard
                 const balAnnual = totalAnnual - usedAnnual;
 
-                const usedSick = empLeaves.filter(l => l.leaveType === 'SICK').reduce((sum, l) => sum + l.totalDays, 0);
+                const usedSick = empLeaves.filter(l => l.leaveType === 'SICK').reduce((sum, l) => sum + (l.totalDays || 0), 0);
                 const totalSick = 15; // full pay
                 const balSick = Math.max(0, totalSick - usedSick);
 
@@ -202,18 +198,15 @@ export const KuwaitHolidaysApp: React.FC<KuwaitHolidaysAppProps> = ({ employees,
                         <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, (balSick / totalSick) * 100)}%` }}></div>
                       </div>
                     </div>
-                  </div>
-                );
+                  </div>);
               })}
             </div>
             {employees.length > 5 && (
               <button className="w-full mt-4 text-sm text-purple-700 font-medium hover:bg-purple-50 p-2 rounded-lg transition-all">
                 عرض جميع الموظفين
-              </button>
-            )}
+              </button>)}
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

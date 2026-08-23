@@ -255,8 +255,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
           >
             <ShieldCheck className="w-3.5 h-3.5 text-amber-300 shrink-0" />
             <span>لوحة السوبر أدمن 👑</span>
-          </button>
-        )}
+          </button>)}
       </div>
 
       {/* Middle: Search & Filter Bar */}
@@ -271,8 +270,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             className="bg-transparent border-none outline-none w-full placeholder-white/70 focus:placeholder-slate-400 text-xs py-0.5"
           />
           <Filter className="w-3.5 h-3.5 opacity-70 mr-1 cursor-pointer hover:opacity-100 shrink-0" />
-        </div>
-      )}
+        </div>)}
 
       {/* Left Side: Actions, Switcher, Tools & Profile */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -325,8 +323,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                 <Grid className="w-3.5 h-3.5" />
                 طباعة تقرير الإجازات
               </button>
-            </div>
-          )}
+            </div>)}
         </div>
 
         {/* Ask AI Copilot Button */}
@@ -338,8 +335,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 fill-slate-950 shrink-0" />
             <span className="hidden lg:inline text-[11px]">اسأل الذكاء الاصطناعي</span>
-          </button>
-        )}
+          </button>)}
 
         {/* Quick OCR Scanner Trigger */}
         <button
@@ -363,8 +359,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             title="تشغيل/إيقاف الأجواء الصوتية والموسيقى البيئية"
           >
             {isAmbientPlaying ? <Volume2 className="w-3.5 h-3.5 shrink-0" /> : <VolumeX className="w-3.5 h-3.5 opacity-70 shrink-0" />}
-          </button>
-        )}
+          </button>)}
 
         {/* Multi-Company Switcher Dropdown */}
         <div className="relative odoo-topbar-dropdown-container">
@@ -405,8 +400,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                         <div className="font-bold text-purple-900 flex items-center gap-1.5">
                           <span className="truncate">إدارة النظام المركزية (Super Admin)</span>
                           {activeCompany?.id === 'comp-super-admin' && (
-                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>
-                          )}
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>)}
                         </div>
                         <div className="text-[10px] text-purple-600 truncate">التحكم الشامل والاشتراكات والمنشآت</div>
                       </div>
@@ -444,8 +438,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                           <Building2 className="w-3.5 h-3.5 text-[#714B67] shrink-0" />
                           <span className="truncate">{comp?.nameAr || ''}</span>
                           {comp?.id === activeCompany?.id && (
-                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>
-                          )}
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold shrink-0">نشط</span>)}
                         </div>
                         <div className="text-[10px] text-slate-500 truncate">سجل تجاري: {comp?.commercialRegNo || 'غير محدد'}</div>
                       </div>
@@ -463,8 +456,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                         <Eye className="w-3.5 h-3.5" />
                         <span>دخول</span>
                       </button>
-                    </div>
-                  ))}
+                    </div>))}
 
                   <div className="border-t border-slate-100 mt-1 pt-1 px-1">
                     <button
@@ -479,23 +471,18 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                       إدارة المنظومة والاشتراكات (SaaS Admin)
                     </button>
                   </div>
-                </div>
-              )}
-            </>
-          ) : (
+                </div>)}
+            </>) : (
             <div 
               className="flex items-center gap-1.5 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded-md border border-white/20 select-none shadow-xs"
               title="بيئة المنشأة المعزولة"
             >
               {activeCompany?.logoUrl ? (
-                <img src={activeCompany.logoUrl} alt="" className="w-4 h-4 rounded object-cover" />
-              ) : (
-                <Building2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              )}
+                <img src={activeCompany.logoUrl} alt="" className="w-4 h-4 rounded object-cover" />) : (
+                <Building2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />)}
               <span className="truncate max-w-[140px] font-bold text-[11px]">{activeCompany?.nameAr || activeCompany?.nameEn || 'المنشأة'}</span>
               <span className="text-[9px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold shrink-0">معزول</span>
-            </div>
-          )}
+            </div>)}
         </div>
 
         {/* Odoo Enterprise Developer Mode Toolbar & Debug Dropdown */}
@@ -505,8 +492,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
             currentViewType={(viewMode === 'list' || viewMode === 'form' || viewMode === 'kanban') ? viewMode : 'kanban'}
             isInspectorActive={isInspectorActive}
             onToggleFieldInspector={onToggleFieldInspector}
-          />
-        )}
+          />)}
 
         {/* Notifications Dropdown Trigger */}
         <div className="relative">
@@ -526,8 +512,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                 criticalCount > 0 ? 'bg-rose-500 text-white' : 'bg-amber-400 text-slate-900'
               }`}>
                 {unreadCount}
-              </span>
-            )}
+              </span>)}
           </button>
 
           {/* Notifications Dropdown Menu */}
@@ -542,13 +527,11 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   {criticalCount > 0 && (
                     <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
                       {criticalCount} حرج 🚨
-                    </span>
-                  )}
+                    </span>)}
                   {warningCount > 0 && (
                     <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
                       {warningCount} متوسط ⚠️
-                    </span>
-                  )}
+                    </span>)}
                 </div>
               </div>
 
@@ -558,8 +541,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                     <Check className="w-6 h-6 text-emerald-500 mx-auto" />
                     <p className="font-bold text-xs text-slate-600">لا توجد تنبيهات حالياً</p>
                     <p className="text-[10px]">جميع الإقامات والتراخيص وفترات التجربة سارية وسليمة.</p>
-                  </div>
-                ) : (
+                  </div>) : (
                   notifications.map((notif) => {
                     const isCritical = notif.severity === 'CRITICAL';
                     return (
@@ -579,16 +561,11 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                           isCritical ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
                         }`}>
                           {notif.type === 'MOH_LICENSE' ? (
-                            <ShieldAlert className="w-3.5 h-3.5" />
-                          ) : notif.type === 'PROBATION' ? (
-                            <Clock className="w-3.5 h-3.5" />
-                          ) : notif.type === 'ABSENCE' ? (
-                            <UserX className="w-3.5 h-3.5" />
-                          ) : notif.type === 'TARDINESS' ? (
-                            <Clock3 className="w-3.5 h-3.5" />
-                          ) : (
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                          )}
+                            <ShieldAlert className="w-3.5 h-3.5" />) : notif.type === 'PROBATION' ? (
+                            <Clock className="w-3.5 h-3.5" />) : notif.type === 'ABSENCE' ? (
+                            <UserX className="w-3.5 h-3.5" />) : notif.type === 'TARDINESS' ? (
+                            <Clock3 className="w-3.5 h-3.5" />) : (
+                            <AlertTriangle className="w-3.5 h-3.5" />)}
                         </div>
 
                         <div className="flex-1 space-y-0.5">
@@ -606,13 +583,11 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                             <ArrowLeft className="w-3 h-3" />
                           </div>
                         </div>
-                      </div>
-                    );
+                      </div>);
                   })
                 )}
               </div>
-            </div>
-          )}
+            </div>)}
         </div>
 
         {/* Language Switcher Menu (o_switch_lang_menu) */}
@@ -720,8 +695,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   >
                     <ShieldCheck className="w-4 h-4 text-indigo-600" />
                     <span>لوحة تحكم السوبر أدمن (Master Portal)</span>
-                  </button>
-                )}
+                  </button>)}
 
                 {isSuperAdmin && onNavigateToApp && (
                   <button
@@ -733,8 +707,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   >
                     <Building2 className="w-4 h-4 text-[#714B67]" />
                     <span>إعدادات الشركات والمنظومة</span>
-                  </button>
-                )}
+                  </button>)}
               </div>
 
               {/* Logout Option */}
@@ -755,8 +728,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   </span>
                 </button>
               </div>
-            </div>
-          )}
+            </div>)}
         </div>
 
         {/* Direct Logout Quick Button in Header */}
@@ -771,6 +743,5 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
           <span className="hidden xl:inline text-[11px]">خروج</span>
         </button>
       </div>
-    </header>
-  );
+    </header>);
 };

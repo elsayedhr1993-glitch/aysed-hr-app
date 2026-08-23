@@ -320,7 +320,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
       }
     });
 
-    const totalCalculatedPenalties = riskItems.reduce((acc, item) => acc + item.potentialPenalty, 0);
+    const totalCalculatedPenalties = riskItems.reduce((acc, item) => acc + (item.potentialPenalty || 0), 0);
     const estimatedRenewalBudget = (expiringMOHCount * 30) + (expiringCivilIdCount * 10) + 150; // PAM & PACI fees
     
     // Overall Compliance Rate
@@ -654,8 +654,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
           {riskAnalytics.expiredMOHCount + riskAnalytics.expiredCivilIdCount > 0 && (
             <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
               {riskAnalytics.expiredMOHCount + riskAnalytics.expiredCivilIdCount}
-            </span>
-          )}
+            </span>)}
         </button>
 
         <button
@@ -833,16 +832,14 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                             {item.daysRemaining < 0 ? (
                               <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-0.5 rounded border border-rose-200">
                                 منتهي منذ {Math.abs(item.daysRemaining)} يوم
-                              </span>
-                            ) : (
+                              </span>) : (
                               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                                 item.daysRemaining <= 15 
                                   ? 'bg-amber-100 text-amber-800 border-amber-200' 
                                   : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                               }`}>
                                 متبقي {item.daysRemaining} يوم
-                              </span>
-                            )}
+                              </span>)}
                           </td>
                           <td className="py-3 px-4">
                             <div className="font-bold text-rose-700 font-mono">{formatKWD(item.potentialPenalty)}</div>
@@ -859,8 +856,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                               إحالة للمندوب الذكي
                             </button>
                           </td>
-                        </tr>
-                      ))
+                        </tr>))
                     ) : (
                       <tr>
                         <td colSpan={6} className="py-8 text-center text-slate-400">
@@ -868,14 +864,12 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                           <div className="font-bold text-slate-700 text-sm">كافة التراخيص والإقامات سارية وبحالة ممتازة!</div>
                           <div className="text-xs text-slate-400">لا توجد غرامات تأخير أو مخالفات مرتقبة هذا الشهر</div>
                         </td>
-                      </tr>
-                    )}
+                      </tr>)}
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
-        )}
+          </div>)}
 
         {/* ===================================================================== */}
         {/* 2. AI MANDOUB COPILOT */}
@@ -911,8 +905,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                   >
                     <Zap className="w-3 h-3 text-indigo-500" />
                     <span>{p.title}</span>
-                  </button>
-                ))}
+                  </button>))}
               </div>
             </div>
 
@@ -944,10 +937,8 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                         {msg.tags.map((tag, tIdx) => (
                           <span key={tIdx} className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded border border-indigo-100">
                             {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                          </span>))}
+                      </div>)}
 
                     {/* Checklist Requirements */}
                     {msg.checklist && msg.checklist.length > 0 && (
@@ -958,26 +949,22 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                         </div>
                         <ul className="space-y-1 pr-4 list-disc text-slate-700 text-[11px]">
                           {msg.checklist.map((item, cIdx) => (
-                            <li key={cIdx}>{item}</li>
-                          ))}
+                            <li key={cIdx}>{item}</li>))}
                         </ul>
-                      </div>
-                    )}
+                      </div>)}
 
                     {/* Fees & Law Ref */}
                     {(msg.fees || msg.lawRef) && (
                       <div className="pt-1 border-t border-slate-100 space-y-1 text-[10px] text-slate-500">
                         {msg.fees && <div className="font-medium text-emerald-700">💰 {msg.fees}</div>}
                         {msg.lawRef && <div className="text-slate-400">⚖️ {msg.lawRef}</div>}
-                      </div>
-                    )}
+                      </div>)}
 
                     <div className={`text-[9px] text-left ${msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
                       {msg.time}
                     </div>
                   </div>
-                </div>
-              ))}
+                </div>))}
             </div>
 
             {/* Query Input Box */}
@@ -1000,8 +987,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                 <Send className="w-3.5 h-3.5" />
               </button>
             </div>
-          </div>
-        )}
+          </div>)}
 
         {/* ===================================================================== */}
         {/* 3. DYNAMIC GEOFENCED QR PUNCH */}
@@ -1035,8 +1021,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                   }`}
                 >
                   {b.name.split('(')[0]} (نطاق {b.radiusMeters}م)
-                </button>
-              ))}
+                </button>))}
             </div>
 
             {/* Mode Action Launchers (Kiosk Fullscreen Stand & Mobile Scanner) */}
@@ -1077,12 +1062,10 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                       src={qrCanvasUrl} 
                       alt="Dynamic Attendance QR" 
                       className="w-48 h-48 object-contain rounded-xl"
-                    />
-                  ) : (
+                    />) : (
                     <div className="w-48 h-48 flex items-center justify-center">
                       <RefreshCw className="w-8 h-8 animate-spin text-slate-400" />
-                    </div>
-                  )}
+                    </div>)}
                 </div>
 
                 {/* Token string and dynamic timer */}
@@ -1135,8 +1118,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.fullNameAr} ({emp.jobTitle})
-                    </option>
-                  ))}
+                    </option>))}
                 </select>
               </div>
 
@@ -1182,12 +1164,10 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                       <div className="font-mono font-bold text-slate-700 text-[11px]">{log.time}</div>
                       <div className="text-[9px] font-mono text-indigo-600 font-bold">{log.hash}</div>
                     </div>
-                  </div>
-                ))}
+                  </div>))}
               </div>
             </div>
-          </div>
-        )}
+          </div>)}
 
         {/* ===================================================================== */}
         {/* 4. QR DIGITAL SEAL & VERIFICATION PORTAL */}
@@ -1309,10 +1289,8 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                     <span>مشاركة رابط التحقق</span>
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              </div>)}
+          </div>)}
 
         {/* ===================================================================== */}
         {/* 5. WHATSAPP HR BOT SIMULATOR */}
@@ -1341,8 +1319,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                   {employees.map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.fullNameAr} ({emp.jobTitle})
-                    </option>
-                  ))}
+                    </option>))}
                 </select>
               </div>
             </div>
@@ -1394,8 +1371,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                         {m.time} {m.sender === 'emp' && '✓✓'}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  </div>))}
               </div>
 
               {/* WhatsApp Quick Command Action Chips */}
@@ -1447,8 +1423,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          </div>)}
 
       </div>
 
@@ -1467,8 +1442,7 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
             setIsKioskModalOpen(false);
             setIsMobileScannerOpen(true);
           }}
-        />
-      )}
+        />)}
 
       {/* Mobile QR Camera Scanner Modal */}
       {isMobileScannerOpen && (
@@ -1493,8 +1467,6 @@ export const ExclusiveInnovationsSuite: React.FC<ExclusiveInnovationsSuiteProps>
               hash: `GEO-VERIFIED`
             }, ...prev.slice(0, 7)]);
           }}
-        />
-      )}
-    </div>
-  );
+        />)}
+    </div>);
 };

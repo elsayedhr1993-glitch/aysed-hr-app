@@ -515,12 +515,11 @@ export function getAysedSmartLeaveBalance(hireDateInput?: string | Date, asOfDat
  * - Hired during 2026 (e.g. 2026-06-01): June, July, August = 3 months * 2.5 = 7.5 days.
  */
 export function calculate2026AccruedDays(
-  employeeOrHireDate?: string | Date | { date_start?: string; joinDate?: string; startDate?: string; employeeCode?: string; fullNameAr?: string } | null,
+  employeeOrHireDate?: string | Date | { date_start?: string; joinDate?: string; startDate?: string; openingLeaveDate?: string; openingDate?: string; employeeCode?: string; fullNameAr?: string } | null,
   asOfDate: Date = new Date(2026, 7, 31) // August 2026 target
 ): number {
   const jan_2026 = new Date(2026, 0, 1);
-  const aug_2026_end = new Date(2026, 7, 31);
-  const targetDate = asOfDate < aug_2026_end ? asOfDate : aug_2026_end;
+  const targetDate = asOfDate;
 
   if (targetDate < jan_2026) return 0;
 
@@ -531,9 +530,9 @@ export function calculate2026AccruedDays(
       if (!isNaN(p.getTime())) hire_date = new Date(p.getFullYear(), p.getMonth(), p.getDate());
     } else if (employeeOrHireDate instanceof Date) {
       if (!isNaN(employeeOrHireDate.getTime())) hire_date = new Date(employeeOrHireDate.getFullYear(), employeeOrHireDate.getMonth(), employeeOrHireDate.getDate());
-    } else if (typeof employeeOrHireDate === 'object') {
-      const isBkhit = employeeOrHireDate.employeeCode === 'EMP-001' || employeeOrHireDate.fullNameAr?.includes('السيد بخيت');
-      const dStr = isBkhit ? '2026-06-01' : (employeeOrHireDate.date_start || employeeOrHireDate.joinDate || employeeOrHireDate.startDate);
+    } else if (typeof employeeOrHireDate === 'object' && employeeOrHireDate !== null) {
+      const isBkhit = employeeOrHireDate.fullNameAr?.includes('السيد بخيت') && (employeeOrHireDate as any).joinDate === '2026-06-01';
+      const dStr = isBkhit ? '2026-06-01' : ((employeeOrHireDate as any).openingLeaveDate || (employeeOrHireDate as any).openingDate || employeeOrHireDate.date_start || employeeOrHireDate.joinDate || employeeOrHireDate.startDate);
       if (dStr) {
         const p = new Date(dStr);
         if (!isNaN(p.getTime())) hire_date = new Date(p.getFullYear(), p.getMonth(), p.getDate());
@@ -544,12 +543,11 @@ export function calculate2026AccruedDays(
   const start_date = hire_date < jan_2026 ? jan_2026 : hire_date;
   if (targetDate < start_date) return 0;
 
-  let years = targetDate.getFullYear() - start_date.getFullYear();
-  let months = targetDate.getMonth() - start_date.getMonth();
-
-  const totalMonths = Math.max(0, years * 12 + months + 1);
-  const cappedMonths = Math.min(8, totalMonths);
-  return Number((cappedMonths * 2.5).toFixed(2));
+  // Monthly Accrual Rate: 2.5 days per month accrued strictly on a pro-rata daily basis (30.4375 days/month)
+  const diffTime = targetDate.getTime() - start_date.getTime();
+  const diffDays = diffTime / (1000 * 60 * 60 * 24) + 1; // inclusive of start day
+  const accrued = (diffDays / 30.4375) * 2.5;
+  return Number(Math.max(0, accrued).toFixed(2));
 }
 
 /**
@@ -566,7 +564,7 @@ export function isEmployeeHiredIn2026OrLater(
   } else if (employeeOrHireDate instanceof Date) {
     if (!isNaN(employeeOrHireDate.getTime())) hire_date = employeeOrHireDate;
   } else if (typeof employeeOrHireDate === 'object') {
-    const isBkhit = employeeOrHireDate.employeeCode === 'EMP-001' || employeeOrHireDate.fullNameAr?.includes('السيد بخيت');
+    const isBkhit = employeeOrHireDate.fullNameAr?.includes('السيد بخيت') && (employeeOrHireDate as any).joinDate === '2026-06-01';
     const dStr = isBkhit ? '2026-06-01' : (employeeOrHireDate.date_start || employeeOrHireDate.joinDate || employeeOrHireDate.startDate);
     if (dStr) {
       const p = new Date(dStr);
@@ -582,22 +580,74 @@ export function isEmployeeHiredIn2026OrLater(
  * - Hired on or after 2026-01-01: strictly 0.0 days.
  * - Hired before 2026-01-01: carryover from 2025 allocations.
  */
-export function getGlobalOpeningBalance(emp: any): number {
-  if (isEmployeeHiredIn2026OrLater(emp)) {
-    return 0.0;
+export function getCarriedOverBalance(emp: any): number {
+  if (!emp) return 0.0;
+
+  const v2025 = Number(emp.carriedOverLeave2025 ?? emp.carriedOver_2025);
+  const vBal = Number(emp.carriedOverBalance ?? emp.carriedOverLeaveBalance ?? emp.aysed_carried_over);
+
+  if (!isNaN(v2025) && v2025 > 0) return v2025;
+  if (!isNaN(vBal) && vBal > 0) return vBal;
+
+  if (emp.carriedOverLeave2025 !== undefined && emp.carriedOverLeave2025 !== null && !isNaN(Number(emp.carriedOverLeave2025))) {
+    return Number(emp.carriedOverLeave2025);
   }
-  return Number(emp?.openingLeaveBalance ?? emp?.carriedOverLeave2025 ?? 46.5);
+  if (emp.carriedOverBalance !== undefined && emp.carriedOverBalance !== null && !isNaN(Number(emp.carriedOverBalance))) {
+    return Number(emp.carriedOverBalance);
+  }
+  return 0.0;
+}
+
+export function getOpeningBalance(emp: any): number {
+  return 0.0;
+}
+
+export function getGlobalOpeningBalance(emp: any): number {
+  return getCarriedOverBalance(emp);
+}
+
+export function getCurrentYearAccrued(emp: any, asOfDate: Date = new Date(2026, 7, 31)): number {
+  return calculate2026AccruedDays(emp, asOfDate);
+}
+
+export function getGlobalAccrued2026(emp: any, asOfDate: Date = new Date(2026, 7, 31)): number {
+  return getCurrentYearAccrued(emp, asOfDate);
+}
+
+export interface UniversalLeaveLedger {
+  carriedOverBalance: number;
+  currentYearAccrued: number;
+  totalAllocated: number;
+  totalApprovedTaken: number;
+  netAvailableBalance: number;
+  breakdown: string;
 }
 
 /**
- * Global Accrual Rule for 2026:
- * - Pre-2026 hires: 20.0 days (8 months * 2.5)
- * - 2026 hires: prorated based on service months in 2026 up to August 2026.
+ * Universal Multi-Year Leave Balance Formula (Single Source of Truth):
+ * Total Available Balance = (carried_over_balance + current_year_accrued) - total_approved_leaves_taken
  */
-export function getGlobalAccrued2026(emp: any, asOfDate: Date = new Date(2026, 7, 31)): number {
-  const isBkhit = emp?.employeeCode === 'EMP-001' || emp?.fullNameAr?.includes('السيد بخيت');
-  const effectiveEmp = isBkhit ? { ...emp, joinDate: '2026-06-01' } : emp;
-  return calculate2026AccruedDays(effectiveEmp, asOfDate);
+export function computeUniversalLeaveLedger(emp: any, leaves: any[] = [], asOfDate: Date = new Date(2026, 7, 31)): UniversalLeaveLedger {
+  const carriedOverBalance = getCarriedOverBalance(emp);
+  const currentYearAccrued = getCurrentYearAccrued(emp, asOfDate);
+
+  const totalAllocated = Number((carriedOverBalance + currentYearAccrued).toFixed(2));
+
+  const approvedTaken = (leaves || [])
+    .filter(l => !l.isHistorical && l.employeeId === emp?.id && (l.status === 'APPROVED' || l.status === 'VALIDATED') && l.leaveType === 'ANNUAL')
+    .reduce((sum, l) => sum + (l.totalDays || 0), 0);
+
+  const netAvailableBalance = Number(Math.max(0, totalAllocated - approvedTaken).toFixed(2));
+  const breakdown = `مرحل: ${carriedOverBalance} + مكتسب: ${currentYearAccrued} - مستهلك: ${approvedTaken} = متاح: ${netAvailableBalance}`;
+
+  return {
+    carriedOverBalance,
+    currentYearAccrued,
+    totalAllocated,
+    totalApprovedTaken: approvedTaken,
+    netAvailableBalance,
+    breakdown
+  };
 }
 
 /**

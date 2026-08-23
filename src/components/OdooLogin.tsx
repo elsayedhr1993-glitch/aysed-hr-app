@@ -307,8 +307,7 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
             <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800 text-xs animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
               <div className="leading-relaxed font-medium">{errorMessage}</div>
-            </div>
-          )}
+            </div>)}
           
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
@@ -366,13 +365,11 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
               className="w-full bg-[#008784] hover:bg-[#00706d] active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 mt-2"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>) : (
                 <>
                   <KeyRound className="w-4 h-4" />
                   <span>تسجيل الدخول الآمن (Sign In)</span>
-                </>
-              )}
+                </>)}
             </button>
 
             <button 
@@ -427,8 +424,7 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
                 >
                   إغلاق والعودة لتسجيل الدخول
                 </button>
-              </div>
-            ) : (
+              </div>) : (
               <form onSubmit={handleSendResetPassword} className="space-y-4">
                 <p className="text-xs text-slate-600 leading-relaxed">
                   أدخل بريدك الإلكتروني المسجل وسنرسل لك رابطاً آمناً لتعيين كلمة مرور جديدة لحسابك.
@@ -459,11 +455,9 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
                     إلغاء
                   </button>
                 </div>
-              </form>
-            )}
+              </form>)}
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Subscription Request Modal */}
       {isSubscriptionModalOpen && (
@@ -477,10 +471,8 @@ export const OdooLogin: React.FC<OdooLoginProps> = ({ onLogin }) => {
             </button>
             <SubscriptionRequest onBackToLogin={() => setIsSubscriptionModalOpen(false)} />
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };
 
 export default OdooLogin;

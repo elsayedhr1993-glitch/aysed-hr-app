@@ -177,8 +177,7 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                 <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">
                   لا توجد حركات يومية مسجلة حالياً
                 </td>
-              </tr>
-            ) : (
+              </tr>) : (
               filteredMovements.map((m, idx) => {
                 const emp = employees.find(e => e.id === m.employeeId);
                 return (
@@ -202,14 +201,11 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                       {m.movementType === 'permission' ? (
                         <span className="text-purple-900 font-bold">
                           من {m.hourFrom} إلى {m.hourTo} ({m.totalHours || 0} ساعة)
-                        </span>
-                      ) : m.movementType === 'allowance' ? (
+                        </span>) : m.movementType === 'allowance' ? (
                         <span className="text-emerald-700 font-bold">
                           {(m.amount || 0).toFixed(3)} د.ك
-                        </span>
-                      ) : (
-                        <span className="text-slate-600">يوم كامل</span>
-                      )}
+                        </span>) : (
+                        <span className="text-slate-600">يوم كامل</span>)}
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
@@ -229,16 +225,14 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>اعتماد</span>
-                          </button>
-                        )}
+                          </button>)}
                         {m.state === 'approved' && (
                           <button
                             onClick={() => onUpdateMovementState(m.id, 'refused')}
                             className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded text-[11px] font-bold transition cursor-pointer"
                           >
                             إلغاء الاعتماد
-                          </button>
-                        )}
+                          </button>)}
                         <button
                           onClick={() => setEditingMovement(m)}
                           className="p-1 text-slate-400 hover:text-[#714B67] transition cursor-pointer"
@@ -255,8 +249,7 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                         </button>
                       </div>
                     </td>
-                  </tr>
-                );
+                  </tr>);
               })
             )}
           </tbody>
@@ -284,8 +277,7 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.jobTitle})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.jobTitle})</option>))}
                 </select>
               </div>
 
@@ -344,8 +336,7 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                       className="w-full border border-purple-300 rounded p-2 text-xs font-mono bg-white"
                     />
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {editingMovement.movementType === 'allowance' && (
                 <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-200">
@@ -357,8 +348,7 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
                     onChange={e => setEditingMovement({ ...editingMovement, amount: parseFloat(e.target.value) || 0 })}
                     className="w-full border border-emerald-300 rounded p-2 text-xs font-mono bg-white"
                   />
-                </div>
-              )}
+                </div>)}
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">ملاحظات / بيان الحركة</label>
@@ -387,8 +377,6 @@ export const DailyMovementsApp: React.FC<DailyMovementsAppProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

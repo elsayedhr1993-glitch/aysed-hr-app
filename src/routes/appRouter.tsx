@@ -32,6 +32,9 @@ import { DailyMovementsApp } from '../apps/DailyMovementsApp';
 import { OdooAppLauncher } from '../components/OdooAppLauncher';
 
 export interface AppRouterProps {
+  autoOpenLeaveForEmpId?: string | null;
+  onClearAutoOpenLeave?: () => void;
+  onOpenLeaveModal?: (empId: string) => void;
   currentApp?: string | null;
   setCurrentApp?: (app: string | null) => void;
   activeApp?: string | null;
@@ -122,6 +125,7 @@ export interface AppRouterProps {
   handleAssignShift: (asgn: any) => void;
   handleRemoveAssignment: (id: string) => void;
   handleSaveCommencement: (c: any) => void;
+  handleDeleteCommencement?: (id: string) => void;
   handleUpdateEmployeeStatus: (id: string, status: any) => void;
   handleUpdateSubscription: (sub: any) => void;
   handleDeleteSubscription: (id: string) => Promise<void>;
@@ -232,6 +236,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     handleAssignShift,
     handleRemoveAssignment,
     handleSaveCommencement,
+    handleDeleteCommencement,
     handleUpdateEmployeeStatus,
     handleUpdateSubscription,
     handleDeleteSubscription,
@@ -271,8 +276,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
         currentUserRole={currentUserRole} 
         activeCompany={activeCompany}
         stats={stats} 
-      />
-    );
+      />);
   }
 
   const getAppMetadata = (appKey: string) => {
@@ -309,6 +313,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       case 'EMPLOYEES':
         return (
           <Employees
+            onOpenLeaveModal={props.onOpenLeaveModal}
             employees={scopedEmployees}
             contracts={scopedContracts}
             leaves={scopedLeaves}
@@ -333,8 +338,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             onFilterTabChange={setFilterTab}
             onSelectEmployeeForLeaves={(empId) => setSelectedEmployeeForLeavesFilter(empId)}
             onOpenNotificationModal={onOpenNotificationModal}
-          />
-        );
+          />);
 
       // 2. شاشة البصمة والدوام (src/components/Attendance.tsx)
       case 'ATTENDANCE':
@@ -350,13 +354,14 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             onSaveAttendanceBatch={handleSaveAttendanceBatch}
             onPostAttendanceToPayroll={() => {}}
             onNavigateToApp={(app) => setActiveApp(app)}
-          />
-        );
+          />);
 
       // 3. شاشة الإجازات (src/components/LeaveManagement.tsx)
       case 'LEAVES':
         return (
           <LeaveManagement
+            autoOpenNewLeaveForEmpId={props.autoOpenLeaveForEmpId}
+            onClearAutoOpenLeave={props.onClearAutoOpenLeave}
             leaves={scopedLeaves}
             employees={scopedEmployees}
             contracts={scopedContracts}
@@ -372,12 +377,13 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             initialEmployeeId={selectedEmployeeForLeavesFilter || 'ALL'}
             onOpenNotificationModal={onOpenNotificationModal}
             onNavigateToApp={(app) => setActiveApp(app)}
-          />
-        );
+          />);
 
       case 'LEAVE_MANAGEMENT':
         return (
           <LeaveManagement
+            autoOpenNewLeaveForEmpId={props.autoOpenLeaveForEmpId}
+            onClearAutoOpenLeave={props.onClearAutoOpenLeave}
             leaves={scopedLeaves}
             employees={scopedEmployees}
             contracts={scopedContracts}
@@ -393,8 +399,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             initialEmployeeId={selectedEmployeeForLeavesFilter || 'ALL'}
             onOpenNotificationModal={onOpenNotificationModal}
             onNavigateToApp={(app) => setActiveApp(app)}
-          />
-        );
+          />);
 
       // 4. شاشة إدارة الاشتراكات (src/components/SaasAdmin.tsx)
       case 'SAAS_ADMIN':
@@ -408,8 +413,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                 <div className="text-4xl mb-3">🔒</div>
                 <h2 className="text-lg font-bold text-slate-800">غير مصرح لك بالوصول</h2>
                 <p className="text-xs text-slate-500 mt-1">شاشة إدارة الاشتراكات (SaaS) مقيدة بصلاحيات base.group_system للمدير العام فقط.</p>
-              </div>
-            );
+              </div>);
           }
           return (
             <SaasAdmin
@@ -425,8 +429,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                 }
               }}
               onLogout={onLogout}
-            />
-          );
+            />);
         }
 
       case 'CONTRACTS':
@@ -442,8 +445,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onDeleteContract={handleDeleteContract}
           onViewModeChange={setViewMode}
           onNavigateToApp={(app) => setActiveApp(app)}
-        />
-      );
+        />);
 
     case 'PAYROLL':
       return (
@@ -461,8 +463,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onSavePayslip={handleSavePayslip}
           onNavigateToApp={(app) => setActiveApp(app)}
           onOpenNotificationModal={onOpenNotificationModal}
-        />
-      );
+        />);
 
     case 'EOS':
       return (
@@ -472,16 +473,14 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           leaves={scopedLeaves}
           activeCompany={activeCompany}
           onNavigateToApp={(app) => setActiveApp(app)}
-        />
-      );
+        />);
 
     case 'HOLIDAY_WORK':
       return (
         <HolidayWorkManagementView
           employees={scopedEmployees}
           activeCompanyId={activeCompany?.id}
-        />
-      );
+        />);
 
     case 'LEAVE_TYPES_CONFIG':
       return <LeaveTypesConfigView />;
@@ -498,8 +497,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           custodies={scopedCustodies}
           loans={scopedLoans}
           activeCompany={activeCompany}
-        />
-      );
+        />);
 
     case 'DOCUMENTS':
       return (
@@ -514,8 +512,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           isOCRModalOpenInitially={isOCRModalOpen}
           onNavigateToApp={(app) => setActiveApp(app)}
           onSelectEmpForForm={(emp) => setSelectedEmpForForm(emp)}
-        />
-      );
+        />);
 
     case 'DOCUMENT_TEMPLATES':
       return (
@@ -529,8 +526,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onDeleteTemplate={handleDeleteDocumentTemplate}
           onIssueDocument={handleIssueDocument}
           onAddAuditLog={handleAddAuditLog}
-        />
-      );
+        />);
 
     case 'AUDIT_LOGS':
       return (
@@ -549,8 +545,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onAddLeave={(lv) => handleSaveLeave(lv)}
           onIssueDocument={handleIssueDocument}
           onAddAuditLog={handleAddAuditLog}
-        />
-      );
+        />);
 
     case 'CUSTODY_LOANS':
       return (
@@ -573,8 +568,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onSaveNote={handleSaveNote}
           onDeleteNote={handleDeleteNote}
           onNavigateToApp={(app: any) => setActiveApp(app)}
-        />
-      );
+        />);
 
     case 'AUTOMATION':
       return (
@@ -583,8 +577,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           activeCompany={activeCompany}
           onToggleRule={(id) => setAutomationRules(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r))}
           onAddRule={(r) => setAutomationRules(prev => [r, ...prev])}
-        />
-      );
+        />);
 
     case 'AI_COPILOT':
       return (
@@ -593,8 +586,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           employees={employees}
           contracts={contracts}
           leaves={leaves}
-        />
-      );
+        />);
 
     case 'SHIFTS':
       return (
@@ -607,8 +599,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onDeleteShift={handleDeleteShift}
           onAssignShift={handleAssignShift}
           onRemoveAssignment={handleRemoveAssignment}
-        />
-      );
+        />);
 
     case 'COMMENCEMENT':
       return (
@@ -620,12 +611,12 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           activeCompany={activeCompany}
           filterTab={filterTab}
           onSaveCommencement={handleSaveCommencement}
+          onDeleteCommencement={handleDeleteCommencement}
           onUpdateEmployeeStatus={handleUpdateEmployeeStatus}
           onSaveEmployee={onSaveEmployee}
           onSaveContract={handleSaveContract}
           onNavigateToApp={(app) => setActiveApp(app)}
-        />
-      );
+        />);
 
     case 'DAILY_MOVEMENTS':
       return (
@@ -638,8 +629,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onUpdateMovementState={onUpdateMovementState}
           onDeleteMovement={onDeleteMovement}
           onNavigateToApp={(app) => setActiveApp(app)}
-        />
-      );
+        />);
 
     case 'EXCLUSIVE_INNOVATIONS':
     case 'INNOVATIONS':
@@ -653,16 +643,14 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           documents={documents}
           onAddAttendance={(rec) => handleSaveAttendance(rec)}
           onNavigateToApp={(app) => setActiveApp(app)}
-        />
-      );
+        />);
 
     case 'HOLIDAYS':
       return (
         <KuwaitHolidaysApp
           employees={scopedEmployees}
           leaves={scopedLeaves}
-        />
-      );
+        />);
 
     case 'RECRUITMENT':
       return (
@@ -671,8 +659,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           activeCompany={activeCompany}
           onSaveCandidate={() => {}}
           onConvertCandidateToEmployee={() => {}}
-        />
-      );
+        />);
 
     case 'COMPANIES': {
       const emailLower = (currentUserEmail || '').toLowerCase();
@@ -695,8 +682,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             currentUserEmail={currentUserEmail}
             currentUserRole={currentUserRole}
             initialSubTab="COMPANY"
-          />
-        );
+          />);
       }
       return (
         <CompaniesApp
@@ -707,8 +693,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onDeleteCompany={handleDeleteCompany}
           currentUserEmail={currentUserEmail}
           currentUserRole={currentUserRole}
-        />
-      );
+        />);
     }
 
     case 'SETTINGS':
@@ -728,8 +713,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           setMotionEnabled={setMotionEnabled}
           currentUserEmail={currentUserEmail}
           currentUserRole={currentUserRole}
-        />
-      );
+        />);
 
     case 'NOTIFICATIONS':
       return (
@@ -750,8 +734,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           }}
           onDeleteNotification={handleDeleteNotification}
           onClearAllNotifications={handleClearAllNotifications}
-        />
-        );
+        />);
 
       default:
         return (
@@ -760,8 +743,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             currentUserEmail={currentUserEmail} 
             currentUserRole={currentUserRole} 
             stats={stats} 
-          />
-        );
+          />);
     }
   };
 
@@ -803,8 +785,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       <div className="flex-1 overflow-auto">
         {renderScreenContent()}
       </div>
-    </div>
-  );
+    </div>);
 };
 
 export default AppRouter;

@@ -238,15 +238,13 @@ export const OdooFieldInspector: React.FC<OdooFieldInspectorProps> = ({
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-slate-500 text-[10px]">Relation:</span>
                   <span className="text-indigo-400">{hoveredField.relation}</span>
-                </div>
-              )}
+                </div>)}
 
               {hoveredField.domain && (
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-slate-500 text-[10px]">Domain:</span>
                   <span className="text-slate-400 text-[9px] truncate">{hoveredField.domain}</span>
-                </div>
-              )}
+                </div>)}
 
               <div className="flex items-center gap-3 pt-1 text-[10px] border-t border-slate-900">
                 <span className={hoveredField.required ? 'text-rose-400 font-bold' : 'text-slate-500'}>
@@ -261,12 +259,9 @@ export const OdooFieldInspector: React.FC<OdooFieldInspectorProps> = ({
               {hoveredField.help && (
                 <div className="text-[10px] text-slate-400 font-sans italic pt-1 border-t border-slate-800 leading-snug" dir="rtl">
                   {hoveredField.help}
-                </div>
-              )}
+                </div>)}
             </div>
           </div>
-        </div>
-      )}
-    </>
-  );
+        </div>)}
+    </>);
 };

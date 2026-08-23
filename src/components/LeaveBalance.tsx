@@ -177,8 +177,7 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
           <AlertTriangle className="w-5 h-5 text-danger-600 flex-shrink-0" />
           <p className="text-sm text-danger-700">{error}</p>
           <button onClick={() => setError(null)} className="ms-auto text-danger-600 text-sm font-medium">{lang === 'ar' ? 'إغلاق' : 'Dismiss'}</button>
-        </div>
-      )}
+        </div>)}
 
       {/* Search */}
       <div className="relative max-w-sm">
@@ -189,8 +188,7 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
       {/* Table */}
       <SectionCard noPadding>
         {filteredRows.length === 0 ? (
-          <EmptyState icon={Scale} title={t('no_data')} message="" />
-        ) : (
+          <EmptyState icon={Scale} title={t('no_data')} message="" />) : (
           <div className="table-wrap overflow-x-auto">
             <table className="table">
               <thead>
@@ -250,20 +248,17 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
                             <button onClick={() => saveCarryForward(r.id)} disabled={isSaving} className="btn-icon text-success-600 hover:bg-success-50" title={t('save')}>
                               {isSaving ? <div className="w-3.5 h-3.5 border-2 border-success-400 border-t-transparent rounded-full animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                             </button>
-                          </div>
-                        ) : isSaved ? (
+                          </div>) : isSaved ? (
                           <span className="inline-flex items-center gap-1 text-success-600 animate-scale-in">
                             <Check className="w-4 h-4" /> <span className="text-sm tabular">{carry}</span>
-                          </span>
-                        ) : (
+                          </span>) : (
                           <button
                             onClick={() => setEditingCarry((prev) => ({ ...prev, [r.id]: String(carry) }))}
                             className="inline-flex items-center gap-1 text-sm tabular text-surface-600 hover:text-brand-600 hover:bg-brand-50 px-2 py-1 rounded-lg transition-colors"
                             title={lang === 'ar' ? 'اضغط للتعديل' : 'Click to edit'}
                           >
                             {carry}
-                          </button>
-                        )}
+                          </button>)}
                       </td>
                       <td className="text-center">
                         <span className={`text-sm tabular ${sickRem <= 3 ? 'text-warning-600 font-medium' : 'text-surface-600'}`}>{sickRem}</span>
@@ -284,13 +279,11 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
                           <span className="tabular font-semibold">{remaining}</span>
                         </Badge>
                       </td>
-                    </tr>
-                  );
+                    </tr>);
                 })}
               </tbody>
             </table>
-          </div>
-        )}
+          </div>)}
       </SectionCard>
 
       {/* Info */}
@@ -307,6 +300,5 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
           </p>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 }

@@ -96,9 +96,9 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
   });
 
   // KPI Calculations
-  const totalGross = monthPayslips.reduce((sum, p) => sum + p.grossSalary, 0);
-  const totalNet = monthPayslips.reduce((sum, p) => sum + p.netSalary, 0);
-  const totalDeductions = monthPayslips.reduce((sum, p) => sum + (p.latenessDeduction + (p.loanDeduction || 0) + (p.unpaidLeaveDeduction || 0) + p.otherDeductions), 0);
+  const totalGross = monthPayslips.reduce((sum, p) => sum + (p.grossSalary || 0), 0);
+  const totalNet = monthPayslips.reduce((sum, p) => sum + (p.netSalary || 0), 0);
+  const totalDeductions = monthPayslips.reduce((sum, p) => sum + (p.latenessDeduction + (p.loanDeduction || 0) + (p.unpaidLeaveDeduction || 0) + (p.otherDeductions || 0)), 0);
 
   // Open Edit Structure Modal
   const handleOpenEditStructure = (emp: Employee) => {
@@ -355,8 +355,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
         {localSearch && (
           <button onClick={() => setLocalSearch('')} className="text-slate-400 hover:text-slate-700 font-bold">
             ✕
-          </button>
-        )}
+          </button>)}
       </div>
 
       {/* SUB-TAB 1: MONTHLY PAYSLIPS TABLE */}
@@ -394,8 +393,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                     <td colSpan={10} className="p-8 text-center text-slate-400 font-semibold">
                       لا توجد كشوف رواتب مولدة لشهر {selectedMonth}. اضغط على زر "توليد كشوف الشهر تلقائياً" بأعلى الصفحة لتوليدها.
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   filteredPayslips.map((p, index) => {
                     const emp = employees.find(e => e.id === p.employeeId);
                     const totalDeductionsEmp = p.latenessDeduction + (p.loanDeduction || 0) + (p.unpaidLeaveDeduction || 0);
@@ -408,8 +406,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                             <div>
                               <p className="text-slate-900">{emp.fullNameAr}</p>
                               <p className="text-[10px] text-slate-400 font-mono">{emp.employeeCode} | {emp.jobTitle}</p>
-                            </div>
-                          ) : 'مجهول'}
+                            </div>) : 'مجهول'}
                         </td>
                         <td className="p-2.5 font-mono text-slate-700 dir-ltr">{emp?.civilId || '—'}</td>
                         <td className="p-2.5 font-mono font-bold text-slate-800 dir-ltr">{formatKWD(p.basicSalary)}</td>
@@ -445,19 +442,16 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                               >
                                 <Smartphone className="w-3.5 h-3.5" />
                                 <span>واتساب</span>
-                              </button>
-                            )}
+                              </button>)}
                           </div>
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* SUB-TAB 2: SALARY STRUCTURE (هيكل الراتب والبدلات) */}
       {activeSubTab === 'STRUCTURE' && (
@@ -530,14 +524,12 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                           <span>تعديل الهيكل</span>
                         </button>
                       </td>
-                    </tr>
-                  );
+                    </tr>);
                 })}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       
 
@@ -591,8 +583,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                     <td colSpan={5} className="p-6 text-center text-slate-400">
                       لا توجد كشوف رواتب مولدة لهذا الشهر لعرضها في ملف WPS.
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   monthPayslips.map((p, index) => {
                     const emp = employees.find(e => e.id === p.employeeId);
                     const bankName = emp?.bankName || activeCompany?.bankName || 'بنك الكويت الوطني (NBK)';
@@ -613,8 +604,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                         <td className="p-3 font-mono font-black text-emerald-700 dir-ltr text-left text-sm">
                           {formatKWD(p.netSalary)}
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
@@ -632,12 +622,10 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                       {formatKWD(totalNet)}
                     </td>
                   </tr>
-                </tfoot>
-              )}
+                </tfoot>)}
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* MODAL 1: EDIT SALARY STRUCTURE */}
       {editingStructureEmp && (
@@ -739,8 +727,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* MODAL 2: PAYSLIP PDF PRINT PREVIEW (إشعار راتب فردي) */}
       {selectedPayslipForPrint && (
@@ -833,7 +820,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[10px]">الجنسية / الصفة:</span>
-                      <strong className="text-slate-900">{emp?.nationality} ({emp?.isKuwaiti ? 'كويتي' : emp?.residencyType})</strong>
+                      <strong className="text-slate-900">{emp?.nationality || (emp?.isKuwaiti ? "كويتي" : "")}</strong>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[10px]">حساب التحويل البنكي:</span>
@@ -936,12 +923,9 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                       <p className="text-[10px] text-slate-400 mt-1">ختم الشركة الرسمية</p>
                     </div>
                   </div>
-                </div>
-              );
+                </div>);
             })()}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

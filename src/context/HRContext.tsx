@@ -161,8 +161,7 @@ export const HRProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   return (
     <HRContext.Provider value={{ employees, loading, refreshData, updateEmployeeBalance, updateEmployee }}>
       {children}
-    </HRContext.Provider>
-  );
+    </HRContext.Provider>);
 };
 
 export const useHR = () => {

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Employee, Contract, LeaveRequest, AttendanceRecord, DocumentItem } from '../../types';
 import { ReportCategory } from '../../apps/ReportsApp';
-import { get_aysed_official_balance, getGlobalOpeningBalance, getGlobalAccrued2026 } from '../../utils/kuwaitLaw';
+import { get_aysed_official_balance, getGlobalOpeningBalance, getGlobalAccrued2026, isEmployeeHiredIn2026OrLater } from '../../utils/kuwaitLaw';
 
 interface OdooScopeBarProps {
   employees: Employee[];
@@ -107,8 +107,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
             >
               <option value="ALL">كافة الأقسام والقطاعات ({departments.length})</option>
               {departments.map((dept) => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
+                <option key={dept} value={dept}>{dept}</option>))}
             </select>
           </div>
 
@@ -130,8 +129,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   {selectedEmployee ? (
                     <strong className="text-slate-900 font-bold">
                       {selectedEmployee.fullNameAr} ({selectedEmployee.employeeCode})
-                    </strong>
-                  ) : (
+                    </strong>) : (
                     'كافة الموظفين (All Employees)'
                   )}
                 </span>
@@ -148,8 +146,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                     title="إلغاء التحديد وعرض الكل"
                   >
                     <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
+                  </span>)}
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isEmployeeDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
             </button>
@@ -195,8 +192,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   {filteredEmployees.length === 0 ? (
                     <div className="p-3 text-center text-xs text-slate-400">
                       لا توجد نتائج مطابقة
-                    </div>
-                  ) : (
+                    </div>) : (
                     filteredEmployees.map((emp) => {
                       const isSelected = selectedEmployeeId === emp.id;
                       return (
@@ -219,8 +215,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold">{emp.fullNameAr}</span>
                                 {emp.isKuwaiti && (
-                                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">كويتي</span>
-                                )}
+                                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">كويتي</span>)}
                               </div>
                               <div className="text-[10px] text-slate-400 flex items-center gap-2">
                                 <span>{emp.jobTitle} • {emp.department}</span>
@@ -230,15 +225,12 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                           </div>
 
                           {isSelected && (
-                            <Check className="w-4 h-4 text-[#714B67] shrink-0" />
-                          )}
-                        </div>
-                      );
+                            <Check className="w-4 h-4 text-[#714B67] shrink-0" />)}
+                        </div>);
                     })
                   )}
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
 
           {/* Quick Reset Button if any filter active */}
@@ -253,8 +245,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
             >
               <X className="w-3.5 h-3.5" />
               <span>عرض الكل</span>
-            </button>
-          )}
+            </button>)}
         </div>
 
         {/* Direct Action: Print Single PDF if Employee Selected */}
@@ -268,8 +259,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
               <Printer className="w-3.5 h-3.5 text-amber-300" />
               <span>طباعة تقرير الموظف (Single PDF)</span>
             </button>
-          </div>
-        )}
+          </div>)}
       </div>
 
       {/* Single-Employee Profile & Live Quick Summary Banner */}
@@ -292,12 +282,10 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   {selectedEmployee.isKuwaiti ? (
                     <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded font-bold">
                       🇰🇼 عمالة وطنية (تأمينات)
-                    </span>
-                  ) : (
+                    </span>) : (
                     <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-700/60 px-2 py-0.5 rounded font-bold">
                       مادة 18 (وافد)
-                    </span>
-                  )}
+                    </span>)}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 mt-1">
@@ -339,22 +327,24 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                       })()} د.ك
                     </strong>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {activeCategory === 'LEAVE_BALANCE' && (() => {
                 const opening = getGlobalOpeningBalance(selectedEmployee);
                 const accrued = getGlobalAccrued2026(selectedEmployee);
-                const taken = leaves
+                const totalAvailable = opening + accrued;
+                const rawTaken = leaves
                   .filter(l => !l.isHistorical && l.employeeId === selectedEmployee.id && (l.status === 'APPROVED' || (l.status as any) === 'VALIDATED') && l.leaveType === 'ANNUAL')
-                  .reduce((a, b) => a + (b.totalDays || 0), 0);
-                const remaining = (opening + accrued) - taken;
+      .reduce((a, b) => a + (b.totalDays || 0), 0);
+                const taken = rawTaken;
+                const remaining = Math.max(0, totalAvailable - taken);
+                const excessUnpaid = Math.max(0, taken - totalAvailable);
 
                 return (
                   <div className="flex items-center gap-2">
                     <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
-                      <span className="text-[10px] text-slate-400 block">الافتتاحي + المكتسب</span>
-                      <strong className="text-xs font-mono text-white">{(opening + accrued).toFixed(1)} يوم</strong>
+                      <span className="text-[10px] text-slate-400 block">مكتسب 2026</span>
+                      <strong className="text-xs font-mono text-white">{totalAvailable.toFixed(1)} يوم</strong>
                     </div>
 
                     <div className="bg-rose-950/70 border border-rose-800/50 px-3 py-2 rounded-xl text-center">
@@ -365,7 +355,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                     </div>
 
                     <div className={`px-3.5 py-2 rounded-xl text-center border ${
-                      remaining < 0 
+                      excessUnpaid > 0 
                         ? 'bg-rose-950/90 border-rose-600 text-rose-300' 
                         : remaining === 0 
                           ? 'bg-slate-800 border-slate-600 text-slate-300' 
@@ -375,11 +365,10 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                     }`}>
                       <span className="text-[10px] block opacity-80">صافي الرصيد المتبقي</span>
                       <strong className="text-sm font-mono font-bold">
-                        {remaining.toFixed(1)} يوم {remaining === 0 ? '(مصفّر)' : ''}
+                        {remaining.toFixed(1)} يوم {excessUnpaid > 0 ? `(تجاوز: ${excessUnpaid.toFixed(1)} بدون راتب)` : ''}
                       </strong>
                     </div>
-                  </div>
-                );
+                  </div>);
               })()}
 
               {activeCategory === 'ATTENDANCE_ANALYSIS' && (
@@ -394,18 +383,10 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   <div className="bg-slate-800/80 border border-slate-700 px-3 py-2 rounded-xl text-center">
                     <span className="text-[10px] text-slate-400 block">الساعات الفعلية</span>
                     <strong className="text-xs font-mono text-white">
-                      {attendance.filter(a => a.employeeId === selectedEmployee.id).reduce((a, b) => a + (b.workHours || 8), 0) || 176} س
+                      {attendance.filter(a => a.employeeId === selectedEmployee.id).reduce((a, b) => a + (b.overtimeHours || 0), 0)} س
                     </strong>
                   </div>
-
-                  <div className="bg-purple-950/80 border border-purple-700/60 px-3 py-2 rounded-xl text-center">
-                    <span className="text-[10px] text-purple-300 block">الإضافي والتأخير</span>
-                    <strong className="text-xs font-mono text-amber-300">
-                      +{attendance.filter(a => a.employeeId === selectedEmployee.id).reduce((a, b) => a + (b.overtimeHours || 0), 0)} س
-                    </strong>
-                  </div>
-                </div>
-              )}
+                </div>)}
 
               {activeCategory === 'MOH_DOCS_EXPIRY' && (
                 <div className="flex items-center gap-2">
@@ -420,8 +401,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                     <span className="text-[10px] text-emerald-400 block">حالة الوثائق</span>
                     <strong className="text-xs text-emerald-300 font-bold">مكتملة ومعتمدة</strong>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {activeCategory === 'WORKFORCE_DEMO' && (
                 <div className="flex items-center gap-2">
@@ -434,8 +414,7 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                     <span className="text-[10px] text-emerald-400 block">حالة التعيين</span>
                     <strong className="text-xs text-emerald-300 font-bold">على رأس العمل</strong>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {/* Print Button inside Banner */}
               <button
@@ -448,8 +427,6 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

@@ -112,8 +112,7 @@ export const AutomationApp: React.FC<AutomationAppProps> = ({
                 <span>{rule.active ? 'مفعلة' : 'معطلة'}</span>
               </button>
             </div>
-          </div>
-        ))}
+          </div>))}
       </div>
 
       {/* New Rule Modal */}
@@ -177,8 +176,6 @@ export const AutomationApp: React.FC<AutomationAppProps> = ({
               <button onClick={handleSave} className="bg-orange-600 text-white px-5 py-2 rounded font-bold shadow">إنشاء القاعدة</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

@@ -133,8 +133,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
             هذه الصفحة مخصصة حصرياً للمالك (System Owner / Super Admin). ليس لديك صلاحية للوصول إلى لوحة تحكم اشتراكات الشركات.
           </p>
         </div>
-      </div>
-    );
+      </div>);
   }
 
   const filteredSubscriptions = allMergedSubscriptions.filter(sub => {
@@ -568,8 +567,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                 <Plus className="w-4 h-4" />
                 <span className="hidden md:inline">إنشاء عقد</span>
               </button>
-            </>
-          )}
+            </>)}
         </div>
       </div>
 
@@ -589,8 +587,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
           {pendingRequests.filter(r => r.status === 'new').length > 0 && (
             <span className="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full">
               {pendingRequests.filter(r => r.status === 'new').length}
-            </span>
-          )}
+            </span>)}
         </button>
       </div>
 
@@ -599,8 +596,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
           {pendingRequests.length === 0 ? (
             <div className="text-center py-12 text-slate-500 bg-white rounded-2xl border border-slate-200">
               لا توجد طلبات اشتراك جديدة
-            </div>
-          ) : (
+            </div>) : (
             <div className="grid grid-cols-1 gap-4">
               {pendingRequests.map(req => (
                 <div key={req.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -637,19 +633,14 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                           <XCircle className="w-4 h-4" />
                           رفض
                         </button>
-                      </>
-                    ) : (
+                      </>) : (
                       <span className={`px-3 py-1 text-xs font-bold rounded-full ${req.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                         {req.status === 'approved' ? 'تمت الموافقة' : 'مرفوض'}
-                      </span>
-                    )}
+                      </span>)}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
+                </div>))}
+            </div>)}
+        </div>) : (
         <>
           {/* Odoo KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -739,12 +730,10 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                     {isActive ? (
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5" /> نشط
-                      </span>
-                    ) : (
+                      </span>) : (
                       <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 border border-rose-200">
                         <XCircle className="w-3.5 h-3.5" /> موقوف
-                      </span>
-                    )}
+                      </span>)}
                   </div>
 
                   {/* Card Body */}
@@ -798,8 +787,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                       >
                         <Building2 className="w-3.5 h-3.5" />
                         <span>إدارة الشركة</span>
-                      </button>
-                    )}
+                      </button>)}
 
                     <button
                       onClick={() => handleExtendPeriod(sub)}
@@ -842,11 +830,9 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                     </button>
                   </div>
                 </div>
-              </div>
-            );
+              </div>);
           })}
-        </div>
-      ) : (
+        </div>) : (
         /* List View */
         <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-right border-collapse text-xs">
@@ -887,12 +873,10 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                       {isActive ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" /> نشط
-                        </span>
-                      ) : (
+                        </span>) : (
                         <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full text-[10px] font-bold border border-rose-200">
                           <XCircle className="w-3 h-3" /> موقوف
-                        </span>
-                      )}
+                        </span>)}
                     </td>
                     <td className="p-4 text-center">
                       <button
@@ -937,16 +921,13 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
                         </button>
                       </div>
                     </td>
-                  </tr>
-                );
+                  </tr>);
               })}
             </tbody>
           </table>
-        </div>
-      )}
+        </div>)}
       
-      </>
-      )}
+      </>)}
 
             {/* Force Change Password Modal */}
       {passwordModalSub && (
@@ -1004,8 +985,7 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
       
       {/* Odoo Form Modal for Subscriptions */}
       {isModalOpen && editingSub && (
@@ -1139,8 +1119,6 @@ export const CompaniesSubscriptionApp: React.FC<CompaniesSubscriptionAppProps> =
               </div>
             </form>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

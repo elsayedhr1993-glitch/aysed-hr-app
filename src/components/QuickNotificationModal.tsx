@@ -386,8 +386,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                 {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>
                     {emp.fullNameAr} - ({emp.jobTitle})
-                  </option>
-                ))}
+                  </option>))}
               </select>
             </div>
 
@@ -397,8 +396,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                 {formattedPhone && (
                   <span className="text-[10px] text-emerald-600 font-mono font-bold">
                     جاهز للإرسال
-                  </span>
-                )}
+                  </span>)}
               </label>
               <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg p-1.5 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition">
                 <Phone className="w-4 h-4 text-emerald-600 shrink-0 ml-1" />
@@ -445,8 +443,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                   <span>فتح في نافذة جديدة</span>
                 </a>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* Triggers Category Selector */}
           <div>
@@ -587,8 +584,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                   />
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {(triggerType === 'MOH_RENEWAL' || triggerType === 'RESIDENCY_RENEWAL' || triggerType === 'CIVIL_ID_RENEWAL') && (
             <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200 space-y-3">
@@ -619,8 +615,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                   />
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {triggerType === 'LEAVE_APPROVAL' && (
             <div className="bg-teal-50/70 p-3.5 rounded-xl border border-teal-200 space-y-3">
@@ -666,8 +661,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                   />
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {triggerType === 'PAYROLL_SALARY' && (
             <div className="bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-200 space-y-3">
@@ -696,8 +690,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                   />
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* Delivery Channel Selector */}
           <div>
@@ -799,8 +792,7 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
               >
                 <Smartphone className="w-4 h-4" />
                 <span>إرسال عبر واتساب ويب/التطبيق (مباشر)</span>
-              </button>
-            )}
+              </button>)}
 
             <button
               type="button"
@@ -818,20 +810,17 @@ export const QuickNotificationModal: React.FC<QuickNotificationModalProps> = ({
                 <>
                   <Clock className="w-4 h-4 animate-spin" />
                   <span>جاري الإرسال عبر البوابة...</span>
-                </>
-              ) : (
+                </>) : (
                 <>
                   <Send className="w-4 h-4" />
                   <span>
                     {channel === 'WHATSAPP' ? 'إرسال عبر البوابة (API Live)' : channel === 'SMS' ? 'إرسال SMS' : 'إرسال الإشعار'}
                   </span>
-                </>
-              )}
+                </>)}
             </button>
           </div>
         </div>
 
       </div>
-    </div>
-  );
+    </div>);
 };

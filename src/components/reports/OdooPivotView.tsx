@@ -121,13 +121,11 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
               <>
                 <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
                 <span>طي كافة المجموعات</span>
-              </>
-            ) : (
+              </>) : (
               <>
                 <Maximize2 className="w-3.5 h-3.5 text-purple-600" />
                 <span>توسيع كافة المجموعات</span>
-              </>
-            )}
+              </>)}
           </button>
         </div>
       </div>
@@ -149,11 +147,9 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                   <div className="flex flex-col items-end">
                     <span>{measure.label}</span>
                     {measure.unit && (
-                      <span className="text-[10px] font-normal text-slate-500 font-mono">({measure.unit})</span>
-                    )}
+                      <span className="text-[10px] font-normal text-slate-500 font-mono">({measure.unit})</span>)}
                   </div>
-                </th>
-              ))}
+                </th>))}
             </tr>
           </thead>
           
@@ -165,8 +161,7 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                   <p className="text-xs font-bold">لا توجد بيانات مطابقة لمعايير الفلترة الحالية</p>
                   <p className="text-[11px] text-slate-400 mt-1">يرجى تعديل الفلاتر أو تحديد أبعاد أخرى</p>
                 </td>
-              </tr>
-            ) : (
+              </tr>) : (
               <>
                 {data.map((row) => {
                   const hasChildren = Boolean(row.children && row.children.length > 0);
@@ -184,15 +179,12 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                                 className="w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-purple-200 text-purple-700 transition cursor-pointer"
                               >
                                 {isExpanded ? <Minus className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                              </button>
-                            ) : (
-                              <span className="w-5 h-5 flex items-center justify-center text-slate-300">•</span>
-                            )}
+                              </button>) : (
+                              <span className="w-5 h-5 flex items-center justify-center text-slate-300">•</span>)}
                             <div>
                               <span>{row.label}</span>
                               {row.subLabel && (
-                                <span className="text-[10px] text-slate-400 font-normal mr-1.5">({row.subLabel})</span>
-                              )}
+                                <span className="text-[10px] text-slate-400 font-normal mr-1.5">({row.subLabel})</span>)}
                             </div>
                           </div>
                         </td>
@@ -207,8 +199,7 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                             className={`py-2.5 px-4 text-left border-l border-slate-100 font-mono ${getHeatmapBg(row.values[measure.id], measure.id)}`}
                           >
                             {formatValue(row.values[measure.id], measure)}
-                          </td>
-                        ))}
+                          </td>))}
                       </tr>
 
                       {/* Nested Children Rows when expanded */}
@@ -219,8 +210,7 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                               <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
                               <span>{child.label}</span>
                               {child.subLabel && (
-                                <span className="text-[10px] text-slate-400 font-mono">({child.subLabel})</span>
-                              )}
+                                <span className="text-[10px] text-slate-400 font-mono">({child.subLabel})</span>)}
                             </div>
                           </td>
 
@@ -231,12 +221,9 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                           {activeMeasures.map((measure) => (
                             <td key={measure.id} className="py-1.5 px-4 text-left border-l border-slate-100 font-mono text-slate-700">
                               {formatValue(child.values[measure.id], measure)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  );
+                            </td>))}
+                        </tr>))}
+                    </React.Fragment>);
                 })}
 
                 {/* Grand Total Row (Odoo Sticky Footer) */}
@@ -253,14 +240,11 @@ export const OdooPivotView: React.FC<OdooPivotViewProps> = ({
                   {activeMeasures.map((measure) => (
                     <td key={measure.id} className="py-3 px-4 text-left border-l border-slate-800 font-mono text-emerald-300">
                       {formatValue(grandTotal[measure.id], measure)}
-                    </td>
-                  ))}
+                    </td>))}
                 </tr>
-              </>
-            )}
+              </>)}
           </tbody>
         </table>
       </div>
-    </div>
-  );
+    </div>);
 };

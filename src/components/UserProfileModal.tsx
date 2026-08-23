@@ -270,15 +270,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-bold shadow transition cursor-pointer flex items-center gap-2 disabled:opacity-70"
             >
               {loading ? (
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
-              )}
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>) : (
+                <CheckCircle2 className="w-4 h-4" />)}
               <span>حفظ التعديلات</span>
             </button>
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>);
 };

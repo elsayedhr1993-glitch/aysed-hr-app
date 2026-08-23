@@ -132,8 +132,7 @@ export const LeaveApprovalDashboard: React.FC = () => {
         >
           {notification.type === 'success' ? <ShieldCheck size={20} /> : <AlertCircle size={20} />}
           <span className="text-sm font-medium">{notification.msg}</span>
-        </div>
-      )}
+        </div>)}
 
       {/* جدول الطلبات */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
@@ -175,17 +174,14 @@ export const LeaveApprovalDashboard: React.FC = () => {
                     <XCircle size={18} />
                   </button>
                 </td>
-              </tr>
-            ))}
+              </tr>))}
           </tbody>
         </table>
 
         {leaves.length === 0 && (
           <div className="p-10 text-center text-gray-400 italic text-sm">
             لا توجد طلبات إجازة بانتظار الاعتماد حالياً.
-          </div>
-        )}
+          </div>)}
       </div>
-    </div>
-  );
+    </div>);
 };

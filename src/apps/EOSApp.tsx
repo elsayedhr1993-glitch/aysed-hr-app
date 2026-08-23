@@ -33,12 +33,11 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
   // Calculate actual unused leave balance for the active employee
   const calculatedUnusedLeaveDays = useMemo(() => {
     if (!activeEmp) return 0;
-    const opening = activeEmp.openingLeaveBalance ?? activeEmp.carriedOverLeave2025 ?? 0;
     const accrued = get_aysed_official_balance(activeEmp);
     const takenAnnualDays = (leaves || [])
       .filter(l => !l.isHistorical && l.employeeId === activeEmp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && l.leaveType === 'ANNUAL')
       .reduce((sum, l) => sum + (l.totalDays || 0), 0);
-    return Math.max(0, (opening + accrued) - takenAnnualDays);
+    return Math.max(0, accrued - takenAnnualDays);
   }, [activeEmp, leaves]);
 
   const effectiveUnusedLeaveDays = manualLeaveDaysOverride !== null ? manualLeaveDaysOverride : calculatedUnusedLeaveDays;
@@ -135,13 +134,11 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>جاري التصدير...</span>
-                </>
-              ) : (
+                </>) : (
                 <>
                   <Download className="w-4 h-4 text-emerald-200" />
                   <span>تحميل PDF مباشر</span>
-                </>
-              )}
+                </>)}
             </button>
             <button
               onClick={handlePrint}
@@ -150,8 +147,7 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
               <Printer className="w-4 h-4 text-amber-400" />
               <span>طباعة سند المخالصة (Print)</span>
             </button>
-          </div>
-        )}
+          </div>)}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -178,8 +174,7 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
               {companyEmps.map(emp => (
                 <option key={emp.id} value={emp.id}>
                   {emp.fullNameAr} ({emp.civilId}) - {emp.jobTitle}
-                </option>
-              ))}
+                </option>))}
             </select>
           </div>
 
@@ -226,10 +221,8 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                   >
                     <span>سجل الإجازات</span>
                   </button>
-                </div>
-              )}
-            </div>
-          )}
+                </div>)}
+            </div>)}
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">سبب انتهاء الخدمة (المادة 53)</label>
@@ -283,18 +276,15 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                   title="استعادة القيمة التلقائية المسجلة من جدول الإجازات"
                 >
                   استعادة التلقائي ({calculatedUnpaidDays} يوم)
-                </button>
-              )}
+                </button>)}
             </div>
 
             <p className="text-[10px] text-amber-800 leading-relaxed">
               {calculatedUnpaidDays > 0 ? (
                 <span>
                   تم رصد <strong className="font-mono">{calculatedUnpaidDays}</strong> يوماً من واقع {employeeUnpaidLeaves.length} طلب إجازة بدون راتب معتمدة في النظام وسيتم استبعادها تلقائياً من مدة الخدمة.
-                </span>
-              ) : (
-                <span>لا توجد طلبات إجازة بدون راتب مسجلة للموظف في النظام (يمكن التعديل يدوياً إن وجد).</span>
-              )}
+                </span>) : (
+                <span>لا توجد طلبات إجازة بدون راتب مسجلة للموظف في النظام (يمكن التعديل يدوياً إن وجد).</span>)}
             </p>
           </div>
 
@@ -309,8 +299,7 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                 >
                   <RotateCcw className="w-2.5 h-2.5" />
                   <span>استعادة الرصيد الفعلي ({calculatedUnusedLeaveDays.toFixed(1)} يوم)</span>
-                </button>
-              )}
+                </button>)}
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -443,17 +432,14 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                               <td className="p-2 text-slate-800 font-bold">{item.endDate}</td>
                               <td className="p-2 text-center text-rose-700 font-bold">{item.days} يوم</td>
                               <td className="p-2 text-slate-600 font-sans">{item.reason}</td>
-                            </tr>
-                          ))}
+                            </tr>))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                ) : (
+                  </div>) : (
                   <div className="text-[10px] text-slate-500 italic bg-white p-2 rounded border border-slate-100">
                     • لم يتم تسجيل أي فترات انقطاع أو إجازات بدون راتب سابقة لهذا الموظف (مدة الخدمة الإجمالية مطابقة للمدة الصافية).
-                  </div>
-                )}
+                  </div>)}
               </div>
 
               {/* Step 1: Legal Calculations Breakdown */}
@@ -511,8 +497,7 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                     <div className="flex justify-between items-center text-rose-700">
                       <span>خصومات أو سلف وقروض مستحقة:</span>
                       <span className="font-mono font-bold dir-ltr">- {formatKWD(eosResult.otherDeductions)}</span>
-                    </div>
-                  )}
+                    </div>)}
                 </div>
               </div>
 
@@ -548,14 +533,11 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
+            </div>) : (
             <div className="text-center py-12 text-slate-400">
               يرجى اختيار موظف لحساب المستحقات
-            </div>
-          )}
+            </div>)}
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

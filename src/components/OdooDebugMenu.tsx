@@ -186,8 +186,7 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
           >
             <Bug className="w-3.5 h-3.5 text-amber-300" />
             <span className="hidden md:inline">وضع المطور</span>
-          </button>
-        ) : (
+          </button>) : (
           /* أيقونة حشرة المطور Odoo Enterprise Bug Icon */
           <div className="flex items-center gap-1.5 o_debug_manager">
             <button
@@ -205,13 +204,11 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
               {isSuperuser && (
                 <span className="text-[9px] bg-purple-900 text-amber-300 px-1 rounded font-mono font-black">
                   SU
-                </span>
-              )}
+                </span>)}
               {isInspectorActive && (
                 <span className="text-[10px] bg-purple-950 text-white px-1.5 py-0.2 rounded-full font-bold">
                   فاحص الحقول
-                </span>
-              )}
+                </span>)}
             </button>
 
             {/* Odoo Enterprise Debug Menu Dropdown */}
@@ -339,10 +336,8 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
                     </button>
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-        )}
+              </>)}
+          </div>)}
       </div>
 
       {/* Modal 1: View Metadata Modal */}
@@ -427,8 +422,7 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Modal 2: Edit View Architecture Modal */}
       {showEditViewModal && (
@@ -475,8 +469,7 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Modal 3: Access Rights & Record Rules Modal */}
       {showAccessRulesModal && (
@@ -557,8 +550,6 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </>
-  );
+        </div>)}
+    </>);
 };

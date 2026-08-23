@@ -7,10 +7,22 @@ import {
   Building, Briefcase, Hash, CreditCard, Sparkles, X
 } from 'lucide-react';
 import { printDocument, exportElementToPdf } from '../utils/printUtils';
-import { get_aysed_settlement_report_data, get_aysed_official_balance, getGlobalOpeningBalance, getGlobalAccrued2026 } from '../utils/kuwaitLaw';
+import { 
+   
+  get_aysed_official_balance, 
+  getGlobalOpeningBalance, 
+  getGlobalAccrued2026,
+  computeUniversalLeaveLedger,
+  getCarriedOverBalance,
+  getOpeningBalance 
+} from '../utils/kuwaitLaw';
+import { computeFifoLeaveAllocations, buildEmployeeBaselineAllocations } from '../services/leaveService';
+import { computeLeaveRequest } from '../utils/leaveEngine';
 import toast from 'react-hot-toast';
 
 export interface LeaveSettlementCalculatorProps {
+  allocations?: any[];
+  onOpenLeaveModal?: (empId: string) => void;
   employees: Employee[];
   contracts?: Contract[];
   leaves?: LeaveRequest[];
@@ -22,6 +34,8 @@ export interface LeaveSettlementCalculatorProps {
 }
 
 export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps> = ({
+  allocations = [],
+  onOpenLeaveModal,
   employees = [],
   contracts = [],
   leaves = [],
@@ -55,7 +69,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   const [settlementState, setSettlementState] = useState<'draft' | 'validated' | 'paid'>('draft');
 
   // Modals for Header actions
-  const [showNewLeaveModal, setShowNewLeaveModal] = useState<boolean>(false);
+  
   const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
   const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
 
@@ -93,9 +107,9 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   }, [contracts, selectedEmp]);
 
   // Approved leaves for current employee
-  const employeeApprovedLeaves = useMemo(() => {
+  const employeeLeavesForSettlement = useMemo(() => {
     if (!selectedEmp) return [];
-    return leaves.filter(l => l.employeeId === selectedEmp.id && l.status === 'APPROVED');
+    return leaves.filter(l => l.employeeId === selectedEmp.id && ['APPROVED', 'SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(l.status));
   }, [leaves, selectedEmp]);
 
   // Handle selecting a specific approved leave
@@ -104,7 +118,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     if (leaveId === 'custom') {
       return;
     }
-    const found = employeeApprovedLeaves.find(l => l.id === leaveId);
+    const found = employeeLeavesForSettlement.find(l => l.id === leaveId);
     if (found) {
       setDateFrom(found.startDate);
       setDateTo(found.endDate);
@@ -120,25 +134,66 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   const totalWage = basicSalary + allowances;
   const dailyWage = totalWage > 0 ? totalWage / 26 : 0;
 
-  const openingBalance = selectedEmp ? getGlobalOpeningBalance(selectedEmp) : 0;
-  const accruedBalance = selectedEmp ? getGlobalAccrued2026(selectedEmp) : 0;
-  const totalAccrued = openingBalance + accruedBalance;
+  const empFifo = useMemo(() => {
+    if (!selectedEmp) return null;
+    return computeFifoLeaveAllocations(selectedEmp, buildEmployeeBaselineAllocations(selectedEmp, allocations || []), leaves || []);
+  }, [selectedEmp, allocations, leaves]);
+
+  const carriedOverBal = empFifo?.allocations.filter(a => a.allocationType === 'regular').reduce((sum, a) => sum + (a.numberOfDays || 0), 0) || 0;
+  const accruedBalance = empFifo?.allocations.filter(a => a.allocationType === 'accrual').reduce((sum, a) => sum + (a.numberOfDays || 0), 0) || 0;
+  const totalTaken = empFifo?.totalConsumed || 0;
+  const netAvailable = empFifo?.netAvailable || 0;
+  const totalAccrued = carriedOverBal + accruedBalance;
 
   const settlementData = useMemo(() => {
-    const res = get_aysed_settlement_report_data(totalAccrued, leaveDaysInput, totalWage);
-    return res || {
-      total_accrued: totalAccrued,
-      requested_days: leaveDaysInput,
-      available_paid: totalAccrued,
-      aysed_paid_days: Math.min(leaveDaysInput, totalAccrued),
-      aysed_unpaid_days: Math.max(0, leaveDaysInput - totalAccrued),
-      daily_wage: dailyWage,
-      paid_amount: Math.min(leaveDaysInput, totalAccrued) * dailyWage
-    };
-  }, [totalAccrued, leaveDaysInput, totalWage, dailyWage]);
+    if (!selectedEmp) return null;
+    const grossSalary = selectedContract ? (selectedContract as any).grossSalary : totalWage;
+    const empForCalc = { ...selectedEmp, grossSalary } as Employee & { grossSalary: number };
 
-  const settlementAmount = settlementData?.paid_amount ?? (Math.min(leaveDaysInput, totalAccrued) * dailyWage);
-  const netPayable = settlementAmount + ticketAllowanceInput - deductionsInput;
+    const leaveRecord = selectedLeaveId !== 'custom' 
+      ? employeeLeavesForSettlement.find(l => l.id === selectedLeaveId) 
+      : null;
+
+    if (leaveRecord) {
+      const leavePaidDays = leaveRecord.paidDays ?? leaveRecord.totalDays ?? 0;
+      const leaveUnpaidDays = leaveRecord.unpaidDays ?? leaveRecord.excessDays ?? 0;
+      const leaveTotalDays = leaveRecord.totalDays ?? 0;
+      
+      const snapshotAvailable = leaveRecord.totalAvailableBalance ?? leavePaidDays;
+       
+      const dailyWageCalc = leaveRecord.dailyWage ?? (grossSalary / 26);
+      const paidLeavePay = leaveRecord.leaveAmount ?? (Math.round(leavePaidDays * dailyWageCalc * 1000) / 1000);
+      const netPayableCalc = paidLeavePay + (ticketAllowanceInput || 0) - (deductionsInput || 0);
+
+      return {
+        total_accrued: totalAccrued,
+        requested_days: leaveTotalDays,
+        available_paid: snapshotAvailable,
+        aysed_paid_days: leavePaidDays,
+        aysed_unpaid_days: leaveUnpaidDays,
+        daily_wage: dailyWageCalc,
+        paid_amount: paidLeavePay,
+        netPayable: netPayableCalc
+      };
+    } else {
+      if (!dateFrom || !dateTo) return null;
+      const res = computeLeaveRequest(empForCalc, dateFrom, dateTo, [], netAvailable, ticketAllowanceInput);
+      return {
+        total_accrued: totalAccrued,
+        requested_days: res.totalNetDays,
+        available_paid: netAvailable,
+        aysed_paid_days: res.paidDays,
+        aysed_unpaid_days: res.unpaidDays,
+        daily_wage: res.dailyWage,
+        paid_amount: res.paidLeavePay,
+        netPayable: res.netPayable - deductionsInput
+      };
+    }
+  }, [selectedEmp, selectedLeaveId, employeeLeavesForSettlement, dateFrom, dateTo, netAvailable, totalAccrued, ticketAllowanceInput, deductionsInput, selectedContract, totalWage]);
+
+
+  const settlementAmount = settlementData?.paid_amount || 0;
+  const netPayable = settlementData?.netPayable || 0;
 
   // History lines
   const employeeHistoryLines = useMemo(() => {
@@ -173,41 +228,6 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     }
   };
 
-  const handleCreateNewLeave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedEmp) return;
-    const newReq: LeaveRequest = {
-      id: `leave-req-${Date.now()}`,
-      employeeId: selectedEmp.id,
-      companyId: selectedEmp.companyId || activeCompany?.id || 'comp-1',
-      leaveType: newLeaveType as any,
-      startDate: newLeaveFrom,
-      endDate: newLeaveTo,
-      totalDays: Number(newLeaveDays) || 1,
-      reason: newLeaveReason || 'طلب إجازة جديد عبر شاشة التسوية',
-      status: 'APPROVED',
-      createdAt: new Date().toISOString(),
-    };
-
-    if (onSaveLeave) {
-      onSaveLeave(newReq);
-    }
-    
-    // Add to session history
-    setManualHistoryLines(prev => [{
-      id: newReq.id,
-      employeeId: selectedEmp.id,
-      transaction_date: newReq.startDate,
-      description: `إجازة ${newLeaveType === 'ANNUAL' ? 'سنوية' : newLeaveType} - ${newReq.reason}`,
-      days_taken: newReq.totalDays,
-      amount_paid: newReq.totalDays * dailyWage,
-      state: 'معتمد'
-    }, ...prev]);
-
-    setShowNewLeaveModal(false);
-    toast.success(`تم تسجيل طلب الإجازة للموظف ${selectedEmp.fullNameAr} بنجاح`);
-  };
-
   const handleCreateArchiveLeave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmp) return;
@@ -240,7 +260,13 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
             {/* action_new_leave: تقديم طلب إجازة جديد */}
             <button
               type="button"
-              onClick={() => setShowNewLeaveModal(true)}
+              onClick={() => {
+                if (selectedEmp && onOpenLeaveModal) {
+                  onOpenLeaveModal(selectedEmp.id);
+                } else if (!selectedEmp) {
+                  toast.error('يرجى اختيار الموظف أولاً');
+                }
+              }}
               className="bg-[#71639e] hover:bg-[#5e5284] text-white text-xs font-bold px-4 py-2 rounded-md flex items-center gap-2 shadow-xs transition-all cursor-pointer active:scale-95"
             >
               <Plus size={15} />
@@ -322,8 +348,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     {employees.map(emp => (
                       <option key={emp.id} value={emp.id} className="text-slate-800 font-bold text-base">
                         {emp.fullNameAr} ({emp.employeeCode || emp.civilId})
-                      </option>
-                    ))}
+                      </option>))}
                   </select>
                 </h1>
               </div>
@@ -354,7 +379,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                 <div>
                   <span className="block text-xs font-bold text-slate-500">الأرصدة والافتتاحي</span>
                   <span className="block text-sm font-black text-[#71639e] font-mono mt-0.5">
-                    {totalAccrued.toFixed(1)} يوم متاح
+                    {netAvailable.toFixed(2)} يوم متاح
                   </span>
                 </div>
               </button>
@@ -421,11 +446,10 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-[#71639e]"
                       >
                         <option value="custom">-- إجازة محددة مخصصة (إدخال يدوي للأيام) --</option>
-                        {employeeApprovedLeaves.map(l => (
+                        {employeeLeavesForSettlement.map(l => (
                           <option key={l.id} value={l.id}>
                             إجازة {l.leaveType === 'ANNUAL' ? 'سنوية' : l.leaveType} ({l.startDate} إلى {l.endDate}) - {l.totalDays} يوم
-                          </option>
-                        ))}
+                          </option>))}
                       </select>
                     </div>
 
@@ -455,7 +479,16 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
                     {/* number_of_days */}
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-600">عدد أيام الإجازة المطلوبة:</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-600">عدد أيام الإجازة المطلوبة (للتسوية):</label>
+                        <button
+                          type="button"
+                          onClick={() => setLeaveDaysInput(netAvailable)}
+                          className="text-[11px] text-[#71639e] hover:underline font-bold cursor-pointer"
+                        >
+                          استدعاء كامل الرصيد المتاح ({netAvailable.toFixed(2)} يوم)
+                        </button>
+                      </div>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
@@ -499,19 +532,31 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     {/* Days Breakdown Helper Box */}
                     <div className="p-3 bg-white rounded-lg border border-slate-200 text-xs space-y-1.5 font-medium">
                       <div className="flex justify-between text-slate-600">
-                        <span>الرصيد التراكمي المتاح:</span>
-                        <span className="font-mono font-bold text-[#71639e]">{totalAccrued.toFixed(1)} يوم</span>
+                        <span>الرصيد المرحل (Carried-Over):</span>
+                        <span className="font-mono font-bold text-teal-800">{carriedOverBal.toFixed(2)} يوم</span>
+                      </div>
+                      
+                      <div className="flex justify-between text-slate-600">
+                        <span>المكتسب الحالي (Accrued):</span>
+                        <span className="font-mono font-bold text-purple-800">{accruedBalance.toFixed(2)} يوم</span>
                       </div>
                       <div className="flex justify-between text-slate-600">
+                        <span>إجمالي المستهلك (Taken):</span>
+                        <span className="font-mono font-bold text-rose-700">{totalTaken.toFixed(2)} يوم</span>
+                      </div>
+                      <div className="flex justify-between text-slate-800 border-t border-slate-200 pt-1 font-bold">
+                        <span>صافي الرصيد المتاح (Net Available):</span>
+                        <span className="font-mono font-black text-[#71639e]">{(settlementData?.available_paid || 0).toFixed(2)} يوم</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-100">
                         <span>أيام مستحقة براتب مدفوع:</span>
-                        <span className="font-mono font-bold text-blue-700">{(settlementData?.aysed_paid_days || 0).toFixed(1)} يوم</span>
+                        <span className="font-mono font-bold text-blue-700">{(settlementData?.aysed_paid_days || 0).toFixed(2)} يوم</span>
                       </div>
                       {(settlementData?.aysed_unpaid_days || 0) > 0 && (
                         <div className="flex justify-between text-rose-600 font-bold">
                           <span>أيام بدون راتب (تخصم من الخدمة):</span>
-                          <span className="font-mono">{settlementData.aysed_unpaid_days.toFixed(1)} يوم</span>
-                        </div>
-                      )}
+                          <span className="font-mono">{settlementData.aysed_unpaid_days.toFixed(2)} يوم</span>
+                        </div>)}
                     </div>
                   </div>
 
@@ -605,8 +650,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     <span>معاينة وطباعة المستند</span>
                   </button>
                 </div>
-              </div>
-            )}
+              </div>)}
 
             {/* Page 2: كشف حركة الموظف والأرشيف (employee_history) */}
             {activeTab === 'employee_history' && (
@@ -648,10 +692,9 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                           <td colSpan={5} className="p-8 text-center text-slate-400 font-bold">
                             لا توجد حركات أو إجازات سابقة مسجلة لهذا الموظف
                           </td>
-                        </tr>
-                      ) : (
+                        </tr>) : (
                         employeeHistoryLines.map((line, idx) => (
-                          <tr key={line.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                          <tr key={`${line.id || 'hist'}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
                             <td className="p-3.5 font-mono text-slate-700 font-bold">{line.transaction_date}</td>
                             <td className="p-3.5 font-bold text-slate-800">{line.description}</td>
                             <td className="p-3.5 text-center font-mono font-bold text-purple-900">{line.days_taken} يوم</td>
@@ -667,116 +710,15 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                                 {line.state}
                               </span>
                             </td>
-                          </tr>
-                        ))
+                          </tr>))
                       )}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
         </div>
       </div>
-
-      {/* Modal: تقديم طلب إجازة جديد */}
-      {showNewLeaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-['Tajawal']" dir="rtl">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <Plus size={18} className="text-[#71639e]" />
-                تقديم طلب إجازة جديد للموظف: {selectedEmp?.fullNameAr}
-              </h3>
-              <button 
-                onClick={() => setShowNewLeaveModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateNewLeave} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">نوع الإجازة:</label>
-                <select
-                  value={newLeaveType}
-                  onChange={(e) => setNewLeaveType(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2 font-bold"
-                >
-                  <option value="ANNUAL">إجازة سنوية اعتيادية (Annual Leave)</option>
-                  <option value="SICK">إجازة مرضية (Sick Leave)</option>
-                  <option value="EMERGENCY">إجازة اضطرارية (Emergency)</option>
-                  <option value="UNPAID">إجازة بدون راتب (Unpaid)</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">من تاريخ:</label>
-                  <input
-                    type="date"
-                    value={newLeaveFrom}
-                    onChange={(e) => setNewLeaveFrom(e.target.value)}
-                    required
-                    className="w-full border border-slate-300 rounded-lg p-2 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">إلى تاريخ:</label>
-                  <input
-                    type="date"
-                    value={newLeaveTo}
-                    onChange={(e) => setNewLeaveTo(e.target.value)}
-                    required
-                    className="w-full border border-slate-300 rounded-lg p-2 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">عدد الأيام:</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  value={newLeaveDays}
-                  onChange={(e) => setNewLeaveDays(parseFloat(e.target.value) || 1)}
-                  required
-                  className="w-full border border-slate-300 rounded-lg p-2 font-mono font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">السبب / الملاحظات:</label>
-                <input
-                  type="text"
-                  value={newLeaveReason}
-                  onChange={(e) => setNewLeaveReason(e.target.value)}
-                  placeholder="إجازة دورية سنوية..."
-                  className="w-full border border-slate-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowNewLeaveModal(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 cursor-pointer"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-[#71639e] hover:bg-[#5e5284] text-white rounded-lg font-bold cursor-pointer shadow-xs"
-                >
-                  تسجيل واعتماد الطلب
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Modal: تسجيل إجازة أرشيفية */}
       {showArchiveModal && (
@@ -847,8 +789,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Modal: حاسبة وطباعة التسوية الرسمية */}
       {showPrintModal && (
@@ -921,23 +862,28 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                 </table>
 
                 {/* ملخص الأرصدة */}
-                <h4 className="text-sm font-bold text-slate-900 mt-6 mb-3">١. مـلخص الـأرصدة (Days Summary)</h4>
+                <h4 className="text-sm font-bold text-slate-900 mt-6 mb-3">١. مـلخص الـأرصدة وFIFO (Days Summary)</h4>
                 <table className="table table-bordered w-full text-xs border border-slate-300 text-center mb-6">
                   <thead>
                     <tr style={{ backgroundColor: '#f8f9fa' }} className="font-bold text-slate-900 border-b border-slate-300">
-                      <th className="p-2.5 border border-slate-300">إجـمالي الـرصيد المـستحق</th>
-                      <th className="p-2.5 border border-slate-300">أيام مـدفوعة (بـراتب)</th>
-                      <th className="p-2.5 border border-slate-300 text-rose-700">أيام خـصم (بـدون راتب)</th>
-                      <th className="p-2.5 border border-slate-300">الـرصيد المـتبقي بـعد الـتصفية</th>
+                      <th className="p-2 border border-slate-300">المكتسب 2026</th>
+                      <th className="p-2 border border-slate-300 text-[#71639e]">صافي المتاح</th>
+                      <th className="p-2 border border-slate-300 text-rose-700">إجمالي المستهلك</th>
+                      <th className="p-2 border border-slate-300 text-blue-900">أيام مدفوعة</th>
+                      <th className="p-2 border border-slate-300 text-rose-700">بدون راتب</th>
+                      <th className="p-2 border border-slate-300">المتبقي</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold">{totalAccrued.toFixed(1)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-blue-900">{(settlementData?.aysed_paid_days || 0).toFixed(1)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-rose-700">{(settlementData?.aysed_unpaid_days || 0).toFixed(1)} يوم</td>
+                      
+                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-purple-800">{(accruedBalance || 0).toFixed(2)} يوم</td>
+                      <td className="p-2.5 border border-slate-300 font-mono font-black text-[#71639e]">{(settlementData?.available_paid || 0).toFixed(2)} يوم</td>
+                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-rose-700">{(settlementData?.requested_days || 0).toFixed(2)} يوم</td>
+                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-blue-900">{(settlementData?.aysed_paid_days || 0).toFixed(2)} يوم</td>
+                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-rose-700">{(settlementData?.aysed_unpaid_days || 0).toFixed(2)} يوم</td>
                       <td className="p-2.5 border border-slate-300 font-mono font-bold text-emerald-800">
-                        {Math.max(0, totalAccrued - leaveDaysInput).toFixed(1)} يـوم
+                        {Math.max(0, (settlementData?.available_paid || 0) - (settlementData?.aysed_paid_days || 0)).toFixed(2)} يوم
                       </td>
                     </tr>
                   </tbody>
@@ -949,7 +895,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                   <tbody>
                     <tr className="bg-slate-100 border-b border-slate-300">
                       <td className="p-3 font-bold">
-                        إجـمالي المـبلغ المـستحق لـلإجازة ({settlementData?.aysed_paid_days || 0} يوم × أجر اليوم {dailyWage.toFixed(3)} د.ك)
+                        إجـمالي المـبلغ المـستحق لـلإجازة ({(settlementData?.aysed_paid_days || 0).toFixed(2)} يوم × أجر اليوم {dailyWage.toFixed(3)} د.ك = {settlementAmount.toFixed(3)} د.ك)
                       </td>
                       <td className="p-3 text-left font-mono font-bold text-base text-blue-900" dir="ltr">{settlementAmount.toFixed(3)} د.ك</td>
                     </tr>
@@ -957,14 +903,12 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                       <tr className="border-b border-slate-300">
                         <td className="p-2.5 font-bold">بدل تذاكر السفر المعتمد</td>
                         <td className="p-2.5 text-left font-mono font-bold" dir="ltr">{ticketAllowanceInput.toFixed(3)} د.ك</td>
-                      </tr>
-                    )}
+                      </tr>)}
                     {deductionsInput > 0 && (
                       <tr className="border-b border-slate-300 bg-rose-50/50">
                         <td className="p-2.5 font-bold text-rose-800">استقطاعات وسلفيات مسجلة</td>
                         <td className="p-2.5 text-left font-mono font-bold text-rose-700" dir="ltr">-{deductionsInput.toFixed(3)} د.ك</td>
-                      </tr>
-                    )}
+                      </tr>)}
                     <tr className="bg-slate-900 text-white font-bold text-sm">
                       <td className="p-3">صافي المستحق النهائي (NET PAYABLE)</td>
                       <td className="p-3 text-left font-mono text-emerald-400 font-black text-base" dir="ltr">{netPayable.toFixed(3)} د.ك</td>
@@ -1000,10 +944,8 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };
 
 export default LeaveSettlementCalculator;

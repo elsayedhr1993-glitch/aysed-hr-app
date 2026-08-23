@@ -7,10 +7,22 @@ import { validateKuwaitCivilId, parseKuwaitCivilId, formatKWD } from '../utils/k
 import { processAnyDocument } from '../utils/ocrService';
 import { 
   User, Users, CheckCircle, AlertTriangle, FileText, Calendar, Briefcase,
-  Folder, Shield, Plus, Edit2, Trash2, X, Building, Phone, Mail, Award, Search, Check, Eye, Camera, Loader2, Sparkles, LayoutGrid, List, ArrowLeftRight, Filter, Fingerprint, Key, CreditCard, MessageSquare, Send, ShieldCheck, History, Save, RotateCcw, Clock
+  Folder, Shield, Plus, Edit2, Trash2, X, Building, Phone, Mail, Award, Search, Check, Eye, Camera, Loader2, Sparkles, LayoutGrid, List, ArrowLeftRight, Filter, Fingerprint, Key, CreditCard, MessageSquare, Send, ShieldCheck, History, Save, RotateCcw, Clock, Upload, Link as LinkIcon
 } from 'lucide-react';
 
+const PRESET_AVATARS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=250',
+];
+
 interface EmployeesAppProps {
+  onOpenLeaveModal?: (empId: string) => void;
   employees: Employee[];
   contracts: Contract[];
   leaves: LeaveRequest[];
@@ -38,6 +50,7 @@ interface EmployeesAppProps {
 }
 
 export const EmployeesApp: React.FC<EmployeesAppProps> = ({
+  onOpenLeaveModal,
   employees = [],
   contracts = [],
   leaves = [],
@@ -109,6 +122,15 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   const [odooFilter, setOdooFilter] = useState<'ALL' | 'ACTIVE' | 'ON_LEAVE' | 'ARCHIVED'>('ALL');
   const [odooGroupBy, setOdooGroupBy] = useState<'NONE' | 'DEPARTMENT' | 'MANAGER'>('NONE');
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('employees_view_mode') as ViewMode) || 'KANBAN';
+  });
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setLocalViewMode(mode);
+    localStorage.setItem('employees_view_mode', mode);
+    if (onViewModeChange) onViewModeChange(mode);
+  };
   const [isGroupByMenuOpen, setIsGroupByMenuOpen] = useState(false);
 
   // Inline Job Title Editing state
@@ -124,6 +146,59 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   const [loadingScan, setLoadingScan] = useState<boolean>(false);
   const [scannedFilePreviewUrl, setScannedFilePreviewUrl] = useState<string | null>(null);
   const [highlightedFields, setHighlightedFields] = useState<Record<string, boolean>>({});
+
+  // Profile Picture state
+  const [showPresetAvatars, setShowPresetAvatars] = useState<boolean>(false);
+  const [showAvatarUrlInput, setShowAvatarUrlInput] = useState<boolean>(false);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('حجم الصورة يجب ألا يتجاوز 10 ميجابايت');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const rawBase64 = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 300;
+        const maxHeight = 300;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: compressedBase64 }) : null);
+        } else {
+          setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: rawBase64 }) : null);
+        }
+        toast.success('تم تحميل صورة البروفايل بنجاح');
+      };
+      img.onerror = () => {
+        setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: rawBase64 }) : null);
+        toast.success('تم تحميل صورة البروفايل بنجاح');
+      };
+      img.src = rawBase64;
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (selectedEmpForForm) {
@@ -185,7 +260,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       mohLicenseExpiry: isMOH ? '2029-12-31' : undefined,
       bankName: 'بنك الكويت الوطني',
       joinDate: new Date().toISOString().split('T')[0],
-      carriedOverLeave2025: 0,
+      
       tags: ['جديد'],
     });
     setActiveTab('WORK');
@@ -343,8 +418,8 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       pinCode: editingEmp.pinCode?.trim() || undefined,
       parentId: editingEmp.parentId || undefined,
       coachId: editingEmp.coachId || undefined,
-      carriedOverLeave2025: editingEmp.carriedOverLeave2025 ?? 0,
-      openingLeaveBalance: editingEmp.openingLeaveBalance ?? 0,
+      
+      
     };
 
     onSaveEmployee(empToSave);
@@ -382,16 +457,15 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             {softDeletedEmps.length > 0 && (
               <span className="bg-rose-600 text-white px-1.5 py-0.2 rounded-full text-[10px] font-mono">
                 {softDeletedEmps.length}
-              </span>
-            )}
+              </span>)}
           </button>
 
           {/* View Switcher */}
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
             <button
-              onClick={() => onViewModeChange('KANBAN')}
+              onClick={() => handleViewModeChange('KANBAN')}
               className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 ${
-                viewMode === 'KANBAN'
+                localViewMode === 'KANBAN'
                   ? 'bg-[#714B67] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -400,9 +474,9 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               <span>كانبان</span>
             </button>
             <button
-              onClick={() => onViewModeChange('LIST')}
+              onClick={() => handleViewModeChange('LIST')}
               className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 ${
-                viewMode === 'LIST'
+                localViewMode === 'LIST'
                   ? 'bg-[#714B67] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -445,8 +519,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             {localSearchTerm && (
               <button onClick={() => setLocalSearchTerm('')} className="text-slate-400 hover:text-slate-600 p-0.5">
                 <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+              </button>)}
           </div>
 
           <div className="relative">
@@ -463,8 +536,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                 <button onClick={() => { setOdooFilter('ACTIVE'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold text-emerald-700">الموظفين النشطين</button>
                 <button onClick={() => { setOdooFilter('ON_LEAVE'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold text-amber-700">في إجازة اليوم</button>
                 <button onClick={() => { setOdooFilter('ARCHIVED'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold text-rose-700">المؤرشفين</button>
-              </div>
-            )}
+              </div>)}
           </div>
 
           <div className="relative">
@@ -480,8 +552,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                 <button onClick={() => { setOdooGroupBy('NONE'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">بدون تجميع</button>
                 <button onClick={() => { setOdooGroupBy('DEPARTMENT'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">حسب القسم/الإدارة</button>
                 <button onClick={() => { setOdooGroupBy('MANAGER'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">حسب المدير المباشر</button>
-              </div>
-            )}
+              </div>)}
           </div>
         </div>
       </div>
@@ -503,11 +574,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             <Plus className="w-4 h-4" />
             <span>إضافة موظف جديد</span>
           </button>
-        </div>
-      )}
+        </div>)}
 
       {/* KANBAN VIEW */}
-      {viewMode === 'KANBAN' && filteredEmps.length > 0 && (
+      {localViewMode === 'KANBAN' && filteredEmps.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredEmps.map(emp => {
             const empDocs = documents.filter(d => d.employeeId === emp.id);
@@ -521,12 +591,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3">
                       {emp.avatarUrl ? (
-                        <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-12 h-12 rounded-full object-cover border-2 border-slate-200" />
-                      ) : (
+                        <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-12 h-12 rounded-full object-cover border-2 border-slate-200" />) : (
                         <div className="w-12 h-12 rounded-full bg-[#714B67]/10 text-[#714B67] flex items-center justify-center font-bold text-lg">
                           {emp.fullNameAr.charAt(0)}
-                        </div>
-                      )}
+                        </div>)}
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm group-hover:text-[#714B67] transition">{emp.fullNameAr}</h4>
                         <span className="text-xs text-slate-500 block truncate">{emp.jobTitle || 'موظف'}</span>
@@ -570,8 +638,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                         title="الإجازات"
                       >
                         <Calendar className="w-4 h-4" />
-                      </button>
-                    )}
+                      </button>)}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -587,14 +654,12 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     </button>
                   </div>
                 </div>
-              </div>
-            );
+              </div>);
           })}
-        </div>
-      )}
+        </div>)}
 
       {/* LIST VIEW */}
-      {viewMode === 'LIST' && filteredEmps.length > 0 && (
+      {localViewMode === 'LIST' && filteredEmps.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-right text-xs">
             <thead className="bg-[#714B67] text-white font-bold">
@@ -621,12 +686,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <td className="p-3 font-bold text-slate-900 cursor-pointer" onClick={() => handleOpenEditEmployee(emp)}>
                     <div className="flex items-center gap-2 hover:text-[#714B67] transition">
                       {emp.avatarUrl ? (
-                        <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-7 h-7 rounded-full object-cover" />
-                      ) : (
+                        <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-7 h-7 rounded-full object-cover" />) : (
                         <div className="w-7 h-7 rounded-full bg-[#714B67]/10 flex items-center justify-center text-[#714B67] font-bold">
                           {emp.fullNameAr.charAt(0)}
-                        </div>
-                      )}
+                        </div>)}
                       <span>{emp.fullNameAr}</span>
                     </div>
                   </td>
@@ -652,12 +715,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       </button>
                     </div>
                   </td>
-                </tr>
-              ))}
+                </tr>))}
             </tbody>
           </table>
-        </div>
-      )}
+        </div>)}
 
       {/* EDIT / CREATE EMPLOYEE MODAL */}
       {editingEmp && (
@@ -676,6 +737,18 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <p className="text-xs text-purple-200">الرقم المدني الكويتي والتفاصيل الوظيفية (Odoo HR)</p>
                 </div>
               </div>
+              {editingEmp.id && employees.some(e => e.id === editingEmp.id) && onOpenLeaveModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenLeaveModal(editingEmp.id);
+                  }}
+                  className="bg-white text-[#714B67] hover:bg-emerald-50 hover:text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition mr-4"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>تقديم طلب إجازة</span>
+                </button>
+              )}
               <button 
                 onClick={() => setEditingEmp(null)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition"
@@ -730,8 +803,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                           {activeC ? `${activeC.basicSalary} د.ك` : 'العقد'}
                         </div>
                         <div className="text-[9px] text-slate-400 truncate">عقود العمل</div>
-                      </button>
-                    );
+                      </button>);
                   })()}
 
                   {/* 2. Leaves */}
@@ -760,8 +832,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                           الإجازات
                         </div>
                         <div className="text-[9px] text-slate-400 truncate">الأرصدة والطلبات</div>
-                      </button>
-                    );
+                      </button>);
                   })()}
 
                   {/* 3. Attendance */}
@@ -875,8 +946,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                           المستندات
                         </div>
                         <div className="text-[9px] text-slate-400 truncate">الأرشيف والـ OCR</div>
-                      </button>
-                    );
+                      </button>);
                   })()}
 
                   {/* 8. Commencement */}
@@ -901,8 +971,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     <div className="text-[9px] text-slate-400 truncate">استلام العمل</div>
                   </button>
                 </div>
-              </div>
-            )}
+              </div>)}
 
             {/* Modal Tabs */}
             <div className="flex border-b border-slate-200 bg-slate-50 px-6 gap-2">
@@ -925,13 +994,171 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   >
                     <Icon className="w-3.5 h-3.5" />
                     <span>{tab.label}</span>
-                  </button>
-                );
+                  </button>);
               })}
             </div>
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {/* Employee Profile Picture Header Banner */}
+              <div className="bg-gradient-to-r from-slate-900 via-[#3d2737] to-[#714B67] text-white p-4 rounded-2xl shadow-sm border border-slate-700">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Avatar Frame with Camera trigger */}
+                  <div className="relative group shrink-0">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-white/30 shadow-md bg-white/10 flex items-center justify-center relative">
+                      {editingEmp.avatarUrl ? (
+                        <img 
+                          src={editingEmp.avatarUrl} 
+                          alt={editingEmp.fullNameAr || 'الموظف'} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-white/80">
+                          <User className="w-10 h-10 mb-0.5 text-purple-200" />
+                          <span className="text-[10px] text-purple-200">بدون صورة</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Camera Overlay Upload button */}
+                    <label 
+                      className="absolute -bottom-1 -right-1 bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-xl shadow-lg cursor-pointer transition flex items-center justify-center border-2 border-slate-900 group-hover:scale-110"
+                      title="رفع صورة جديدة"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleAvatarUpload} 
+                        className="hidden" 
+                      />
+                    </label>
+                  </div>
+
+                  {/* Employee Info & Photo Action Buttons */}
+                  <div className="flex-1 text-center sm:text-right space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <h4 className="font-bold text-base text-white">
+                        {editingEmp.fullNameAr || 'موظف جديد'}
+                      </h4>
+                      {editingEmp.employeeCode && (
+                        <span className="bg-white/15 px-2 py-0.5 rounded-md font-mono text-xs text-purple-200 border border-white/10">
+                          {editingEmp.employeeCode}
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        editingEmp.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-slate-700 text-slate-300'
+                      }`}>
+                        {editingEmp.status === 'ACTIVE' ? 'نشط' : 'غير نشط'}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300">
+                      {editingEmp.jobTitle || 'المسمى الوظيفي غير محدد'} • {editingEmp.department || 'القسم غير محدد'}
+                    </p>
+
+                    {/* Buttons Row */}
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                      {/* Upload File Button */}
+                      <label className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition flex items-center gap-1.5 shadow-xs">
+                        <Upload className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>رفع صورة بروفايل</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleAvatarUpload} 
+                          className="hidden" 
+                        />
+                      </label>
+
+                      {/* Preset Avatars Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPresetAvatars(!showPresetAvatars)}
+                        className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>صور رمزية جاهزة</span>
+                      </button>
+
+                      {/* Toggle URL Input */}
+                      <button
+                        type="button"
+                        onClick={() => setShowAvatarUrlInput(!showAvatarUrlInput)}
+                        className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <LinkIcon className="w-3.5 h-3.5 text-sky-300" />
+                        <span>رابط صورة (URL)</span>
+                      </button>
+
+                      {/* Remove Photo */}
+                      {editingEmp.avatarUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: '' }) : null);
+                            toast.success('تم إزالة صورة البروفايل');
+                          }}
+                          className="bg-rose-500/20 hover:bg-rose-500/40 border border-rose-400/30 text-rose-200 text-xs font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                          title="حذف الصورة الحالية"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>حذف الصورة</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Expandable URL Input Field */}
+                    {showAvatarUrlInput && (
+                      <div className="flex items-center gap-2 pt-2 max-w-md animate-in fade-in duration-200">
+                        <input
+                          type="url"
+                          value={editingEmp.avatarUrl || ''}
+                          onChange={(e) => setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: e.target.value }) : null)}
+                          placeholder="https://example.com/photo.jpg"
+                          className="flex-1 bg-black/40 border border-white/30 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 outline-none dir-ltr text-left"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAvatarUrlInput(false);
+                            toast.success('تم تحديث رابط الصورة');
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold"
+                        >
+                          تطبيق
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Expandable Preset Avatars Gallery */}
+                    {showPresetAvatars && (
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/20 mt-2 animate-in fade-in duration-200">
+                        <p className="text-[11px] font-bold text-slate-300 mb-2">اختر من الصور الرمزية الجاهزة للموظفين:</p>
+                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                          {PRESET_AVATARS.map((url, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: url }) : null);
+                                setShowPresetAvatars(false);
+                                toast.success('تم اختيار الصورة الرمزية');
+                              }}
+                              className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition hover:scale-105 cursor-pointer ${
+                                editingEmp.avatarUrl === url ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-white/20 hover:border-white'
+                              }`}
+                            >
+                              <img src={url} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {activeTab === 'WORK' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -988,8 +1215,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     >
                       <option value="">اختر المسمى الوظيفي...</option>
                       {jobTitles.map(jt => (
-                        <option key={jt.id} value={jt.titleName}>{jt.titleName}</option>
-                      ))}
+                        <option key={jt.id} value={jt.titleName}>{jt.titleName}</option>))}
                       <option value="محاسب أول">محاسب أول</option>
                       <option value="موظف موارد بشرية">موظف موارد بشرية</option>
                       <option value="طبيب عام">طبيب عام</option>
@@ -1023,6 +1249,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     />
                   </div>
 
+                  
+
+                  
+
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">حالة الموظف</label>
                     <select
@@ -1036,8 +1266,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       <option value="TERMINATED">منهي خدماته (Terminated)</option>
                     </select>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {activeTab === 'PRIVATE' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1107,8 +1336,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none dir-ltr text-right"
                     />
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {activeTab === 'HR_SETTINGS' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1157,8 +1385,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     />
                     <p className="text-[10px] text-slate-400 mt-1">يمنع محرك الإجازات الآلي الترحيل المكرر في نفس الشهر</p>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {activeTab === 'BANK' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1187,8 +1414,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none dir-ltr text-right"
                     />
                   </div>
-                </div>
-              )}
+                </div>)}
             </div>
 
             {/* Modal Footer */}
@@ -1208,8 +1434,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* SOFT DELETED / ARCHIVE MODAL */}
       {showSoftDeletedModal && (
@@ -1223,8 +1448,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             </div>
             <div className="p-6 overflow-y-auto flex-1 space-y-3">
               {softDeletedEmps.length === 0 ? (
-                <p className="text-center text-slate-500 text-xs py-8">لا توجد سجلات في الأرشيف</p>
-              ) : (
+                <p className="text-center text-slate-500 text-xs py-8">لا توجد سجلات في الأرشيف</p>) : (
                 softDeletedEmps.map(emp => (
                   <div key={emp.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
                     <div>
@@ -1241,15 +1465,12 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>استعادة</span>
-                      </button>
-                    )}
-                  </div>
-                ))
+                      </button>)}
+                  </div>))
               )}
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* JOB TITLES MODAL */}
       {isJobTitlesModalOpen && (
@@ -1298,8 +1519,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     <div>
                       <span className="font-bold text-xs text-slate-800">{jt.titleName}</span>
                       {jt.departmentName && (
-                        <span className="text-[10px] text-slate-500 mr-2">({jt.departmentName})</span>
-                      )}
+                        <span className="text-[10px] text-slate-500 mr-2">({jt.departmentName})</span>)}
                     </div>
                     {onDeleteJobTitle && (
                       <button 
@@ -1311,15 +1531,11 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                         title="حذف المسمى"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                      </button>)}
+                  </div>))}
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

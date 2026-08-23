@@ -17,8 +17,7 @@ export const SaasAdmin: React.FC<SaasAdminProps> = ({ currentUserEmail, onImpers
       currentUserEmail={currentUserEmail}
       onImpersonateCompany={onImpersonateCompany}
       onLogout={onLogout}
-    />
-  );
+    />);
 };
 
 export default SaasAdmin;

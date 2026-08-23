@@ -66,8 +66,7 @@ export const LeaveTypesConfigView: React.FC = () => {
                   <td className="p-3 text-center">
                     {lt.isUnpaid ? <span className="text-rose-600 font-bold">نعم</span> : <span className="text-slate-400">لا</span>}
                   </td>
-                </tr>
-              ))}
+                </tr>))}
             </tbody>
           </table>
         </div>
@@ -111,6 +110,5 @@ export const LeaveTypesConfigView: React.FC = () => {
           </form>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

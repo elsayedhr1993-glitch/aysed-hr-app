@@ -47,8 +47,7 @@ export const SmartNotificationsBanner: React.FC<SmartNotificationsBannerProps> =
         <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-mono shrink-0">
           0 تنبيهات
         </span>
-      </div>
-    );
+      </div>);
   }
 
   const handleActionClick = (notif: SystemNotification) => {
@@ -101,13 +100,11 @@ export const SmartNotificationsBanner: React.FC<SmartNotificationsBannerProps> =
               <span className="bg-rose-100 text-rose-800 border border-rose-300 px-1.5 py-0.5 rounded-full flex items-center gap-1 text-[10px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping inline-block"></span>
                 <span>{criticalCount} حرج</span>
-              </span>
-            )}
+              </span>)}
             {warningCount > 0 && (
               <span className="bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded-full text-[10px]">
                 {warningCount} تنبيه
-              </span>
-            )}
+              </span>)}
           </div>
 
           <button 
@@ -218,16 +215,11 @@ export const SmartNotificationsBanner: React.FC<SmartNotificationsBannerProps> =
                     <div className="flex items-start gap-2">
                       <div className={`p-1.5 rounded-lg shrink-0 ${isCritical ? 'bg-rose-200 text-rose-800' : 'bg-amber-200 text-amber-900'}`}>
                         {notif.type === 'MOH_LICENSE' ? (
-                          <ShieldAlert className="w-4 h-4" />
-                        ) : notif.type === 'PROBATION' ? (
-                          <Clock className="w-4 h-4" />
-                        ) : notif.type === 'ABSENCE' ? (
-                          <UserX className="w-4 h-4" />
-                        ) : notif.type === 'TARDINESS' ? (
-                          <Clock3 className="w-4 h-4" />
-                        ) : (
-                          <AlertTriangle className="w-4 h-4" />
-                        )}
+                          <ShieldAlert className="w-4 h-4" />) : notif.type === 'PROBATION' ? (
+                          <Clock className="w-4 h-4" />) : notif.type === 'ABSENCE' ? (
+                          <UserX className="w-4 h-4" />) : notif.type === 'TARDINESS' ? (
+                          <Clock3 className="w-4 h-4" />) : (
+                          <AlertTriangle className="w-4 h-4" />)}
                       </div>
 
                       <div className="pl-4">
@@ -257,12 +249,9 @@ export const SmartNotificationsBanner: React.FC<SmartNotificationsBannerProps> =
                       <ArrowLeft className="w-3 h-3" />
                     </button>
                   </div>
-                </div>
-              );
+                </div>);
             })}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

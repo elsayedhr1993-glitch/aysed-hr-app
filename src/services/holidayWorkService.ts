@@ -1,5 +1,6 @@
 // src/services/holidayWorkService.ts
-import { SupabaseClient } from '@supabase/supabase-js';
+import { db } from '../lib/firebase';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 
 export interface LeaveType {
   id?: string;
@@ -63,10 +64,9 @@ export function calculateHolidayCompensation(
 }
 
 /**
- * اعتماد السجل وترحيله لمسير الرواتب أو رصيد الإجازات في Supabase
+ * اعتماد السجل وترحيله لمسير الرواتب أو رصيد الإجازات في Firestore
  */
 export async function approveHolidayWork(
-  supabase: SupabaseClient,
   record: WorkOnHolidayRecord,
   basicWage: number
 ): Promise<{ success: boolean; message: string }> {
@@ -74,30 +74,30 @@ export async function approveHolidayWork(
     const calc = calculateHolidayCompensation(basicWage, record.hoursWorked, record.compensationType);
 
     // 1. تحديث حالة السجل إلى approved
-    const { error: updateError } = await supabase
-      .from('work_on_holidays')
-      .update({ state: 'approved' })
-      .eq('id', record.id);
-
-    if (updateError) throw updateError;
+    if (record.id) {
+        await updateDoc(doc(db, 'work_on_holidays', record.id), { state: 'approved' });
+    }
 
     // 2. إذا كان التعويض يوماً بديلاً: يضاف إلى رصيد الإجازات
     if (record.compensationType === 'day' && calc.compensatoryDaysAdded > 0) {
-      await supabase.from('leave_allocations').insert({
-        employee_id: record.employeeId,
-        allocation_type: 'compensatory_off',
+      await addDoc(collection(db, 'allocations'), {
+        employeeId: record.employeeId,
+        allocationType: 'compensatory_off',
         name: `يوم بديل عن عمل في (${record.holidayName})`,
-        number_of_days: calc.compensatoryDaysAdded,
-        state: 'validated'
+        numberOfDays: calc.compensatoryDaysAdded,
+        remainingDays: calc.compensatoryDaysAdded,
+        consumedDays: 0,
+        state: 'validated',
+        dateFrom: record.date
       });
     }
 
     // 3. إذا كان التعويض نقدياً: يرحل إلى جدول مستحقات مسير الرواتب القادم
     if (record.compensationType === 'pay' && calc.cashPayableAmount > 0) {
-      await supabase.from('payslip_overtime_inputs').insert({
-        employee_id: record.employeeId,
-        work_date: record.date,
-        holiday_name: record.holidayName,
+      await addDoc(collection(db, 'payslip_overtime_inputs'), {
+        employeeId: record.employeeId,
+        workDate: record.date,
+        holidayName: record.holidayName,
         amount: calc.cashPayableAmount,
         hours: record.hoursWorked,
         rate: 1.5,

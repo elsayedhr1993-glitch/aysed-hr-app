@@ -59,8 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-right text-xs text-slate-700 font-mono overflow-auto max-h-36">
                 <span className="text-rose-600 font-bold block mb-1">تفاصيل الخطأ:</span>
                 {this.state.error.message || String(this.state.error)}
-              </div>
-            )}
+              </div>)}
 
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
@@ -85,8 +84,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <span>بياناتك السحابية وقاعدة البيانات آمنة تماماً</span>
             </div>
           </div>
-        </div>
-      );
+        </div>);
     }
 
     return this.props.children;

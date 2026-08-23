@@ -37,11 +37,9 @@ export function Modal({
         {footer && (
           <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2">
             {footer}
-          </div>
-        )}
+          </div>)}
       </div>
-    </div>
-  );
+    </div>);
 }
 
 export function Badge({
@@ -79,8 +77,7 @@ export function Badge({
     >
       {dot && <span className={`w-1.5 h-1.5 rounded-full ${dotTones[tone] || dotTones.neutral}`} />}
       {children}
-    </span>
-  );
+    </span>);
 }
 
 export function Avatar({ name, src, size = 'md' }: { name: string; src?: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -103,8 +100,7 @@ export function Avatar({ name, src, size = 'md' }: { name: string; src?: string;
         alt={name}
         className={`${sizes[size]} rounded-xl object-cover shadow-sm shrink-0 border border-slate-200`}
         referrerPolicy="no-referrer"
-      />
-    );
+      />);
   }
 
   return (
@@ -112,8 +108,7 @@ export function Avatar({ name, src, size = 'md' }: { name: string; src?: string;
       className={`${sizes[size]} rounded-xl bg-purple-700 text-white font-bold flex items-center justify-center shadow-sm shrink-0`}
     >
       {initials || 'U'}
-    </div>
-  );
+    </div>);
 }
 
 export function EmptyState({
@@ -132,8 +127,7 @@ export function EmptyState({
       </div>
       <h4 className="font-bold text-slate-700 text-sm">{title}</h4>
       <p className="text-xs text-slate-400 mt-1 max-w-xs">{message}</p>
-    </div>
-  );
+    </div>);
 }
 
 export function LoadingState() {
@@ -141,8 +135,7 @@ export function LoadingState() {
     <div className="py-12 flex flex-col items-center justify-center gap-3">
       <div className="w-8 h-8 border-3 border-purple-200 border-t-purple-700 rounded-full animate-spin" />
       <span className="text-xs text-slate-400 font-medium">جاري التحميل...</span>
-    </div>
-  );
+    </div>);
 }
 
 export function SectionCard({
@@ -161,6 +154,5 @@ export function SectionCard({
       } ${className}`}
     >
       {children}
-    </div>
-  );
+    </div>);
 }

@@ -87,9 +87,9 @@ export interface Employee {
   biometricId?: string; // معرّف كود البصمة في جهاز البصمة (Biometric Device ID / ZKTeco ID / Fingerprint ID)
   badgeId?: string;     // معرّف الشارة في أودو (Odoo Badge ID / Barcode)
   pinCode?: string;     // رمز PIN للحضور في أودو (Attendance PIN Code)
-  carriedOverLeave2025?: number; // رصيد الإجازات السنوية المتراكم من نهاية 2025 (إدخال يدوي)
-  openingLeaveBalance?: number; // الرصيد الافتتاحي للإجازات عند الانتقال للنظام (Opening Balance)
-  unpaid_days_count?: number;   // إجمالي الأيام بدون راتب (Odoo Computed: unpaid_days_count)
+  currentYearAccruedLeaves?: number;
+  approvedTakenLeavesCurrentYear?: number;
+   unpaid_days_count?: number;   // إجمالي الأيام بدون راتب (Odoo Computed: unpaid_days_count)
   paid_days_remaining?: number; // رصيد الإجازات المتبقي (Odoo Computed: paid_days_remaining)
   lastAccrualDate?: string;     // تاريخ آخر ترحيل آلي لرصيد الإجازات (YYYY-MM أو YYYY-MM-DD)
   accrualHistory?: Array<{
@@ -170,7 +170,7 @@ export interface LeaveRequest {
   endDate: string;
   totalDays: number;
   reason: string;
-  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+  status: 'DRAFT' | 'SUBMITTED' | 'PENDING_MANAGER' | 'PENDING_HR' | 'APPROVED' | 'REJECTED';
   validatedBy?: string;        // Odoo: hr.group_hr_user validation
   validatedAt?: string;        // تاريخ الاعتماد الرسمي
   hrNote?: string;             // ملاحظات الموارد البشرية
@@ -184,6 +184,10 @@ export interface LeaveRequest {
   isHistorical?: boolean;      // سجل إجازة تاريخية/سابقة (أرشيف وكشف حساب فقط، لا تؤثر على مسير الرواتب الحالية)
   historicalYear?: number;     // السنة التاريخية للإجازة (مثلاً 2022، 2023، 2024، 2025)
   paidDays?: number;           // أيام مغطاة من رصيد الإجازات
+  unpaidDays?: number;
+  dailyWage?: number;
+  leaveAmount?: number;
+  totalAvailableBalance?: number;
   excessDays?: number;         // أيام زائدة بدون راتب (تخصم من مدة الخدمة فقط بخصم مالي 0.000 د.ك)
   managerOverride?: boolean;   // تجاوز قيود النظام من قبل المدير للإجازات التي تتجاوز 30 يوماً
   managerOverrideNote?: string;// بيان وموافقة المدير لتجاوز حد 30 يوماً

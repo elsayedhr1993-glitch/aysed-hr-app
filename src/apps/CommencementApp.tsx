@@ -17,6 +17,7 @@ interface CommencementAppProps {
   activeCompany: Company;
   filterTab: string;
   onSaveCommencement: (comm: EmploymentCommencement) => void;
+  onDeleteCommencement?: (id: string) => void;
   onUpdateEmployeeStatus: (employeeId: string, status: 'ACTIVE' | 'ON_LEAVE' | 'TERMINATED' | 'RESIGNED') => void;
   onSaveEmployee?: (emp: Employee) => void;
   onSaveContract?: (contract: Contract) => void;
@@ -105,12 +106,14 @@ export const CommencementApp: React.FC<CommencementAppProps> = ({
   onSaveEmployee,
   onSaveContract,
   onNavigateToApp,
+  onDeleteCommencement,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isDevCodeModalOpen, setIsDevCodeModalOpen] = useState<boolean>(false);
   const [selectedCommForPrint, setSelectedCommForPrint] = useState<EmploymentCommencement | null>(null);
   const [selectedCommForView, setSelectedCommForView] = useState<EmploymentCommencement | null>(null);
   const [editingCommId, setEditingCommId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Form Fields
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
@@ -276,7 +279,7 @@ export const CommencementApp: React.FC<CommencementAppProps> = ({
         const updatedEmp: Employee = {
           ...emp,
           status: 'ACTIVE',
-          joinDate: actualJoiningDate,
+          joinDate: emp.joinDate || actualJoiningDate,
           resourceCalendarId,
           workingSchedule,
           workHoursType,
@@ -292,7 +295,7 @@ export const CommencementApp: React.FC<CommencementAppProps> = ({
         if (empContract && onSaveContract) {
           const updatedContract: Contract = {
             ...empContract,
-            startDate: actualJoiningDate,
+            startDate: empContract.startDate || actualJoiningDate,
             contractType,
             resourceCalendarId,
             workingSchedule,
@@ -356,7 +359,7 @@ export const CommencementApp: React.FC<CommencementAppProps> = ({
       const updatedEmp: Employee = {
         ...emp,
         status: 'ACTIVE',
-        joinDate: comm.actualJoiningDate,
+        joinDate: emp.joinDate || comm.actualJoiningDate,
         resourceCalendarId: comm.resourceCalendarId || 'cal-std-8h-6d',
         workingSchedule: comm.workingSchedule || 'الدوام الصباحي القياسي - 48 ساعة (08:00 - 16:00)',
         workHoursType: comm.workHoursType || 'STANDARD',
@@ -375,7 +378,7 @@ export const CommencementApp: React.FC<CommencementAppProps> = ({
     if (empContract && onSaveContract) {
       const updatedContract: Contract = {
         ...empContract,
-        startDate: comm.actualJoiningDate,
+        startDate: empContract.startDate || comm.actualJoiningDate,
         contractType: comm.contractType,
         resourceCalendarId: comm.resourceCalendarId || 'cal-std-8h-6d',
         workingSchedule: comm.workingSchedule || 'الدوام الصباحي القياسي - 48 ساعة (08:00 - 16:00)',
@@ -664,8 +667,7 @@ class HrCommencement(models.Model):
                     <p className="font-bold text-slate-600">لا توجد نماذج مباشرة عمل مسجلة حالياً</p>
                     <p className="text-[11px] text-slate-400 mt-1">اضغط على زر "إصدار نموذج مباشرة عمل جديد" لإعداد مباشرة موظف وربط جدول ساعات العمل</p>
                   </td>
-                </tr>
-              ) : (
+                </tr>) : (
                 filteredCommencements.map((comm, index) => {
                   const emp = employees.find(e => e.id === comm.employeeId);
                   const shift = shifts.find(s => s.id === comm.shiftId);
@@ -767,8 +769,7 @@ class HrCommencement(models.Model):
                             >
                               <CheckCircle className="w-3.5 h-3.5" />
                               <span>اعتماد المباشرة</span>
-                            </button>
-                          )}
+                            </button>)}
 
                           <button
                             onClick={() => handleOpenEdit(comm)}
@@ -778,6 +779,44 @@ class HrCommencement(models.Model):
                             <Pencil className="w-3.5 h-3.5" />
                             <span>تعديل</span>
                           </button>
+                          {onDeleteCommencement && (
+                            confirmDeleteId === comm.id ? (
+                              <div className="flex items-center gap-1 bg-rose-100 p-1 rounded-lg border border-rose-300 animate-in fade-in">
+                                <span className="text-[10px] text-rose-900 font-bold px-1">تأكيد الحذف؟</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteCommencement(comm.id);
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="bg-rose-600 hover:bg-rose-700 text-white px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer shadow-xs transition"
+                                >
+                                  نعم، احذف
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition"
+                                >
+                                  إلغاء
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(comm.id)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border border-rose-200 transition flex items-center gap-1 cursor-pointer"
+                                title="حذف نموذج المباشرة"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>حذف</span>
+                              </button>
+                            )
+                          )}
 
                           <button
                             onClick={() => setSelectedCommForPrint(comm)}
@@ -797,8 +836,7 @@ class HrCommencement(models.Model):
                           </button>
                         </div>
                       </td>
-                    </tr>
-                  );
+                    </tr>);
                 })
               )}
             </tbody>
@@ -831,8 +869,7 @@ class HrCommencement(models.Model):
                 <span>
                   <strong>صلاحية مدير النظام (Sayed):</strong> التعديل متاح ومفتوح لكافة الحقول وتتم مزامنة أي تغيير تلقائياً في ملف وعقد الموظف ونظام البصمة.
                 </span>
-              </div>
-            )}
+              </div>)}
 
             <form onSubmit={handleSaveCommencementForm} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               
@@ -850,8 +887,7 @@ class HrCommencement(models.Model):
                   {companyEmployees.map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.fullNameAr} ({emp.employeeCode} - {emp.jobTitle}) - الرقم المدني: {emp.civilId}
-                    </option>
-                  ))}
+                    </option>))}
                 </select>
               </div>
 
@@ -912,18 +948,15 @@ class HrCommencement(models.Model):
                       {STANDARD_WORKING_SCHEDULES.map(sched => (
                         <option key={sched.id} value={sched.id}>
                           {sched.name} [{sched.typeBadge}]
-                        </option>
-                      ))}
+                        </option>))}
                     </optgroup>
                     {shifts.length > 0 && (
                       <optgroup label="شفتات الشركة المخصصة (Company Shift Profiles)">
                         {shifts.map(shift => (
                           <option key={shift.id} value={shift.id}>
                             شفت: {shift.name} ({shift.startTime} - {shift.endTime})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
+                          </option>))}
+                      </optgroup>)}
                   </select>
                   <p className="text-[10px] text-slate-500 mt-1">
                     يرتبط هذا الجدول مباشرة بحسابات البصمة، ساعات العمل الإضافي، ومسير الرواتب.
@@ -963,8 +996,7 @@ class HrCommencement(models.Model):
                           <span className="text-xs">{item.label}</span>
                         </div>
                         <span className="text-[10px] text-slate-500 pr-5 mt-0.5">{item.desc}</span>
-                      </label>
-                    ))}
+                      </label>))}
                   </div>
                 </div>
 
@@ -1026,8 +1058,7 @@ class HrCommencement(models.Model):
                       placeholder="مثال: دوام 6 ساعات يومياً من الساعة 10:00 صباحاً حتى 04:00 مساءً"
                       className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#714B67]/40"
                     />
-                  </div>
-                )}
+                  </div>)}
 
               </div>
 
@@ -1091,8 +1122,7 @@ class HrCommencement(models.Model):
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Developer Odoo Code Viewer Modal (XML & Python) */}
       {isDevCodeModalOpen && (
@@ -1169,8 +1199,7 @@ class HrCommencement(models.Model):
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Official Print/Preview Modal */}
       {selectedCommForPrint && (
@@ -1288,8 +1317,7 @@ class HrCommencement(models.Model):
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
+                  </div>);
               })()}
             </div>
 
@@ -1310,8 +1338,7 @@ class HrCommencement(models.Model):
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Details / View Modal */}
       {selectedCommForView && (
@@ -1385,8 +1412,7 @@ class HrCommencement(models.Model):
                       <span className="text-[10px] text-slate-500 block">أرشيف Supabase Vault</span>
                       <span className="font-mono text-[10px] text-purple-700 break-all">{selectedCommForView.storageFolderUrl}</span>
                     </div>
-                  </div>
-                );
+                  </div>);
               })()}
             </div>
 
@@ -1399,9 +1425,7 @@ class HrCommencement(models.Model):
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
-    </div>
-  );
+    </div>);
 };

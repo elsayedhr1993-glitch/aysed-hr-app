@@ -576,8 +576,7 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
                         </button>
                       </div>
                     </td>
-                  </tr>
-                );
+                  </tr>);
               })}
             </tbody>
           </table>
@@ -639,13 +638,11 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
                     <>
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       <span>داخل النطاق (مقبول)</span>
-                    </>
-                  ) : (
+                    </>) : (
                     <>
                       <AlertTriangle className="w-4 h-4 text-rose-600" />
                       <span>خارج النطاق (مرفوض)</span>
-                    </>
-                  )}
+                    </>)}
                 </div>
               </div>
             </div>
@@ -841,10 +838,8 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
                 : 'bg-rose-50 border-rose-300 text-rose-950'
             }`}>
               {whatsAppTestStatus.success ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              )}
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />) : (
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />)}
               <div className="space-y-1.5 flex-1">
                 <div className="font-black text-sm flex items-center justify-between">
                   <span>
@@ -868,16 +863,14 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
                         حالة الاستجابة: HTTP 200 OK
                       </span>
                     </div>
-                  </div>
-                ) : (
+                  </div>) : (
                   <div className="space-y-1 text-rose-900">
                     <p className="font-bold">{whatsAppTestStatus.error}</p>
                     {whatsAppTestStatus.errorCode && (
                       <div className="text-[11px] font-mono text-rose-700">
                         كود الخطأ: <span className="bg-rose-100 px-1.5 py-0.5 rounded">{whatsAppTestStatus.errorCode}</span>
                         {whatsAppTestStatus.statusCode && ` (HTTP ${whatsAppTestStatus.statusCode})`}
-                      </div>
-                    )}
+                      </div>)}
                     <div className="text-[11px] bg-white/70 p-2 rounded-lg border border-rose-200 text-slate-700 mt-2 space-y-1">
                       <div className="font-bold text-rose-800">💡 إرشادات تصحيح الخطأ:</div>
                       <ul className="list-disc list-inside space-y-0.5 text-[10px]">
@@ -886,11 +879,9 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
                         <li>تأكد من وجود رصيد فعال وإمكانية وصول الخادم لشبكة الإنترنت.</li>
                       </ul>
                     </div>
-                  </div>
-                )}
+                  </div>)}
               </div>
-            </div>
-          )}
+            </div>)}
         </div>
       </div>
 
@@ -1057,8 +1048,7 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
                 >
                   <option value="" disabled>-- اختر موقعاً شهيراً لملء الإحداثيات تلقائياً --</option>
                   {KUWAIT_PRESET_LOCATIONS.map(loc => (
-                    <option key={loc.name} value={loc.name}>{loc.name}</option>
-                  ))}
+                    <option key={loc.name} value={loc.name}>{loc.name}</option>))}
                 </select>
               </div>
 
@@ -1178,9 +1168,7 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
-    </div>
-  );
+    </div>);
 };

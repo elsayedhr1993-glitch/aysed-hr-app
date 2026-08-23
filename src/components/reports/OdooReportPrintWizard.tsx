@@ -238,11 +238,9 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
                 >
                   <option value="الكل">كافة الأقسام</option>
                   {departments.map((dept) => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
+                    <option key={dept} value={dept}>{dept}</option>))}
                 </select>
-              </div>
-            )}
+              </div>)}
 
             {targetScope === 'EMPLOYEE' && (
               <div className="pt-2 space-y-2 animate-in fade-in">
@@ -262,8 +260,7 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
 
                 <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white">
                   {filteredEmployees.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-slate-400">لا توجد نتائج مطابقة</div>
-                  ) : (
+                    <div className="p-3 text-center text-xs text-slate-400">لا توجد نتائج مطابقة</div>) : (
                     filteredEmployees.map((emp) => (
                       <div
                         key={emp.id}
@@ -283,10 +280,8 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
                         </div>
 
                         {selectedEmployeeId === emp.id && (
-                          <Check className="w-4 h-4 text-purple-700 shrink-0" />
-                        )}
-                      </div>
-                    ))
+                          <Check className="w-4 h-4 text-purple-700 shrink-0" />)}
+                      </div>))
                   )}
                 </div>
 
@@ -294,10 +289,8 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
                   <div className="bg-purple-50/70 border border-purple-200 p-2 rounded-lg text-xs text-purple-900 flex items-center justify-between">
                     <span>الموظف المختار للطباعة: <strong>{selectedEmployeeObj.fullNameAr}</strong> ({selectedEmployeeObj.employeeCode})</span>
                     <span className="text-[10px] text-purple-700 font-mono">المدني: {selectedEmployeeObj.civilId || '—'}</span>
-                  </div>
-                )}
-              </div>
-            )}
+                  </div>)}
+              </div>)}
           </div>
 
           {/* Section 2: Period & Date Range */}
@@ -371,8 +364,7 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-mono outline-none focus:border-[#714B67] focus:ring-1 focus:ring-[#714B67]"
                 />
-              </div>
-            )}
+              </div>)}
 
             {periodType === 'CUSTOM_RANGE' && (
               <div className="grid grid-cols-2 gap-3 pt-1 animate-in fade-in">
@@ -394,8 +386,7 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 font-mono outline-none focus:border-[#714B67] focus:ring-1 focus:ring-[#714B67]"
                   />
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
 
           {/* Section 3: Header, Signatures & Layout Options */}
@@ -525,6 +516,5 @@ export const OdooReportPrintWizard: React.FC<OdooReportPrintWizardProps> = ({
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

@@ -725,8 +725,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
           {currentUserEmail && (
             <span className="hidden lg:inline-block text-xs bg-black/20 px-3 py-1.5 rounded-lg text-white/90 border border-white/10 font-mono">
               {currentUserEmail}
-            </span>
-          )}
+            </span>)}
 
           {onLogout && (
             <button
@@ -736,8 +735,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
             >
               <LogOut size={15}/>
               <span className="hidden sm:inline">تسجيل خروج</span>
-            </button>
-          )}
+            </button>)}
 
           {/* زر الانتقال الآمن - ينهي وضع الأدمن ويفتح التطبيقات */}
           <button 
@@ -816,14 +814,12 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
                     <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">
                       جاري تحميل بيانات المنظومة...
                     </td>
-                  </tr>
-                ) : tenants.length === 0 ? (
+                  </tr>) : tenants.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-gray-400 font-bold">
                       لا يوجد مشتركون حالياً
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   tenants.map(tenant => (
                     <tr key={tenant.id} className="hover:bg-purple-50/30 transition-colors">
                       <td className="p-4 font-bold text-gray-800">
@@ -837,16 +833,13 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
                         {tenant.state === 'suspended' ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                             مجمد ⏸️
-                          </span>
-                        ) : tenant.state === 'draft' || tenant.state === 'pending' ? (
+                          </span>) : tenant.state === 'draft' || tenant.state === 'pending' ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
                             قيد المراجعة ⏳
-                          </span>
-                        ) : (
+                          </span>) : (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                             مفعل نشط ✅
-                          </span>
-                        )}
+                          </span>)}
                       </td>
                       <td className="p-4 text-xs text-gray-600 font-semibold text-center whitespace-nowrap">
                         {formatSubscriptionDate(tenant.created_at)}
@@ -898,8 +891,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
                           </button>
                         </div>
                       </td>
-                    </tr>
-                  ))
+                    </tr>))
                 )}
               </tbody>
             </table>
@@ -1018,8 +1010,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
       {/* Create New Company / Subscription Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" dir="rtl">
@@ -1184,8 +1175,7 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
       {/* Cascading Hard Delete Confirmation Modal */}
       {deletingTenant && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1261,13 +1251,11 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     <span>جاري الحذف والتطهير الشامل...</span>
-                  </>
-                ) : (
+                  </>) : (
                   <>
                     <Trash2 className="w-4 h-4" />
                     <span>تأكيد الحذف النهائي الشامل (Purge)</span>
-                  </>
-                )}
+                  </>)}
               </button>
               
               <button
@@ -1280,10 +1268,8 @@ export const SuperAdminPortal: React.FC<SuperAdminPortalProps> = ({
             </div>
 
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };
 
 export default SuperAdminPortal;

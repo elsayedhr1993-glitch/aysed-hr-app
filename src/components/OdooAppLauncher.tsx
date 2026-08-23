@@ -368,8 +368,7 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
                   <span>فتح التطبيق</span>
                   <ArrowUpRight className="w-3 h-3 mr-1" />
                 </div>
-              </button>
-            );
+              </button>);
           })}
         </div>
       </div>
@@ -429,8 +428,7 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
                     dataKey="value"
                   >
                     {payrollDeptData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                      <Cell key={`cell-${index}`} fill={entry.color} />))}
                   </Pie>
                   <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontSize: '10px' }} />
                 </PieChart>
@@ -470,7 +468,6 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
         <span>بيئة العمل: <strong className="text-emerald-700">Dafthra ERP Active</strong></span>
       </div>
 
-    </div>
-  );
+    </div>);
 };
 

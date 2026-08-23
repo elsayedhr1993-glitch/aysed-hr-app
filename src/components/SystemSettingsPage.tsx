@@ -209,8 +209,7 @@ export const SystemSettingsPage: React.FC = () => {
         }`}>
           {message.type === 'success' ? <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
           <span>{message.text}</span>
-        </div>
-      )}
+        </div>)}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 1. الحساب والملف الشخصي */}
@@ -370,6 +369,5 @@ export const SystemSettingsPage: React.FC = () => {
           </button>
         </form>
       </div>
-    </div>
-  );
+    </div>);
 };

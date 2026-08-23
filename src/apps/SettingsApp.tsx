@@ -778,8 +778,7 @@ class ResConfigSettings(models.TransientModel):
           >
             <Settings className="w-4 h-4 text-purple-300" />
             <span>إعدادات المنظومة</span>
-          </button>
-        )}
+          </button>)}
 
         <button
           onClick={() => setActiveTab('COMPANY')}
@@ -840,8 +839,7 @@ class ResConfigSettings(models.TransientModel):
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
             <span>أدوات المطورين</span>
-          </button>
-        )}
+          </button>)}
       </div>
 
       {activeTab === 'AYSED_CONFIG' ? (
@@ -1517,8 +1515,7 @@ class ResConfigSettings(models.TransientModel):
                           <li><strong>3. ربط نوع الإجازة السنوية:</strong> إلزام تخصيص الرصيد (<code>requires_allocation = 'yes'</code>) وربطه بـ <code>accrual_plan_id</code>.</li>
                         </ul>
                       </div>
-                    </div>
-                  ) : codeModalTab === 'INIT_HOOK' ? (
+                    </div>) : codeModalTab === 'INIT_HOOK' ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs text-slate-600 bg-amber-50 p-3 rounded-xl border border-amber-200">
                         <div className="flex items-center gap-2">
@@ -1557,8 +1554,7 @@ class ResConfigSettings(models.TransientModel):
                           <li><strong>2. ضبط التوطين والعملة (KWD):</strong> ربط عملة النظام والشركة الافتراضية بالدينار الكويتي (0.000 د.ك) بـ 3 خانات عشرية.</li>
                         </ul>
                       </div>
-                    </div>
-                  ) : codeModalTab === 'PYTHON' ? (
+                    </div>) : codeModalTab === 'PYTHON' ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
                         <span>فئة <strong>ResConfigSettings</strong> الموروثة من <code>res.config.settings</code> مع تنفيذ <code>set_values()</code>:</span>
@@ -1574,8 +1570,7 @@ class ResConfigSettings(models.TransientModel):
                       <pre className="bg-slate-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto dir-ltr text-left leading-relaxed border border-slate-800">
                         {odooResConfigSettingsPython}
                       </pre>
-                    </div>
-                  ) : codeModalTab === 'XML' ? (
+                    </div>) : codeModalTab === 'XML' ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
                         <span>كود واجهة الإعدادات الشاملة المدمجة في <strong>res.config.settings</strong>:</span>
@@ -1591,8 +1586,7 @@ class ResConfigSettings(models.TransientModel):
                       <pre className="bg-slate-900 text-sky-300 p-4 rounded-xl text-xs font-mono overflow-x-auto dir-ltr text-left leading-relaxed border border-slate-800">
                         {odooResConfigSettingsXml}
                       </pre>
-                    </div>
-                  ) : (
+                    </div>) : (
                     <div className="space-y-3">
                       <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
                         معلمات النظام الحالية المسجلة في جدول <code>ir.config_parameter</code> (Database System Parameters):
@@ -1641,8 +1635,7 @@ class ResConfigSettings(models.TransientModel):
                           </tbody>
                         </table>
                       </div>
-                    </div>
-                  )}
+                    </div>)}
                 </div>
 
                 <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
@@ -1654,15 +1647,11 @@ class ResConfigSettings(models.TransientModel):
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
-        </div>
-      ) : activeTab === 'INTEGRATIONS' ? (
-        <SystemIntegrationsPage activeCompany={activeCompany} />
-      ) : activeTab === 'SYSTEM_SECURITY' ? (
-        <SystemSettingsPage />
-      ) : activeTab === 'APPEARANCE' ? (
+        </div>) : activeTab === 'INTEGRATIONS' ? (
+        <SystemIntegrationsPage activeCompany={activeCompany} />) : activeTab === 'SYSTEM_SECURITY' ? (
+        <SystemSettingsPage />) : activeTab === 'APPEARANCE' ? (
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
           <div>
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-1">
@@ -1706,8 +1695,7 @@ class ResConfigSettings(models.TransientModel):
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#714B67]">
                     <span>{isSelected ? 'الخلفية النشطة حالياً' : 'تفعيل هذا النمط'}</span>
                   </div>
-                </div>
-              );
+                </div>);
             })}
           </div>
 
@@ -1728,8 +1716,7 @@ class ResConfigSettings(models.TransientModel):
               <span>{motionEnabled ? 'الحركة مفعلة (نشط)' : 'الحركة متوقفة (ثابت)'}</span>
             </button>
           </div>
-        </div>
-      ) : activeTab === 'DEVELOPER_TOOLS' ? (
+        </div>) : activeTab === 'DEVELOPER_TOOLS' ? (
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-8 border border-slate-200 shadow-sm space-y-6 max-w-3xl mx-auto text-center">
           <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto text-purple-700 shadow-sm">
             <Sparkles className="w-8 h-8" />
@@ -1864,8 +1851,7 @@ class ResConfigSettings(models.TransientModel):
                </button>
             </div>
           </div>
-        </div>
-      ) : (
+        </div>) : (
         <>
           <div className="space-y-8 max-w-6xl mx-auto pb-12">
             {/* Header banner */}
@@ -1902,8 +1888,7 @@ class ResConfigSettings(models.TransientModel):
                   >
                     <Plus className="w-4 h-4" />
                     <span>إضافة شركة جديدة</span>
-                  </button>
-                )}
+                  </button>)}
               </div>
             </div>
 
@@ -1945,15 +1930,13 @@ class ResConfigSettings(models.TransientModel):
                               <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0">
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
                                 <span>نشطة</span>
-                              </span>
-                            ) : (
+                              </span>) : (
                               <button
                                 onClick={() => onSelectCompany && onSelectCompany(comp)}
                                 className="bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition shrink-0 cursor-pointer shadow-2xs"
                               >
                                 تفعيل
-                              </button>
-                            )}
+                              </button>)}
                           </div>
 
                           <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2 font-mono text-slate-700 shadow-2xs">
@@ -2015,12 +1998,10 @@ class ResConfigSettings(models.TransientModel):
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                      </div>
-                    );
+                      </div>);
                   })}
                 </div>
-              </div>
-            )}
+              </div>)}
 
             {/* Main Form & Sanitation Controls Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -2283,8 +2264,7 @@ class ResConfigSettings(models.TransientModel):
                   </div>
                 </form>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* MODAL: DELETE COMPANY CONFIRMATION */}
           {companyToDelete && (
@@ -2328,8 +2308,7 @@ class ResConfigSettings(models.TransientModel):
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* MODAL: PURGE SYSTEM DATA CONFIRMATION */}
           {showPurgeModal && (
@@ -2368,8 +2347,7 @@ class ResConfigSettings(models.TransientModel):
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* MODAL: LOAD DEMO DATA CONFIRMATION */}
           {showDemoModal && (
@@ -2407,8 +2385,7 @@ class ResConfigSettings(models.TransientModel):
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* NOTIFICATION TOAST MODAL */}
           {notificationMsg && (
@@ -2438,12 +2415,9 @@ class ResConfigSettings(models.TransientModel):
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+            </div>)}
+        </>)}
+    </div>);
 };
 
 

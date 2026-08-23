@@ -23,8 +23,7 @@ export const SettlementView: React.FC = () => {
       <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-3" />
         <p className="text-gray-500 font-medium">جاري تحميل بيانات الموظفين لتصفية المستحقات...</p>
-      </div>
-    );
+      </div>);
   }
 
   return (
@@ -59,8 +58,7 @@ export const SettlementView: React.FC = () => {
             {employees.map(emp => (
               <option key={emp.id} value={emp.id}>
                 {emp.name} - ({emp.department})
-              </option>
-            ))}
+              </option>))}
           </select>
 
           <div>
@@ -127,6 +125,5 @@ export const SettlementView: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

@@ -157,8 +157,8 @@ export const SystemDiagnosticSuite: React.FC<SystemDiagnosticSuiteProps> = ({
       email: 'elsayedhr1993@gmail.com',
       phone: '+965 90001122',
       tags: ['اختبار'],
-      carriedOverLeave2025: 10,
-      openingLeaveBalance: 2.5,
+      // carriedOverLeave2025: 10,
+      
     };
 
     if (typeof onAddEmployee === 'function') {
@@ -353,13 +353,11 @@ export const SystemDiagnosticSuite: React.FC<SystemDiagnosticSuiteProps> = ({
             <>
               <RefreshCw className="w-4 h-4 animate-spin text-purple-200" />
               <span>جاري الفحص المباشر للأنظمة...</span>
-            </>
-          ) : (
+            </>) : (
             <>
               <Play className="w-4 h-4 text-emerald-300 fill-emerald-300" />
               <span>بدء الفحص والاختبار المباشر الشامل (Run E2E Audit)</span>
-            </>
-          )}
+            </>)}
         </button>
       </div>
 
@@ -380,8 +378,7 @@ export const SystemDiagnosticSuite: React.FC<SystemDiagnosticSuiteProps> = ({
           <span className="px-3 py-1 bg-emerald-600 text-white text-xs font-mono font-bold rounded-full shadow">
             STATUS: 100% PRODUCTION READY
           </span>
-        </div>
-      )}
+        </div>)}
 
       {/* Test Tabs */}
       {(testResults || []).length > 0 && (
@@ -438,17 +435,13 @@ export const SystemDiagnosticSuite: React.FC<SystemDiagnosticSuiteProps> = ({
                 {res.metric && (
                   <div className="p-2 bg-slate-50 border border-slate-200 rounded font-mono text-[10px] text-purple-900 font-bold">
                     {res.metric}
-                  </div>
-                )}
+                  </div>)}
 
                 <span className="text-[10px] text-slate-400 block text-left font-mono">
                   وقت الاختبار: {res.timestamp}
                 </span>
-              </div>
-            ))}
+              </div>))}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import { initializeApp, cert, getApps, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import { sendWelcomeEmail, sendAdminNewSubscriptionNotification } from "./src/services/emailService";
 
 dotenv.config();
@@ -496,6 +497,141 @@ ${contextSummary || 'شركة الكويت الطبية والأعمال - 12 م
       source: "fallback_simulated_copilot",
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// ZKTECO & BIOMETRIC REALTIME AUTO-SYNC API ENDPOINTS
+// ---------------------------------------------------------------------------
+const livePunchesCache: Array<{
+  id: string;
+  employeeCode: string;
+  timestamp: string;
+  date: string;
+  time: string;
+  type: 'IN' | 'OUT';
+  deviceSn: string;
+  receivedAt: string;
+  companyId: string;
+}> = [];
+
+app.post("/api/attendance/live-push", async (req, res) => {
+  try {
+    const { punches, companyId, deviceSn } = req.body;
+    const rawPunches = Array.isArray(punches) ? punches : [req.body];
+
+    if (!rawPunches || rawPunches.length === 0) {
+      return res.status(400).json({ success: false, error: "لا توجد سجلات بصمة مرسلة" });
+    }
+
+    const processedList: any[] = [];
+    const nowIso = new Date().toISOString();
+
+    for (const p of rawPunches) {
+      const empCode = (p.employeeCode || p.pin || p.badgenumber || p.userId || p.empId || '').toString().trim();
+      if (!empCode) continue;
+
+      const rawTs = p.timestamp || p.time || p.date || p.datetime || nowIso;
+      const parsedDateObj = new Date(rawTs);
+      const isValidDate = !isNaN(parsedDateObj.getTime());
+
+      const dateStr = isValidDate ? parsedDateObj.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      const timeStr = isValidDate ? parsedDateObj.toTimeString().split(' ')[0].substring(0, 5) : '08:00';
+      const typeStr = (p.type || p.status || p.punchType || 'IN').toString().toUpperCase().includes('OUT') ? 'OUT' : 'IN';
+      const effCompId = companyId || p.companyId || 'comp-1';
+      const effDevSn = deviceSn || p.deviceSn || p.sn || 'ZK-LOCAL-SYNC';
+
+      const punchItem = {
+        id: `punch-${empCode}-${dateStr}-${timeStr.replace(':', '')}-${Date.now()}`,
+        employeeCode: empCode,
+        timestamp: `${dateStr} ${timeStr}`,
+        date: dateStr,
+        time: timeStr,
+        type: typeStr as 'IN' | 'OUT',
+        deviceSn: effDevSn,
+        receivedAt: nowIso,
+        companyId: effCompId,
+      };
+
+      livePunchesCache.unshift(punchItem);
+      if (livePunchesCache.length > 500) livePunchesCache.pop();
+      processedList.push(punchItem);
+
+      if (adminApp) {
+        try {
+          const db = getFirestore(adminApp);
+          const attDocId = `att-live-${effCompId}-${empCode}-${dateStr}`;
+          const attRef = db.collection("attendance").doc(attDocId);
+          const snap = await attRef.get();
+
+          if (snap.exists) {
+            const existing = snap.data() || {};
+            const updatePayload: any = {};
+            if (typeStr === 'IN' && (!existing.checkIn || timeStr < existing.checkIn)) {
+              updatePayload.checkIn = timeStr;
+            } else if (typeStr === 'OUT' && (!existing.checkOut || timeStr > existing.checkOut)) {
+              updatePayload.checkOut = timeStr;
+            } else if (!existing.checkIn) {
+              updatePayload.checkIn = timeStr;
+            } else {
+              updatePayload.checkOut = timeStr;
+            }
+            await attRef.update(updatePayload);
+          } else {
+            await attRef.set({
+              id: attDocId,
+              employeeId: empCode,
+              employeeCode: empCode,
+              companyId: effCompId,
+              date: dateStr,
+              checkIn: typeStr === 'IN' ? timeStr : undefined,
+              checkOut: typeStr === 'OUT' ? timeStr : undefined,
+              workHours: 8,
+              status: 'PRESENT',
+              lateMinutes: 0,
+              earlyDepartureMinutes: 0,
+              overtimeHours: 0,
+              deviceSn: effDevSn,
+              isLiveSynced: true,
+              updatedAt: nowIso
+            });
+          }
+        } catch (dbErr) {
+          console.warn("[Live Attendance DB Sync Warning]:", dbErr);
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `تم معالجة وترحيل ${processedList.length} حركة بصمة لحظية بنجاح إلى النظام`,
+      processedCount: processedList.length,
+      latestPunches: processedList.slice(0, 10),
+    });
+  } catch (err: any) {
+    console.error("[Live Attendance Push Error]:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.all(["/iclock/cdata", "/api/zkteco/iclock/cdata"], async (req, res) => {
+  const sn = (req.query.SN || req.body?.SN || 'ZK-DEVICE').toString();
+
+  if (req.method === 'GET') {
+    return res.send(`GET OPTION FROM: ${sn}\nATTLOGHeader=PIN\tTime\tStatus\tVerify\nOK`);
+  }
+
+  console.log(`[ZKTeco ADMS ADI Push] Incoming logs from SN ${sn}`);
+  return res.send("OK");
+});
+
+app.get("/api/attendance/live-logs", (req, res) => {
+  const compId = (req.query.companyId || 'comp-1').toString();
+  const filtered = livePunchesCache.filter(p => p.companyId === compId || compId === 'ALL');
+  return res.json({
+    success: true,
+    totalCount: filtered.length,
+    punches: filtered,
+  });
 });
 
 // Live WhatsApp API Gateway Route (UltraMsg / Custom WhatsApp Gateway)

@@ -180,10 +180,8 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
                     <span className="truncate flex-1 text-right">{group.title}</span>
                   </div>
                   {isOpen ? (
-                    <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  )}
+                    <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />) : (
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />)}
                 </button>
 
                 {/* Accordion Children Apps */}
@@ -212,13 +210,10 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
                         >
                           <AppIcon className={`w-3.5 h-3.5 shrink-0 ${isAppActive ? 'text-white' : 'text-purple-300'}`} />
                           <span className="truncate flex-1 text-right">{app.title}</span>
-                        </button>
-                      );
+                        </button>);
                     })}
-                  </div>
-                )}
-              </div>
-            );
+                  </div>)}
+              </div>);
           })}
         </div>
       </div>
@@ -233,8 +228,6 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
             <LogOut className="w-4 h-4 shrink-0 text-rose-400" />
             <span className="truncate">تسجيل الخروج الآمن</span>
           </button>
-        </div>
-      )}
-    </aside>
-  );
+        </div>)}
+    </aside>);
 };

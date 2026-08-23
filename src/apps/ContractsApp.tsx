@@ -172,8 +172,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                     إنشاء أول عقد
                   </button>
                 </td>
-              </tr>
-            ) : (
+              </tr>) : (
               filteredContracts.map((cnt, index) => {
 
               const emp = employees.find(e => e.id === cnt.employeeId);
@@ -194,8 +193,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                           title="عرض ملف الموظف"
                         >
                           <User className="w-3 h-3" />
-                        </button>
-                      )}
+                        </button>)}
                     </div>
                   </td>
                   <td className="p-3">
@@ -225,8 +223,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
-                </tr>
-              );
+                </tr>);
             }))}
           </tbody>
         </table>
@@ -266,8 +263,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                     <RotateCcw className="w-3 h-3" />
                     <span>نهاية الخدمة</span>
                   </button>
-                </div>
-              )}
+                </div>)}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -285,8 +281,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {employees.map(e => (
-                    <option key={e.id} value={e.id}>{e.fullNameAr} ({e.civilId})</option>
-                  ))}
+                    <option key={e.id} value={e.id}>{e.fullNameAr} ({e.civilId})</option>))}
                 </select>
               </div>
 
@@ -434,8 +429,6 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

@@ -824,8 +824,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             >
               <Building2 size={15} />
               <span>الانتقال لتطبيقات النظام (HR Apps) 🔄</span>
-            </button>
-          )}
+            </button>)}
 
           <div className="h-4 w-px bg-white/20"></div>
 
@@ -841,8 +840,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             >
               <LogOut size={14} />
               <span>خروج</span>
-            </button>
-          )}
+            </button>)}
         </div>
       </header>
 
@@ -1002,12 +1000,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                       {loading ? (
                         <tr>
                           <td colSpan={6} className="p-8 text-center text-slate-600 font-medium">جاري تحميل سجلات المشتركين...</td>
-                        </tr>
-                      ) : filteredRequests.length === 0 ? (
+                        </tr>) : filteredRequests.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="p-8 text-center text-slate-600 font-medium">لا توجد طلبات اشتراك مطابقة</td>
-                        </tr>
-                      ) : (
+                        </tr>) : (
                         filteredRequests.map((req) => (
                           <tr key={req.id} className="hover:bg-slate-50 transition-colors">
                             <td className="p-3.5">
@@ -1027,25 +1023,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-xs">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
                                   قيد المراجعة (جديد)
-                                </span>
-                              )}
+                                </span>)}
                               {req.state === 'approved' && (
                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold shadow-xs">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                                   نشطة
-                                </span>
-                              )}
+                                </span>)}
                               {req.state === 'suspended' && (
                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-rose-100 text-rose-900 border border-rose-300 text-xs font-bold shadow-xs">
                                   <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
                                   معلقة / مجمدة
-                                </span>
-                              )}
+                                </span>)}
                               {req.state === 'rejected' && (
                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold shadow-xs">
                                   مرفوض
-                                </span>
-                              )}
+                                </span>)}
                             </td>
                             <td className="p-3.5 text-slate-700 font-mono font-bold text-xs">
                               {new Date(req.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}
@@ -1081,8 +1073,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                   >
                                     <PlayCircle size={13} />
                                     <span>{req.state === 'suspended' ? 'إعادة تفعيل' : 'تفعيل'}</span>
-                                  </button>
-                                ) : (
+                                  </button>) : (
                                   <>
                                     <button
                                       onClick={() => {
@@ -1111,8 +1102,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                       <PauseCircle size={13} />
                                       <span>تجميد</span>
                                     </button>
-                                  </>
-                                )}
+                                  </>)}
 
                                 {onImpersonateCompany && req.state === 'approved' && (
                                   <button
@@ -1122,8 +1112,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                   >
                                     <Eye size={13} />
                                     <span>دخول كمسؤول الشركة (Login as Tenant)</span>
-                                  </button>
-                                )}
+                                  </button>)}
 
                                 {/* Cascading Hard Delete button */}
                                 <button
@@ -1139,16 +1128,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                                 </button>
                               </div>
                             </td>
-                          </tr>
-                        ))
+                          </tr>))
                       )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-            </div>
-          )}
+            </div>)}
 
           {activeNav === 'SERVER_STATS' && (
             <div className="max-w-7xl mx-auto space-y-6">
@@ -1184,8 +1171,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {activeNav === 'AUDIT_LOGS' && (
             <div className="max-w-7xl mx-auto space-y-6">
@@ -1204,8 +1190,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <p>[SEC] {new Date().toISOString()} - JWT Token verified successfully with Role: SUPER_ADMIN.</p>
                 </div>
               </div>
-            </div>
-          )}
+            </div>)}
 
         </main>
       </div>
@@ -1298,8 +1283,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Cascading Hard Delete Confirmation Modal */}
       {deletingRequest && (
@@ -1376,13 +1360,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     <span>جاري الحذف والتطهير الشامل...</span>
-                  </>
-                ) : (
+                  </>) : (
                   <>
                     <Trash2 className="w-4 h-4" />
                     <span>تأكيد الحذف النهائي الشامل (Purge)</span>
-                  </>
-                )}
+                  </>)}
               </button>
               
               <button
@@ -1395,8 +1377,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
             </div>
 
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Edit Subscription / Company Account Modal */}
       {editingRequest && (
@@ -1563,8 +1544,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Create New Company / Subscription Modal */}
       {isCreateModalOpen && (
@@ -1730,11 +1710,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
-    </div>
-  );
+    </div>);
 };
 
 export default SuperAdminDashboard;

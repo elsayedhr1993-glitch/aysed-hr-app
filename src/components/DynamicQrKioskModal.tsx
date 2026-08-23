@@ -356,8 +356,7 @@ export const DynamicQrKioskModal: React.FC<DynamicQrKioskModalProps> = ({
                   }`}
                 >
                   {b.name.split('(')[0]} (نطاق {b.radiusMeters}م)
-                </button>
-              ))}
+                </button>))}
             </div>
           </div>
 
@@ -382,12 +381,10 @@ export const DynamicQrKioskModal: React.FC<DynamicQrKioskModalProps> = ({
                   src={qrCanvasUrl} 
                   alt="Dynamic Attendance QR" 
                   className="w-56 h-56 md:w-64 md:h-64 object-contain rounded-xl"
-                />
-              ) : (
+                />) : (
                 <div className="w-64 h-64 flex items-center justify-center">
                   <RefreshCw className="w-8 h-8 animate-spin text-slate-400" />
-                </div>
-              )}
+                </div>)}
 
               {/* Center Logo Icon Overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -509,11 +506,9 @@ export const DynamicQrKioskModal: React.FC<DynamicQrKioskModalProps> = ({
                       <span className="text-[9px] text-emerald-400 flex items-center gap-0.5">
                         <span>تم إرسال واتساب</span>
                         <CheckCircle2 className="w-2.5 h-2.5" />
-                      </span>
-                    )}
+                      </span>)}
                   </div>
-                </div>
-              ))}
+                </div>))}
             </div>
           </div>
 
@@ -526,8 +521,7 @@ export const DynamicQrKioskModal: React.FC<DynamicQrKioskModalProps> = ({
               >
                 <KeyRound className="w-4 h-4 text-amber-400" />
                 <span>استخدام البصمة اليدوية عبر رمز الموظف (PIN / Code)</span>
-              </button>
-            ) : (
+              </button>) : (
               <div className="space-y-2 animate-in fade-in">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                   <span>تسجيل الحضور برقم الموظف / الـ PIN:</span>
@@ -555,12 +549,10 @@ export const DynamicQrKioskModal: React.FC<DynamicQrKioskModalProps> = ({
                     تثبيت البصمة
                   </button>
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
         </div>
 
       </div>
-    </div>
-  );
+    </div>);
 };

@@ -52,8 +52,7 @@ export const LeaveBreakdownBanner: React.FC<LeaveBreakdownProps> = ({
           <div className="flex items-center gap-1 bg-red-600 text-white px-3 py-1.5 rounded-md font-bold shadow-sm animate-pulse">
             <span>تجاوز الرصيد (بدون راتب):</span>
             <strong>{unpaidDays} يوم</strong>
-          </div>
-        )}
+          </div>)}
       </div>
 
       <p className="mt-3 text-xs text-slate-500 leading-relaxed border-t border-slate-200/60 pt-2">
@@ -61,6 +60,5 @@ export const LeaveBreakdownBanner: React.FC<LeaveBreakdownProps> = ({
           ? `⚠️ تنبيه مالي: سيتم احتساب ${unpaidDays} يوم كإجازة غير مدفوعة وخصم قيمتها من مسير الرواتب القادم تلقائياً.`
           : '✓ جميع أيام الإجازة المطلوبة مغطاة بالكامل من رصيدك المعتمد.'}
       </p>
-    </div>
-  );
+    </div>);
 };

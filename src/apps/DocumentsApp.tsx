@@ -98,8 +98,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
            <span className="font-bold text-slate-900">🔔 تنبيهات الوثائق!</span>
            {expiredCount > 0 && <span className="text-rose-600 text-sm">{expiredCount} وثيقة منتهية الصلاحية.</span>}
            {nearExpiryCount > 0 && <span className="text-amber-600 text-sm">{nearExpiryCount} وثيقة تقترب من الانتهاء (60 يوماً).</span>}
-         </div>
-       ), { duration: 5000, position: 'top-center' });
+         </div>), { duration: 5000, position: 'top-center' });
     }
   }, [documents, activeCompany]);
 
@@ -207,8 +206,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                 <p className="text-sm text-amber-800">
                   يجب اتخاذ إجراء فوري لتجديد الوثائق التالية بناءً على قانون العمل (60 يوماً قبل الانتهاء).
                 </p>
-             </div>
-          )}
+             </div>)}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {enrichedDocs.map(doc => {
@@ -239,10 +237,8 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                         <span className={`text-[10px] px-2 py-0.5 rounded ${badgeClass}`}>
                           ينتهي: {doc.expiryDate}
                           {doc.daysToExpiry !== null && (
-                             <span> ({doc.daysToExpiry > 0 ? `بعد ${doc.daysToExpiry} يوم` : 'منتهي'})</span>
-                          )}
-                        </span>
-                      )}
+                             <span> ({doc.daysToExpiry > 0 ? `بعد ${doc.daysToExpiry} يوم` : 'منتهي'})</span>)}
+                        </span>)}
                     </div>
                   </div>
                   <div className="shrink-0 flex flex-col justify-between">
@@ -253,8 +249,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                        <Trash2 className="w-4 h-4" />
                      </button>
                   </div>
-                </div>
-              );
+                </div>);
             })}
           </div>
 
@@ -262,8 +257,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
              <div className="text-center py-20 text-slate-400">
                 <FolderOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
                 <p>لا توجد وثائق في هذا المجلد.</p>
-             </div>
-          )}
+             </div>)}
         </div>
       </div>
 
@@ -286,8 +280,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                 <div className="text-center space-y-4">
                   <div className="w-20 h-20 border-4 border-[#714B67] border-t-transparent rounded-full animate-spin mx-auto"></div>
                   <p className="font-bold text-slate-700 animate-pulse">جاري تحليل الوثيقة وقراءة البيانات (OpenAI Vision)...</p>
-                </div>
-              ) : scanResult ? (
+                </div>) : scanResult ? (
                 <div className="w-full space-y-4">
                   <div className="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-200 flex items-start gap-3">
                     <CheckCircle2 className="w-6 h-6 shrink-0 mt-0.5 text-emerald-600" />
@@ -322,8 +315,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                       تأكيد الأرشفة وإنشاء الموظف
                     </button>
                   </div>
-                </div>
-              ) : (
+                </div>) : (
                 <>
                   <div className="w-32 h-32 bg-slate-100 rounded-full flex items-center justify-center border-4 border-dashed border-slate-300">
                     <Upload className="w-12 h-12 text-slate-400" />
@@ -361,13 +353,10 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                       />
                     </label>
                   </div>
-                </>
-              )}
+                </>)}
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
-    </div>
-  );
+    </div>);
 };

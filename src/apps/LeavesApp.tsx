@@ -6,7 +6,8 @@ import {
 import { 
   calculateActualLeaveDays, 
   getCompensatedHolidays2026,
-  cron_aysed_monthly_accrual
+  cron_aysed_monthly_accrual,
+  getCarriedOverBalance
 } from '../utils/kuwaitLaw';
 import { 
   LeaveService, 
@@ -21,6 +22,8 @@ import {
 } from '../services/leaveService';
 import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData } from '../utils/persistentStorage';
 import { LeaveSettlementCalculator } from '../components/LeaveSettlementCalculator';
+import { useLeaveWorkflow } from '../hooks/useLeaveWorkflow';
+import { OfficialLeaveModal } from '../components/OfficialLeaveModal';
 import { 
   Calendar, Plus, CheckCircle2, Clock, 
   Calculator, FileText, Search, 
@@ -30,6 +33,8 @@ import {
 } from 'lucide-react';
 
 interface LeavesAppProps {
+  autoOpenNewLeaveForEmpId?: string | null;
+  onClearAutoOpenLeave?: () => void;
   leaves: LeaveRequest[];
   employees: Employee[];
   contracts?: Contract[];
@@ -39,7 +44,7 @@ interface LeavesAppProps {
   searchTerm?: string;
   filterTab?: string;
   onSaveLeave: (leave: LeaveRequest) => void;
-  onUpdateLeaveStatus: (leaveId: string, status: 'APPROVED' | 'REJECTED', note?: string) => void;
+  onUpdateLeaveStatus: (leaveId: string, status: 'APPROVED' | 'REJECTED' | 'PENDING_MANAGER' | 'PENDING_HR' | 'DRAFT', note?: string) => void;
   onDeleteLeave?: (leaveId: string, force?: boolean) => Promise<boolean> | boolean | void;
   onSaveEmployee?: (emp: Employee) => void;
   initialEmployeeId?: string;
@@ -47,7 +52,8 @@ interface LeavesAppProps {
   onNavigateToApp?: (app: any) => void;
 }
 
-export const LeavesApp: React.FC<LeavesAppProps> = ({
+export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
+  onClearAutoOpenLeave,
   leaves,
   employees,
   contracts = [],
@@ -84,10 +90,48 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
 
   // Form modals state
   const [editingLeave, setEditingLeave] = useState<Partial<LeaveRequest> | null>(null);
+  useEffect(() => {
+    if (autoOpenNewLeaveForEmpId) {
+      setEditingLeave({
+        status: 'DRAFT',
+        startDate: new Date().toISOString().split('T')[0],
+        employeeId: autoOpenNewLeaveForEmpId
+      });
+      if (onClearAutoOpenLeave) onClearAutoOpenLeave();
+    }
+  }, [autoOpenNewLeaveForEmpId, onClearAutoOpenLeave]);
+
   const [editingAllocation, setEditingAllocation] = useState<Partial<HrLeaveAllocation> | null>(null);
   const [selectedFifoEmployee, setSelectedFifoEmployee] = useState<Employee | null>(null);
   const [selectedAccrualHistoryEmp, setSelectedAccrualHistoryEmp] = useState<Employee | null>(null);
   const [userErrorModal, setUserErrorModal] = useState<{ open: boolean; message: string; leave?: LeaveRequest } | null>(null);
+
+  const handleSaveLeaveRequest = (req: Partial<LeaveRequest>) => {
+    const isNew = !req.id;
+    const newLeave: LeaveRequest = {
+      id: isNew ? 'REQ-' + Date.now().toString() : req.id!,
+      employeeId: req.employeeId!,
+      companyId: activeCompany?.id || '',
+      leaveType: req.leaveType || 'ANNUAL',
+      startDate: req.startDate!,
+      endDate: req.endDate!,
+      totalDays: req.totalDays || 0,
+      paidDays: req.paidDays,
+      unpaidDays: req.unpaidDays,
+      excessDays: req.excessDays || 0,
+      totalAvailableBalance: req.totalAvailableBalance,
+      dailyWage: req.dailyWage,
+      leaveAmount: req.leaveAmount,
+      reason: req.reason || '',
+      status: req.status || 'DRAFT',
+      createdAt: (req as any).createdAt || new Date().toISOString(),
+      isHistorical: false
+    };
+    onSaveLeave(newLeave);
+    setEditingLeave(null);
+  };
+
+  const { calculateLeaveDays, submitRequest, approveByManager, approveByHR, rejectRequest } = useLeaveWorkflow();
 
   // Filters & Search
   const [localSearch, setLocalSearch] = useState<string>('');
@@ -105,7 +149,8 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
     }
   }, [initialEmployeeId]);
 
-  const companyEmployees = (employees || []).filter(e => e.companyId === (activeCompany?.id || 'comp-1') && !e.isDeleted);
+  const rawCompanyEmployees = (employees || []).filter(e => !e.isDeleted && (!activeCompany || activeCompany.id === 'comp-1' || e.companyId === activeCompany.id || !e.companyId));
+  const companyEmployees = rawCompanyEmployees.length > 0 ? rawCompanyEmployees : (employees || []).filter(e => !e.isDeleted);
   const companyLeaves = (leaves || []).filter(l => l.companyId === (activeCompany?.id || 'comp-1'));
   const activeSearchTerm = localSearch || searchTerm;
 
@@ -116,15 +161,15 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
       const updatedAllocations = [...allocations];
 
       companyEmployees.forEach(emp => {
-        const openingVal = Number(emp.openingLeaveBalance ?? emp.carriedOverLeave2025 ?? 0);
+        const openingVal = getCarriedOverBalance(emp);
         const hasOpening = updatedAllocations.some(
-          a => a.employeeId === emp.id && a.allocationType === 'regular' && (a.id.includes('2025') || a.name?.includes('2025') || a.name?.includes('افتتاحي'))
+          a => a.employeeId === emp.id && a.allocationType === 'regular' && (a.id.includes('2025') || a.name?.includes('2025'))
         );
 
         if (!hasOpening && openingVal > 0) {
           updatedAllocations.unshift({
             id: `alloc-open-${emp.id}-2025`,
-            name: 'رصيد إجازات افتتاحي مرحل من 2025 (Opening Balance)',
+            name: 'رصيد إجازات مرحل من 2025 (Carried-Over Balance)',
             employeeId: emp.id,
             companyId: emp.companyId || activeCompany?.id || 'comp-1',
             leaveType: 'ANNUAL',
@@ -288,8 +333,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
     const finalPaidDays = editingLeave.paidDays !== undefined ? editingLeave.paidDays : paidDays;
     const finalExcessDays = editingLeave.excessDays !== undefined ? editingLeave.excessDays : excessDays;
 
-    const determinedStatus: 'APPROVED' | 'SUBMITTED' | 'DRAFT' | 'REJECTED' = 
-      isHist ? 'APPROVED' : (statusOverride || editingLeave.status || 'SUBMITTED');
+    const determinedStatus = (isHist ? 'APPROVED' : (statusOverride || editingLeave.status || 'SUBMITTED')) as any;
 
     const newLeave: LeaveRequest = {
       id: editingLeave.id || `lev-${Date.now()}`,
@@ -450,7 +494,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">الرصيد الافتتاحي (Opening Balance)</span>
+            <span className="text-xs font-bold text-slate-500"> (Opening Balance)</span>
             <div className="p-2 rounded-lg bg-amber-50 text-amber-700">
               <Calendar className="w-4 h-4" />
             </div>
@@ -638,19 +682,18 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                     <td colSpan={8} className="p-8 text-center text-slate-500 font-bold">
                       لا توجد طلبات إجازة مطابقة حالياً
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   filteredLeaves.map((lev, index) => {
                     const emp = employees.find(e => e.id === lev.employeeId);
                     return (
-                      <tr key={lev.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                      <tr key={`${lev.id}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                         <td className="p-3 font-bold text-slate-900">
                           <div>{emp ? emp.fullNameAr : 'مجهول'}</div>
                           <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
                         </td>
                         <td className="p-3">
                           <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[11px]">
-                            {lev.leaveType === 'ANNUAL' ? '🌴 سنوية اعتيادية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType === 'UNPAID' ? '🚫 بدون راتب' : lev.leaveType}
+                            {lev.leaveType === 'ANNUAL' ? '🌴 سنوية اعتيادية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType === 'UNPAID' ? '🚫 بدون راتب' : lev.leaveType === 'COMPENSATORY' ? '🔄 يوم تعويضي' : lev.leaveType}
                           </span>
                         </td>
                         <td className="p-3 font-mono text-slate-700">{lev.startDate} إلى {lev.endDate}</td>
@@ -665,8 +708,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                             {Number(lev.excessDays || 0) > 0 && (
                               <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-bold border border-rose-200">
                                 {lev.excessDays} بدون راتب
-                              </span>
-                            )}
+                              </span>)}
                           </div>
                         </td>
                         <td className="p-3 text-slate-600 max-w-xs truncate">{lev.reason}</td>
@@ -674,49 +716,76 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                           <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
                             lev.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
                             lev.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
+                            lev.status === 'DRAFT' ? 'bg-slate-100 text-slate-800' :
                             'bg-amber-100 text-amber-800'
                           }`}>
                             {lev.status === 'APPROVED' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                            <span>{lev.status === 'APPROVED' ? 'معتمدة' : lev.status === 'REJECTED' ? 'مرفوضة' : 'بانتظار الاعتماد'}</span>
+                            <span>{
+                              lev.status === 'APPROVED' ? 'معتمدة' : 
+                              lev.status === 'REJECTED' ? 'مرفوضة' : 
+                              lev.status === 'PENDING_MANAGER' ? 'بانتظار المدير' :
+                              lev.status === 'PENDING_HR' ? 'بانتظار الموارد البشرية' :
+                              lev.status === 'SUBMITTED' ? 'بانتظار الاعتماد' :
+                              'مسودة'
+                            }</span>
                           </span>
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            {lev.status === 'SUBMITTED' && (
+                            {lev.status === 'DRAFT' && (
+                              <button
+                                onClick={() => onUpdateLeaveStatus(lev.id, 'PENDING_MANAGER')}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>تقديم</span>
+                              </button>)}
+                            {(lev.status === 'PENDING_MANAGER' || lev.status === 'SUBMITTED') && (
+                              <button
+                                onClick={() => onUpdateLeaveStatus(lev.id, 'PENDING_HR')}
+                                className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>اعتماد المدير</span>
+                              </button>)}
+                            {lev.status === 'PENDING_HR' && (
                               <button
                                 onClick={() => onUpdateLeaveStatus(lev.id, 'APPROVED')}
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                               >
                                 <CheckCircle2 className="w-3 h-3" />
-                                <span>اعتماد</span>
+                                <span>اعتماد نهائي</span>
+                              </button>)}
+                            {(lev.status === 'PENDING_MANAGER' || lev.status === 'PENDING_HR' || lev.status === 'SUBMITTED') && 
+                              <button
+                                onClick={() => onUpdateLeaveStatus(lev.id, 'REJECTED')}
+                                className="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>رفض</span>
                               </button>
-                            )}
+}
                             <button
                               onClick={() => setEditingLeave(lev)}
                               className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer"
                             >
                               عرض / تعديل
                             </button>
-                            {onDeleteLeave && lev.status !== 'APPROVED' && (
+                            {onDeleteLeave && (
                               <button
                                 onClick={() => onDeleteLeave(lev.id)}
                                 className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                                title="حذف الطلب"
+                                title="حذف الطلب ورد الرصيد تلقائياً"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                              </button>)}
                           </div>
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Sub-Tab 2: Allocations Manager (hr.leave.allocation) */}
       {activeSubTab === 'ALLOCATIONS' && (
@@ -778,8 +847,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                     <td colSpan={9} className="p-8 text-center text-slate-500 font-bold">
                       لا توجد سجلات تخصيص رصيد مسجلة حالياً
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   filteredAllocations.map((alloc, idx) => {
                     const emp = employees.find(e => e.id === alloc.employeeId);
                     const empFifo = emp ? computeFifoLeaveAllocations(emp, buildEmployeeBaselineAllocations(emp, allocations), companyLeaves) : null;
@@ -790,7 +858,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                     const percent = total > 0 ? Math.min(100, Math.round((consumed / total) * 100)) : 0;
 
                     return (
-                      <tr key={alloc.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                      <tr key={`${alloc.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</div>
                           <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
@@ -836,8 +904,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                               >
                                 <Layers className="w-3.5 h-3.5" />
                                 <span>FIFO</span>
-                              </button>
-                            )}
+                              </button>)}
                             <button
                               onClick={() => setEditingAllocation(alloc)}
                               className="p-1 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
@@ -854,15 +921,13 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                             </button>
                           </div>
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Sub-Tab 3: Balances & FIFO Ledger */}
       {activeSubTab === 'BALANCES' && (
@@ -893,7 +958,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                 <tr>
                   <th className="p-3 text-center">#</th>
                   <th className="p-3">الموظف</th>
-                  <th className="p-3 text-center">الرصيد الافتتاحي (Opening Balance)</th>
+                  <th className="p-3 text-center"> (Opening Balance)</th>
                   <th className="p-3 text-center">المكتسب لعام 2026 (Accrued 2026)</th>
                   <th className="p-3 text-center">المستهلك (Taken Days)</th>
                   <th className="p-3 text-center">الرصيد المتاح الصافي (Net Available Days)</th>
@@ -907,8 +972,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                     <td colSpan={8} className="p-8 text-center text-slate-400 font-bold">
                       لا يوجد موظفين مسجلين في الشركة
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   companyEmployees.map((emp, idx) => {
                     const empFifo = computeFifoLeaveAllocations(
                       emp,
@@ -925,7 +989,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                     const isAccruedForCurrentMonth = emp.lastAccrualDate && emp.lastAccrualDate.slice(0, 7) === targetMonthKey;
 
                     return (
-                      <tr key={emp.id} className={idx % 2 === 0 ? 'bg-white hover:bg-slate-50/50' : 'bg-slate-50/70 hover:bg-slate-50'}>
+                      <tr key={`${emp.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white hover:bg-slate-50/50' : 'bg-slate-50/70 hover:bg-slate-50'}>
                         <td className="p-3 font-mono text-slate-400 text-center">{idx + 1}</td>
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{emp.fullNameAr}</div>
@@ -956,13 +1020,11 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               <span>{emp.lastAccrualDate} (مكتسب)</span>
-                            </span>
-                          ) : (
+                            </span>) : (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                               <Clock className="w-3 h-3 text-amber-600" />
                               <span>{emp.lastAccrualDate || 'معلق للشهر'}</span>
-                            </span>
-                          )}
+                            </span>)}
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
@@ -987,19 +1049,18 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                             </button>
                           </div>
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Sub-Tab 4: Settlement Calculator */}
       {activeSubTab === 'SETTLEMENT' && (
         <LeaveSettlementCalculator
+          allocations={allocations}
           employees={employees}
           contracts={contracts}
           leaves={leaves}
@@ -1008,8 +1069,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
           preSelectedEmployeeId={settlementEmpId}
           onNavigateToTab={(tab) => setActiveSubTab(tab as any)}
           onSaveLeave={onSaveLeave}
-        />
-      )}
+        />)}
 
       {/* Sub-Tab 5: History Log */}
       {activeSubTab === 'HISTORY_LOG' && (
@@ -1027,8 +1087,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
               >
                 <option value="ALL">جميع الموظفين</option>
                 {companyEmployees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.fullNameAr}</option>
-                ))}
+                  <option key={emp.id} value={emp.id}>{emp.fullNameAr}</option>))}
               </select>
             </div>
           </div>
@@ -1052,12 +1111,11 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                     <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">
                       لا توجد سجلات تاريخية مسجلة حالياً
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   historicalLeavesList.map((lev, idx) => {
                     const emp = employees.find(e => e.id === lev.employeeId);
                     return (
-                      <tr key={lev.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
+                      <tr key={`${lev.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                         <td className="p-3 font-mono font-bold text-purple-900">{lev.historicalYear || (lev.startDate ? new Date(lev.startDate).getFullYear() : '2026')}</td>
                         <td className="p-3 font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</td>
                         <td className="p-3">
@@ -1075,15 +1133,13 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                             {lev.isHistorical ? 'أرشيف سابق' : 'حركة فعلية 2026'}
                           </span>
                         </td>
-                      </tr>
-                    );
+                      </tr>);
                   })
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Sub-Tab 6: Holidays */}
       {activeSubTab === 'HOLIDAYS' && (
@@ -1108,212 +1164,24 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                       عطلة رسمية مدفوعة الأجر
                     </span>
                   </td>
-                </tr>
-              ))}
+                </tr>))}
             </tbody>
           </table>
-        </div>
+        </div>)}
+
+      {/* Official Leave Modal Rendered Here */}
+      {editingLeave && (
+        <OfficialLeaveModal
+          editingLeave={editingLeave}
+          onClose={() => setEditingLeave(null)}
+          employees={employees}
+          contracts={contracts}
+          allocations={allocations}
+          allLeaves={leaves}
+          holidaysList={[]}
+          onSave={handleSaveLeaveRequest}
+        />
       )}
-
-      {/* Leave Create / Edit Modal */}
-      {editingLeave && (() => {
-        const selectedEmp = employees.find(e => e.id === (editingLeave.employeeId || ''));
-        const currentLeaveType = editingLeave.leaveType || 'ANNUAL';
-        
-        let netAvailableBalance = 0;
-        if (selectedEmp) {
-          const empFifo = computeFifoLeaveAllocations(
-            selectedEmp,
-            buildEmployeeBaselineAllocations(selectedEmp, allocations),
-            companyLeaves.filter(l => l.id !== editingLeave.id)
-          );
-          netAvailableBalance = empFifo.netAvailable;
-        }
-
-        let calculatedDays = 0;
-        let holidayCount = 0;
-        if (editingLeave.startDate && editingLeave.endDate) {
-          const start = new Date(editingLeave.startDate);
-          const end = new Date(editingLeave.endDate);
-          const rough = Math.max(0, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))) + 1;
-          
-          if (currentLeaveType === 'ANNUAL' || currentLeaveType === 'SICK') {
-            const { actualDays, deductedHolidays } = calculateActualLeaveDays(editingLeave.startDate, editingLeave.endDate);
-            calculatedDays = actualDays > 0 ? actualDays : Math.max(1, rough);
-            holidayCount = deductedHolidays || 0;
-          } else {
-            calculatedDays = Math.max(1, rough);
-          }
-        }
-
-        const isBalanceExceeded = currentLeaveType === 'ANNUAL' && !editingLeave.isHistorical && selectedEmp && calculatedDays > netAvailableBalance;
-        const excessDaysAmount = isBalanceExceeded ? Number((calculatedDays - netAvailableBalance).toFixed(2)) : 0;
-        const paidDaysAmount = isBalanceExceeded ? netAvailableBalance : calculatedDays;
-
-        return (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-300 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <header className="p-4 bg-gradient-to-r from-[#714B67] to-purple-900 text-white flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-white/10 rounded-lg">
-                    <Calendar className="w-5 h-5 text-amber-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm">
-                      {editingLeave.isHistorical ? 'تسجيل إجازة تاريخية في الأرشيف' : 'نموذج طلب إجازة رسمي (hr.leave)'}
-                    </h3>
-                    <p className="text-[11px] text-purple-200">
-                      محرك إجازات أودو - قانون العمل الكويتي (المادة 70)
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setEditingLeave(null)} 
-                  className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white font-bold transition cursor-pointer"
-                >
-                  ✕
-                </button>
-              </header>
-
-              <div className="p-6 space-y-4 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-800 mb-1">الموظف المعني بالطلب *</label>
-                  <select
-                    value={editingLeave.employeeId || ''}
-                    onChange={e => setEditingLeave({ ...editingLeave, employeeId: e.target.value })}
-                    className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#714B67] outline-none"
-                  >
-                    <option value="">-- اختر الموظف --</option>
-                    {companyEmployees.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.jobTitle} - {emp.employeeCode || 'كود'})</option>
-                    ))}
-                  </select>
-
-                  {selectedEmp && (
-                    <div className="mt-2.5 p-3 rounded-xl bg-purple-50/50 border border-purple-200 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-purple-900">رصيد الإجازات السنوية المتاح بنظام FIFO:</span>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs font-mono">
-                          {netAvailableBalance.toFixed(1)} يوم متاح
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-bold text-slate-800 mb-1">نوع الإجازة *</label>
-                    <select
-                      value={currentLeaveType}
-                      onChange={e => setEditingLeave({ ...editingLeave, leaveType: e.target.value as any })}
-                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#714B67] outline-none"
-                    >
-                      <option value="ANNUAL">🌴 إجازة سنوية اعتيادية (خصم من الرصيد)</option>
-                      <option value="SICK">🏥 إجازة مرضية (مستشفى / تقرير طبي)</option>
-                      <option value="UNPAID">🚫 إجازة بدون راتب (خصم من الراتب)</option>
-                      <option value="COMPENSATORY">⚖️ إجازة تعويضية (بدل عمل عطلة)</option>
-                      <option value="MATERNITY">👶 إجازة وضع / أمومة (70 يوماً)</option>
-                      <option value="HAJJ">🕋 إجازة حج (21 يوماً لمرة واحدة)</option>
-                      <option value="COMPASSIONATE">🖤 إجازة عزاء / مناسبة خاصة</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-800 mb-1">المدة المحسوبة تلقائياً</label>
-                    <div className="w-full border border-slate-200 bg-slate-50 rounded-xl p-2.5 text-xs flex items-center justify-between">
-                      <span className="text-slate-600 font-bold">المدة الصافية:</span>
-                      <span className="font-mono font-bold text-[#714B67] text-sm">
-                        {calculatedDays} يوم عمل
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-bold text-slate-800 mb-1">من تاريخ (Start Date) *</label>
-                    <input
-                      type="date"
-                      value={editingLeave.startDate || ''}
-                      onChange={e => setEditingLeave({ ...editingLeave, startDate: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#714B67] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-800 mb-1">إلى تاريخ (End Date) *</label>
-                    <input
-                      type="date"
-                      value={editingLeave.endDate || ''}
-                      onChange={e => setEditingLeave({ ...editingLeave, endDate: e.target.value })}
-                      className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-mono font-bold bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#714B67] outline-none"
-                    />
-                  </div>
-                </div>
-
-                {holidayCount > 0 && (
-                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-2">
-                    <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>تم استبعاد <strong>{holidayCount} يوم</strong> عطلة رسمية تقع ضمن الفترة ولن تُخصم من رصيد الموظف وفق القانون الكويتي.</span>
-                  </div>
-                )}
-
-                {/* Overdraft Protection Alert */}
-                {isBalanceExceeded && (
-                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 space-y-2">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-bold text-xs">معالجة تجاوز الرصيد المتاح (Odoo Overdraft Splitting):</p>
-                        <p className="text-[11px] text-amber-800 mt-0.5">
-                          الرصيد المتاح (<strong className="font-mono">{netAvailableBalance.toFixed(1)} يوم</strong>) يغطي جزءاً من المدة. سيتم اعتماد <strong className="font-mono">{paidDaysAmount.toFixed(1)} يوم</strong> كإجازة مدفوعة، وتحويل <strong className="font-mono">{excessDaysAmount.toFixed(1)} يوم</strong> الزائدة تلقائياً إلى "إجازة بدون راتب / Unpaid Leave" لمنع الرصيد السالب.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block font-bold text-slate-800 mb-1">السبب / الملاحظات</label>
-                  <textarea
-                    rows={2}
-                    value={editingLeave.reason || ''}
-                    onChange={e => setEditingLeave({ ...editingLeave, reason: e.target.value })}
-                    placeholder="اكتب سبب الإجازة..."
-                    className="w-full border border-slate-300 rounded-xl p-2.5 text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#714B67] outline-none"
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                  <button
-                    onClick={() => setEditingLeave(null)}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleSave('SUBMITTED')}
-                      className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Clock className="w-4 h-4" />
-                      <span>إرسال كطلب معلّق (Submit)</span>
-                    </button>
-                    <button
-                      onClick={() => handleSave('APPROVED')}
-                      className="px-5 py-2.5 bg-[#714B67] hover:bg-[#5a3b52] text-white font-bold rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>اعتماد رسمي مباشر (Approve)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Allocation Create / Edit Modal (hr.leave.allocation) */}
       {editingAllocation && (
@@ -1344,8 +1212,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                 >
                   <option value="">-- اختر الموظف --</option>
                   {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>
-                  ))}
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
                 </select>
               </div>
 
@@ -1435,8 +1302,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* FIFO Detailed Consumption Drawer / Modal */}
       {selectedFifoEmployee && (() => {
@@ -1478,7 +1344,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                 {/* 4 Summary Metric Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 text-center">
-                    <div className="text-amber-800 font-bold text-[10px]">الرصيد الافتتاحي (Opening)</div>
+                    <div className="text-amber-800 font-bold text-[10px]"> (Opening)</div>
                     <div className="text-base sm:text-lg font-black text-amber-900 font-mono mt-1">
                       {formatDaysDisplay(openingDays)}
                     </div>
@@ -1542,8 +1408,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                             <td colSpan={8} className="p-6 text-center text-slate-400 font-bold">
                               لا توجد دفعات تخصيص مسجلة لهذا الموظف
                             </td>
-                          </tr>
-                        ) : (
+                          </tr>) : (
                           empFifo.allocations.map((a, aIdx) => {
                             const total = a.numberOfDays || 0;
                             const consumed = a.consumedDays || 0;
@@ -1595,8 +1460,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                                     {isFullyConsumed ? 'مستهلك بالكامل' : isPartiallyConsumed ? 'مستهلك جزئياً' : 'متاح بالكامل'}
                                   </span>
                                 </td>
-                              </tr>
-                            );
+                              </tr>);
                           })
                         )}
                       </tbody>
@@ -1619,8 +1483,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                   {empFifo.breakdown.length === 0 ? (
                     <div className="p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-bold">
                       لم يتم استهلاك أي إجازة سنوية بعد. رصيد الموظف كامل ومتاح للاستخدام.
-                    </div>
-                  ) : (
+                    </div>) : (
                     <div className="space-y-2.5">
                       {empFifo.breakdown.map((b, i) => (
                         <div key={i} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
@@ -1639,16 +1502,14 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                               {b.excessDays > 0 && (
                                 <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
                                   {formatDaysDisplay(b.excessDays)} بدون راتب (تجاوز رصيد)
-                                </span>
-                              )}
+                                </span>)}
                             </div>
                           </div>
 
                           <div className="text-[11px] text-slate-700 space-y-1.5 pt-1">
                             <div className="font-bold text-slate-500 text-[10px]">الدفعات المستهلكة في هذه الإجازة:</div>
                             {b.allocationUsages.length === 0 ? (
-                              <div className="text-rose-600 font-bold">لم تتوفر أرصدة مدفوعة لتغطية هذا الطلب.</div>
-                            ) : (
+                              <div className="text-rose-600 font-bold">لم تتوفر أرصدة مدفوعة لتغطية هذا الطلب.</div>) : (
                               b.allocationUsages.map((u, uIdx) => (
                                 <div key={uIdx} className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 text-emerald-900">
                                   <div className="flex items-center gap-2">
@@ -1662,14 +1523,11 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                                   }`}>
                                     {u.allocationType === 'regular' ? 'رصيد افتتاحي' : 'استحقاق شهري'}
                                   </span>
-                                </div>
-                              ))
+                                </div>))
                             )}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        </div>))}
+                    </div>)}
                 </div>
               </div>
 
@@ -1685,10 +1543,8 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({
                 </button>
               </div>
             </div>
-          </div>
-        );
+          </div>);
       })()}
 
-    </div>
-  );
+    </div>);
 };

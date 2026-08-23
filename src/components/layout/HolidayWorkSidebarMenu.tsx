@@ -66,10 +66,8 @@ export const HolidayWorkSidebarMenu: React.FC<SidebarMenuProps> = ({ activeTab, 
               <CalendarPlus className="w-3.5 h-3.5" />
               <span>تهيئة أنواع الإجازات</span>
             </button>
-          </div>
-        )}
+          </div>)}
       </div>
 
-    </div>
-  );
+    </div>);
 };

@@ -176,8 +176,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
             العودة لصفحة الدخول
           </button>
         </div>
-      </div>
-    );
+      </div>);
   }
 
   return (
@@ -194,8 +193,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
               >
                 <ArrowRight size={14} />
                 <span>العودة للدخول</span>
-              </button>
-            )}
+              </button>)}
             <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-white/20">
               <Building2 size={26} className="text-white" />
             </div>
@@ -221,8 +219,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-800 text-xs font-semibold">
               <AlertCircle size={16} className="shrink-0 text-rose-600" />
               <span>{errorMsg}</span>
-            </div>
-          )}
+            </div>)}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -346,8 +343,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
         </form>
 
       </div>
-    </div>
-  );
+    </div>);
 };
 
 export default SubscriptionRequest;

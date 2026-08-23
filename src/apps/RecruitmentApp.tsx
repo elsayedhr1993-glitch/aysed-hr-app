@@ -372,8 +372,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                 }`}
               >
                 {stg.label.split(' ')[0]} ({count})
-              </button>
-            );
+              </button>);
           })}
         </div>
       </div>
@@ -397,8 +396,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                 {stageCandidates.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 border border-dashed border-slate-200 rounded-lg">
                     <p className="text-[11px]">لا يوجد طلبات بهذه المرحلة</p>
-                  </div>
-                ) : (
+                  </div>) : (
                   stageCandidates.map((cand) => {
                     const attCount = cand.attachments?.length || 0;
                     return (
@@ -411,8 +409,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                           <h4 className="font-bold text-slate-900 text-sm hover:text-[#714B67] transition">{cand.fullName}</h4>
                           <div className="flex text-amber-400 shrink-0">
                             {Array.from({ length: cand.rating || 4 }).map((_, i) => (
-                              <Star key={i} className="w-3 h-3 fill-amber-400" />
-                            ))}
+                              <Star key={i} className="w-3 h-3 fill-amber-400" />))}
                           </div>
                         </div>
 
@@ -426,8 +423,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                           <div className="flex items-center gap-1.5 text-[11px] bg-purple-50 text-purple-800 p-1.5 rounded-lg border border-purple-100 font-semibold">
                             <GraduationCap className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                             <span className="truncate">{cand.degree}</span>
-                          </div>
-                        )}
+                          </div>)}
 
                         {/* Certificates & Attachments badges summary */}
                         <div className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -442,8 +438,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                             <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md font-bold text-[10px] flex items-center gap-1">
                               <Award className="w-3 h-3 text-amber-600" />
                               <span>{cand.certificates.length} شهادات</span>
-                            </span>
-                          )}
+                            </span>)}
                         </div>
 
                         {/* Bottom Row: Salary & Quick Actions */}
@@ -467,8 +462,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                               >
                                 <span>التالي</span>
                                 <ArrowRight className="w-3 h-3" />
-                              </button>
-                            ) : (
+                              </button>) : (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -479,17 +473,14 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                               >
                                 <CheckCircle className="w-3 h-3" />
                                 <span>تعيين كموظف</span>
-                              </button>
-                            )}
+                              </button>)}
                           </div>
                         </div>
-                      </div>
-                    );
+                      </div>);
                   })
                 )}
               </div>
-            </div>
-          );
+            </div>);
         })}
       </div>
 
@@ -572,10 +563,8 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                       <span key={idx} className="bg-white border border-purple-200 text-purple-900 font-bold px-2.5 py-1 rounded-lg text-[11px] shadow-xs flex items-center gap-1">
                         <Award className="w-3 h-3 text-amber-500" />
                         <span>{cert}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
+                      </span>))}
+                  </div>)}
               </div>
 
               {/* Attached Candidate Documents & Certificates Section */}
@@ -602,8 +591,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                     <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p className="font-bold">لم يتم إرفاق مستندات أو شهادات لهذا المتقدم بعد</p>
                     <p className="text-[11px] mt-1">اضغط على "تعديل الطلب" لرفع السيرة الذاتية، الشهادات الدراسية، أو الهوية</p>
-                  </div>
-                ) : (
+                  </div>) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {viewingCandidate.attachments.map((att) => (
                       <div 
@@ -633,10 +621,8 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                             <span>معاينة في تبويب جديد ↗</span>
                           </button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      </div>))}
+                  </div>)}
               </div>
 
               {/* Notes */}
@@ -644,8 +630,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
                   <span className="font-bold text-slate-700 block">ملاحظات وانطباعات المقابلة:</span>
                   <p className="text-slate-600 leading-relaxed whitespace-pre-wrap">{viewingCandidate.notes}</p>
-                </div>
-              )}
+                </div>)}
             </div>
 
             {/* Footer Actions */}
@@ -661,8 +646,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                   >
                     <CheckCircle className="w-4 h-4" />
                     <span>تحويل فوراً إلى موظف وعقد عمل</span>
-                  </button>
-                ) : (
+                  </button>) : (
                   <button
                     onClick={() => {
                       const nextIdx = stages.findIndex(s => s.id === viewingCandidate.stage) + 1;
@@ -676,8 +660,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                   >
                     <span>الترقية للمرحلة التالية</span>
                     <ArrowRight className="w-4 h-4" />
-                  </button>
-                )}
+                  </button>)}
               </div>
 
               <button
@@ -688,8 +671,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* ADD / EDIT CANDIDATE APPLICATION MODAL */}
       {showFormModal && (
@@ -788,8 +770,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                     className="w-full border border-slate-300 rounded-lg p-2 outline-none focus:border-[#714B67]"
                   >
                     {stages.map(s => (
-                      <option key={s.id} value={s.id}>{s.label}</option>
-                    ))}
+                      <option key={s.id} value={s.id}>{s.label}</option>))}
                   </select>
                 </div>
 
@@ -860,10 +841,8 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                           >
                             ×
                           </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                        </span>))}
+                    </div>)}
                 </div>
               </div>
 
@@ -926,8 +905,7 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                   {newAttFileName && (
                     <p className="text-[11px] text-emerald-700 font-mono font-bold mt-1">
                       ✓ جاهز للإضافة: {newAttFileName} ({newAttFileSize})
-                    </p>
-                  )}
+                    </p>)}
                 </div>
 
                 {/* List of Attached Documents */}
@@ -971,11 +949,9 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        </div>
-                      ))}
+                        </div>))}
                     </div>
-                  </div>
-                )}
+                  </div>)}
               </div>
 
               {/* Notes */}
@@ -1010,8 +986,6 @@ export const RecruitmentApp: React.FC<RecruitmentAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

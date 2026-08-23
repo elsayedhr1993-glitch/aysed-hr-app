@@ -59,7 +59,32 @@ export function getPersistentData<T>(key: string, fallback: T, alternateKey?: st
 }
 
 /**
- * Safely saves data to localStorage.
+ * Helper to prune heavy strings (like huge uncompressed base64 images) if quota is exceeded
+ */
+function stripHeavyBase64Data<T>(data: T): T {
+  if (!data) return data;
+  try {
+    if (Array.isArray(data)) {
+      return data.map(item => stripHeavyBase64Data(item)) as unknown as T;
+    }
+    if (typeof data === 'object') {
+      const copy: any = { ...data };
+      for (const k in copy) {
+        if (typeof copy[k] === 'string' && copy[k].length > 100000 && copy[k].startsWith('data:')) {
+          // Clear oversized data URLs that exceed 100KB to fit within localStorage limits
+          copy[k] = '';
+        } else if (typeof copy[k] === 'object' && copy[k] !== null) {
+          copy[k] = stripHeavyBase64Data(copy[k]);
+        }
+      }
+      return copy as T;
+    }
+  } catch (_) {}
+  return data;
+}
+
+/**
+ * Safely saves data to localStorage with automatic QuotaExceeded recovery.
  */
 export function setPersistentData<T>(key: string, data: T, secondaryKey?: string): void {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -71,8 +96,30 @@ export function setPersistentData<T>(key: string, data: T, secondaryKey?: string
     if (secondaryKey) {
       localStorage.setItem(secondaryKey, serialized);
     }
-  } catch (error) {
-    console.error(`[PersistentStorage] Error saving key "${key}":`, error);
+  } catch (error: any) {
+    // Quota Exceeded recovery strategy
+    try {
+      // 1. Clear secondary keys if any
+      if (secondaryKey) {
+        localStorage.removeItem(secondaryKey);
+      }
+      // 2. Clear non-essential cached logs to free space
+      localStorage.removeItem(MANARA_STORAGE_KEYS.AUDIT_LOGS);
+      localStorage.removeItem(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS);
+
+      // 3. Re-try saving
+      const serialized = JSON.stringify(data);
+      localStorage.setItem(key, serialized);
+    } catch (secondErr) {
+      // 4. If still exceeding quota, strip heavy base64 items (e.g. giant avatars/files)
+      try {
+        const cleanedData = stripHeavyBase64Data(data);
+        const serializedCleaned = JSON.stringify(cleanedData);
+        localStorage.setItem(key, serializedCleaned);
+      } catch (finalErr) {
+        console.warn(`[PersistentStorage] Storage quota limit reached for "${key}".`);
+      }
+    }
   }
 }
 

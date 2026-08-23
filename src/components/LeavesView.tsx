@@ -42,8 +42,7 @@ export const LeavesView: React.FC = () => {
       <div className="p-8 text-center bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-3" />
         <p className="text-gray-500 font-medium">جاري تحميل بيانات الموظفين الحية من المصدر المركزي...</p>
-      </div>
-    );
+      </div>);
   }
 
   return (
@@ -78,8 +77,7 @@ export const LeavesView: React.FC = () => {
             {employees.map(emp => (
               <option key={emp.id} value={emp.id}>
                 {emp.name} - ({emp.job_title || 'موظف'} - {emp.department || 'عام'})
-              </option>
-            ))}
+              </option>))}
           </select>
 
           {currentEmp && (
@@ -98,8 +96,7 @@ export const LeavesView: React.FC = () => {
                   {currentEmp.remaining_leaves} يوماً
                 </span>
               </div>
-            </div>
-          )}
+            </div>)}
         </div>
 
         {/* نموذج تقديم واعتماد الإجازة */}
@@ -151,6 +148,5 @@ export const LeavesView: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

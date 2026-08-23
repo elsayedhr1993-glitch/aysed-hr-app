@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { printDocument, exportElementToPdf } from '../../utils/printUtils';
 import { 
   Printer, Download, X, Building2, CheckCircle2, ShieldCheck, 
   Calendar, FileSpreadsheet, Sparkles, User, FileText, Banknote, 
@@ -60,6 +61,10 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
 }) => {
   const effectiveMeasures = activeMeasures || selectedMeasures || [];
   const printAreaRef = useRef<HTMLDivElement>(null);
+  
+  const handlePrint = async () => {
+    await printDocument('official-report-print-area', reportTitle);
+  };
 
   if (!isOpen) return null;
 
@@ -74,8 +79,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
         <span dir="ltr" className="inline-flex items-center gap-1">
           <span className="font-mono">{val.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>
           <span className="font-sans text-[10px] text-slate-500 font-bold">د.ك</span>
-        </span>
-      );
+        </span>);
     }
 
     // 2. If day / hour / minute unit
@@ -85,8 +89,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
         <span dir="ltr" className={`inline-flex items-center gap-1 font-mono font-bold ${isNegative ? 'text-rose-600' : ''}`}>
           <span>{val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
           <span className="font-sans text-[10px] text-slate-500 font-normal">{measure.unit}</span>
-        </span>
-      );
+        </span>);
     }
 
     // 3. Count or standard integer
@@ -94,21 +97,16 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
       return (
         <span dir="ltr" className="font-mono font-bold">
           {val.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-        </span>
-      );
+        </span>);
     }
 
     // 4. Default number
     return (
       <span dir="ltr" className="font-mono">
         {val.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-      </span>
-    );
+      </span>);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
 
   const handleExportExcel = () => {
     const wsData = pivotData.map((row, idx) => {
@@ -171,6 +169,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
         {/* Printable Document Body */}
         <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-100/50 print:bg-white print:p-0">
           <div 
+            id="official-report-print-area"
             ref={printAreaRef}
             className="bg-white border border-slate-300 print:border-none p-6 sm:p-10 max-w-4xl mx-auto shadow-sm print:shadow-none space-y-6 text-slate-800"
             style={{ fontFamily: "'Cairo', 'Tajawal', sans-serif" }}
@@ -207,8 +206,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                 <div><span className="text-slate-500">كود الموظف:</span> <strong className="font-mono text-slate-900 mr-1">{selectedEmployee.employeeCode}</strong></div>
                 <div><span className="text-slate-500">الرقم المدني:</span> <strong className="font-mono text-slate-900 mr-1">{selectedEmployee.civilId || '—'}</strong></div>
                 <div><span className="text-slate-500">المسمى:</span> <span className="text-slate-800 mr-1">{selectedEmployee.jobTitle}</span></div>
-              </div>
-            )}
+              </div>)}
 
             {/* 3. Main Data Table */}
             <div className="overflow-hidden border border-slate-300 rounded-md">
@@ -221,8 +219,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                     {effectiveMeasures.map(m => (
                       <th key={m.id} className="p-2.5 border-l border-slate-700 text-center font-bold">
                         {m.label}
-                      </th>
-                    ))}
+                      </th>))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -231,8 +228,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                       <td colSpan={3 + effectiveMeasures.length} className="p-8 text-center text-slate-400 font-bold">
                         لا توجد بيانات مطابقة لهذا التقرير
                       </td>
-                    </tr>
-                  ) : (
+                    </tr>) : (
                     pivotData.map((row, idx) => (
                       <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
                         <td className="p-2.5 border-l border-slate-200 text-center font-mono text-slate-500">{idx + 1}</td>
@@ -241,10 +237,8 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                         {effectiveMeasures.map(m => (
                           <td key={m.id} className="p-2.5 border-l border-slate-200 text-center">
                             {formatMeasureValue(row.values[m.id], m)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))
+                          </td>))}
+                      </tr>))
                   )}
                 </tbody>
                 {pivotData.length > 0 && (
@@ -257,11 +251,9 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                       {effectiveMeasures.map(m => (
                         <td key={m.id} className="p-2.5 text-center text-xs font-black">
                           {formatMeasureValue(grandTotal[m.id], m)}
-                        </td>
-                      ))}
+                        </td>))}
                     </tr>
-                  </tfoot>
-                )}
+                  </tfoot>)}
               </table>
             </div>
 
@@ -289,6 +281,5 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
         </div>
 
       </div>
-    </div>
-  );
+    </div>);
 };

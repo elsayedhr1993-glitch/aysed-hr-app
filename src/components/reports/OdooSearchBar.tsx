@@ -98,8 +98,7 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
                 >
                   <X className="w-3 h-3" />
                 </button>
-              </span>
-            );
+              </span>);
           })}
 
           {/* Active Group By Chip */}
@@ -113,15 +112,13 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
               >
                 <X className="w-3 h-3" />
               </button>
-            </span>
-          )}
+            </span>)}
 
           {/* Active Measures Chips (if multiple or custom) */}
           {activeMeasures.length > 0 && (
             <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-900 text-xs font-semibold px-2 py-0.5 rounded-md border border-emerald-200">
               <span className="text-[10px] text-emerald-700">المقاييس ({activeMeasures.length})</span>
-            </span>
-          )}
+            </span>)}
 
           <input
             type="text"
@@ -137,8 +134,7 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
               className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+            </button>)}
         </div>
 
         {/* 3 Odoo Enterprise Control Dropdowns */}
@@ -159,8 +155,7 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
               {activeFilters.length > 0 && (
                 <span className="bg-purple-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-mono">
                   {activeFilters.length}
-                </span>
-              )}
+                </span>)}
               <ChevronDown className="w-3.5 h-3.5 opacity-60" />
             </button>
 
@@ -182,12 +177,10 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
                       >
                         <span>{filter.label}</span>
                         {isSelected && <Check className="w-3.5 h-3.5 text-purple-600 shrink-0" />}
-                      </button>
-                    );
+                      </button>);
                   })}
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
 
           {/* 2. Group By Dropdown */}
@@ -233,12 +226,10 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
                       >
                         <span>{group.label}</span>
                         {isSelected && <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                      </button>
-                    );
+                      </button>);
                   })}
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
 
           {/* 3. Measures Dropdown */}
@@ -271,16 +262,13 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
                         <div className="flex items-center gap-2">
                           <span>{measure.label}</span>
                           {measure.unit && (
-                            <span className="text-[10px] text-slate-400">({measure.unit})</span>
-                          )}
+                            <span className="text-[10px] text-slate-400">({measure.unit})</span>)}
                         </div>
                         {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
-                      </button>
-                    );
+                      </button>);
                   })}
                 </div>
-              </div>
-            )}
+              </div>)}
           </div>
 
           {/* Clear Filters button */}
@@ -291,8 +279,7 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
               title="مسح جميع الفلاتر والتجميع"
             >
               <X className="w-4 h-4" />
-            </button>
-          )}
+            </button>)}
         </div>
       </div>
 
@@ -307,6 +294,5 @@ export const OdooSearchBar: React.FC<OdooSearchBarProps> = ({
           <span>محرك تحليلات Odoo Pivot & Graph Engine v18</span>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

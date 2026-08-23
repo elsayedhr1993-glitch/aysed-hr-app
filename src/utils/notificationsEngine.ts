@@ -23,13 +23,13 @@ export function generateSmartNotifications(
 ): SystemNotification[] {
   const notifications: SystemNotification[] = [];
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0,);
 
   const getDaysDiff = (dateStr: string) => {
     if (!dateStr) return 999;
     const target = new Date(dateStr);
     if (isNaN(target.getTime())) return 999;
-    target.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0,);
     const diff = target.getTime() - today.getTime();
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
@@ -112,7 +112,7 @@ export function generateSmartNotifications(
       const join = new Date(emp.joinDate);
       if (!isNaN(join.getTime())) {
         const probationEnd = new Date(join.getTime() + 100 * 24 * 60 * 60 * 1000);
-        probationEnd.setHours(0, 0, 0, 0);
+        probationEnd.setHours(0, 0, 0,);
         const probationDaysLeft = Math.ceil((probationEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
         // Show alert if probation ends within 30 days or completed recently in last 15 days

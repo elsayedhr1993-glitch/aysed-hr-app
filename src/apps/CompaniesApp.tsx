@@ -238,8 +238,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
             >
               <Plus className="w-4 h-4" />
               <span>إنشاء شركة جديدة</span>
-            </button>
-          )}
+            </button>)}
         </div>
       </div>
 
@@ -261,10 +260,8 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-lg border border-purple-200 shadow-inner overflow-hidden o_kanban_image">
                         {comp.logoUrl ? (
-                          <img src={comp.logoUrl} alt={comp.nameAr} className="w-full h-full object-cover" />
-                        ) : (
-                          <Building className="w-6 h-6 text-[#714B67]" />
-                        )}
+                          <img src={comp.logoUrl} alt={comp.nameAr} className="w-full h-full object-cover" />) : (
+                          <Building className="w-6 h-6 text-[#714B67]" />)}
                       </div>
                       <div className="oe_kanban_details">
                         <h3 className="font-bold text-slate-900 text-sm o_kanban_record_title">{comp.nameAr}</h3>
@@ -274,8 +271,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                     {isActive ? (
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5" /> النشطة حالياً
-                      </span>
-                    ) : (
+                      </span>) : (
                       <button
                         name="action_switch_to_this_company"
                         type="button"
@@ -284,8 +280,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                         className="btn btn-primary btn-sm mt-2 bg-[#714B67] hover:bg-[#5e3f55] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition cursor-pointer shadow-sm"
                       >
                         إدارة الشركة
-                      </button>
-                    )}
+                      </button>)}
                   </div>
 
                   {/* Card Body */}
@@ -338,15 +333,12 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                         title="حذف الشركة"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                      </button>)}
                   </div>
                 </div>
-              </div>
-            );
+              </div>);
           })}
-        </div>
-      ) : (
+        </div>) : (
         /* List View */
         <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-right border-collapse text-xs">
@@ -370,10 +362,8 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">
                           {comp.logoUrl ? (
-                            <img src={comp.logoUrl} alt={comp.nameAr} className="w-full h-full object-cover rounded-lg" />
-                          ) : (
-                            <Building className="w-4 h-4 text-[#714B67]" />
-                          )}
+                            <img src={comp.logoUrl} alt={comp.nameAr} className="w-full h-full object-cover rounded-lg" />) : (
+                            <Building className="w-4 h-4 text-[#714B67]" />)}
                         </div>
                         <div>
                           <div className="font-bold text-slate-900">{comp.nameAr}</div>
@@ -392,15 +382,13 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       {isActive ? (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" /> نشطة
-                        </span>
-                      ) : (
+                        </span>) : (
                         <button
                           onClick={() => onSelectCompany(comp)}
                           className="text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-purple-100 transition cursor-pointer"
                         >
                           تعيين كنشطة
-                        </button>
-                      )}
+                        </button>)}
                     </td>
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
@@ -418,17 +406,14 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                             title="حذف"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                          </button>)}
                       </div>
                     </td>
-                  </tr>
-                );
+                  </tr>);
               })}
             </tbody>
           </table>
-        </div>
-      )}
+        </div>)}
 
       {/* Odoo Company Form Modal with Tabs */}
       {isModalOpen && editingCompany && (
@@ -553,12 +538,10 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                     >
                       <option value="">-- بدون شركة أم (شركة مستقلة رئيسية) --</option>
                       {companies.filter(c => c.id !== editingCompany.id).map(c => (
-                        <option key={c.id} value={c.id}>{c.nameAr}</option>
-                      ))}
+                        <option key={c.id} value={c.id}>{c.nameAr}</option>))}
                     </select>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {/* Tab 2: Legal & Tax */}
               {activeTab === 'legal' && (
@@ -631,8 +614,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       />
                     </div>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {/* Tab 3: Address & Contact */}
               {activeTab === 'address' && (
@@ -714,8 +696,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       />
                     </div>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               {/* Tab 4: Branding & Header/Footer & Stamps */}
               {activeTab === 'branding' && (
@@ -764,8 +745,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#714B67] outline-none font-sans"
                     ></textarea>
                   </div>
-                </div>
-              )}
+                </div>)}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
                 <button
@@ -784,8 +764,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
               </div>
             </form>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Delete Confirmation Modal */}
       {companyToDelete && (
@@ -815,8 +794,6 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

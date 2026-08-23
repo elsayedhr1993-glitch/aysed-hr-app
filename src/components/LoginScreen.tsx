@@ -92,8 +92,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           {errorMessage && (
             <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium">
               {errorMessage}
-            </div>
-          )}
+            </div>)}
 
           <form onSubmit={handleLogin} className="space-y-4 text-xs">
             {/* Email Field */}
@@ -142,13 +141,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               className="w-full py-2.5 bg-[#714B67] hover:bg-[#5b3c53] text-white font-bold rounded-lg text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
-                <span>جاري تسجيل الدخول...</span>
-              ) : (
+                <span>جاري تسجيل الدخول...</span>) : (
                 <>
                   <span>تسجيل الدخول</span>
                   <ArrowLeft className="w-4 h-4" />
-                </>
-              )}
+                </>)}
             </button>
           </form>
         </div>
@@ -158,6 +155,5 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
           تطبيق متوافق مع أحكام قانون العمل الكويتي رقم 6/2010 ونظام الحماية الأجور (WPS)
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

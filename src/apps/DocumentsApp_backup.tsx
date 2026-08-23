@@ -342,8 +342,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                 >
                   {part}
                 </span>
-              </React.Fragment>
-            ))}
+              </React.Fragment>))}
       
       {/* OCR Scan Modal */}
       {showOCRModal && (
@@ -364,8 +363,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                   <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
                   <h4 className="text-lg font-bold text-slate-800">جاري مسح وتحليل المستند...</h4>
                   <p className="text-slate-500 mt-2">يتم الآن استخراج البيانات عبر الذكاء الاصطناعي</p>
-                </div>
-              ) : scanResult ? (
+                </div>) : scanResult ? (
                 <div className="space-y-6">
                   <div className="p-4 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5" />
@@ -395,8 +393,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                       >
                         <option value="/">-- اختر المجلد --</option>
                         {allFolders.map(f => (
-                          <option key={f} value={f}>{f}</option>
-                        ))}
+                          <option key={f} value={f}>{f}</option>))}
                       </select>
                     </div>
                   </div>
@@ -418,8 +415,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                       تأكيد الحفظ والأرشفة
                     </button>
                   </div>
-                </div>
-              ) : (
+                </div>) : (
                 <div className="text-center p-8 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50">
                    <Scan className="w-12 h-12 text-slate-400 mx-auto mb-3" />
                    <p className="text-slate-600 font-medium mb-4">قم برفع المستند ليتم قراءته وتصنيفه عبر الذكاء الاصطناعي</p>
@@ -428,12 +424,10 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                       <input type="file" className="hidden" accept="image/*,application/pdf,.pdf,.bdf" onChange={handleOcrUpload} />
                    </label>
                    <p className="text-xs text-slate-400 mt-4">يمكنك مراجعة المستند وتحديد مجلد الحفظ (مثل: مجلد الموظف المعني أو التراخيص) قبل اعتماده.</p>
-                </div>
-              )}
+                </div>)}
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
     </div>
         </div>
 
@@ -497,8 +491,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
             <Folder className="w-20 h-20 opacity-20" />
             <p className="text-lg font-medium">المجلد فارغ</p>
             <p className="text-sm">قم برفع ملفات أو إنشاء مجلدات جديدة هنا</p>
-          </div>
-        ) : (
+          </div>) : (
           viewMode === 'GRID' ? (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6 auto-rows-max">
               {filteredContents.folders.map(folder => (
@@ -522,8 +515,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                   </button>
 <Folder className="w-14 h-14 text-amber-400 mb-3 fill-amber-100" />
                   <span className="text-xs font-medium text-slate-700 text-center line-clamp-2 w-full break-words leading-tight">{folder}</span>
-                </div>
-              ))}
+                </div>))}
               
               {filteredContents.files.map(file => (
                 <div 
@@ -542,10 +534,8 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                   </div>
                   <span className="text-xs font-medium text-slate-700 text-center line-clamp-2 w-full break-words leading-tight">{file.title}</span>
                   <span className="text-[10px] text-slate-400 mt-1">{file.fileSize || 'Unknown size'}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
+                </div>))}
+            </div>) : (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <table className="w-full text-sm text-right">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
@@ -579,8 +569,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                         </button>
 </button>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>))}
                   {filteredContents.files.map(file => (
                     <tr 
                       key={file.id} 
@@ -601,12 +590,10 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>))}
                 </tbody>
               </table>
-            </div>
-          )
+            </div>)
         )}
       </div>
 
@@ -646,8 +633,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
       {/* New Folder Modal */}
       {showAddFolderModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -683,8 +669,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* Quick Upload Modal */}
       {showUploadModal && (
@@ -716,8 +701,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                   >
                     <option value="/">-- اختر المجلد الرئيسي --</option>
                     {allFolders.map(f => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
+                      <option key={f} value={f}>{f}</option>))}
                   </select>
                 </div>
 
@@ -748,9 +732,7 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
-    </div>
-  );
+    </div>);
 };

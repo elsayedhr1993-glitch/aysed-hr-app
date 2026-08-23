@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { collection, onSnapshot, query, where, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, auth, cleanFirestoreData } from '../lib/firebase';
-import { Employee, Contract, LeaveRequest, AttendanceRecord, Payslip, DocumentItem, CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, EmployeeNotification, Company } from '../types';
+import { Employee, Contract, LeaveRequest, AttendanceRecord, Payslip, DocumentItem, CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, EmployeeNotification, Company, EmploymentCommencement } from '../types';
 import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts } from '../data/initialData';
 import { MANARA_STORAGE_KEYS, setPersistentData, getPersistentData } from '../utils/persistentStorage';
 

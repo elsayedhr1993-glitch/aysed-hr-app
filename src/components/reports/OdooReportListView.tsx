@@ -86,13 +86,10 @@ export const OdooReportListView: React.FC<OdooReportListViewProps> = ({
                   }`}>
                     <span>{col.label}</span>
                     {sortKey === col.key ? (
-                      sortAsc ? <ChevronUp className="w-3 h-3 text-purple-700" /> : <ChevronDown className="w-3 h-3 text-purple-700" />
-                    ) : (
-                      <ArrowUpDown className="w-2.5 h-2.5 text-slate-400 opacity-40" />
-                    )}
+                      sortAsc ? <ChevronUp className="w-3 h-3 text-purple-700" /> : <ChevronDown className="w-3 h-3 text-purple-700" />) : (
+                      <ArrowUpDown className="w-2.5 h-2.5 text-slate-400 opacity-40" />)}
                   </div>
-                </th>
-              ))}
+                </th>))}
             </tr>
           </thead>
 
@@ -103,8 +100,7 @@ export const OdooReportListView: React.FC<OdooReportListViewProps> = ({
                   <FileText className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
                   <p className="text-xs font-bold">لا توجد بيانات مسجلة مطابقة للبحث</p>
                 </td>
-              </tr>
-            ) : (
+              </tr>) : (
               sortedData.map((row, idx) => (
                 <tr key={row.id || idx} className="hover:bg-purple-50/30 transition-colors">
                   <td className="py-2 px-3 text-center text-slate-400 font-mono text-[10px] border-l border-slate-100">
@@ -124,17 +120,12 @@ export const OdooReportListView: React.FC<OdooReportListViewProps> = ({
                         ) : col.isCurrency && typeof rawVal === 'number' ? (
                           <span className="font-bold text-slate-900">
                             {rawVal.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك
-                          </span>
-                        ) : typeof rawVal === 'number' ? (
-                          <span className="font-mono text-slate-800">{rawVal.toLocaleString('en-US')}</span>
-                        ) : (
-                          <span className="text-slate-700">{rawVal || '—'}</span>
-                        )}
-                      </td>
-                    );
+                          </span>) : typeof rawVal === 'number' ? (
+                          <span className="font-mono text-slate-800">{rawVal.toLocaleString('en-US')}</span>) : (
+                          <span className="text-slate-700">{rawVal || '—'}</span>)}
+                      </td>);
                   })}
-                </tr>
-              ))
+                </tr>))
             )}
 
             {/* Summary Row */}
@@ -159,14 +150,11 @@ export const OdooReportListView: React.FC<OdooReportListViewProps> = ({
                       ) : (
                         ''
                       )}
-                    </td>
-                  );
+                    </td>);
                 })}
-              </tr>
-            )}
+              </tr>)}
           </tbody>
         </table>
       </div>
-    </div>
-  );
+    </div>);
 };

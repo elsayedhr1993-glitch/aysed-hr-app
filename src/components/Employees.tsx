@@ -5,6 +5,7 @@ import {
 } from '../types';
 
 export interface EmployeesProps {
+  onOpenLeaveModal?: (empId: string) => void;
   employees: Employee[];
   contracts: Contract[];
   leaves: LeaveRequest[];

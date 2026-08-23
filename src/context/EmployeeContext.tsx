@@ -139,8 +139,7 @@ export const EmployeeProvider: React.FC<{
   return (
     <EmployeeContext.Provider value={value}>
       {children}
-    </EmployeeContext.Provider>
-  );
+    </EmployeeContext.Provider>);
 };
 
 export const useEmployeeContext = () => {

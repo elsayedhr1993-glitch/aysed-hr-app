@@ -262,8 +262,7 @@ export const NotificationTemplatesLogApp: React.FC<NotificationTemplatesLogAppPr
               <Send className="w-3.5 h-3.5" />
               <span>إرسال أول إشعار الآن</span>
             </button>
-          </div>
-        ) : (
+          </div>) : (
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead className="bg-[#714B67] text-white font-bold">
@@ -374,13 +373,10 @@ export const NotificationTemplatesLogApp: React.FC<NotificationTemplatesLogAppPr
                                 title="إعادة الإرسال عبر بوابة الواتساب السحابية (Cloud API)"
                               >
                                 {resendingId === notif.id ? (
-                                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-700" />
-                                ) : (
-                                  <Smartphone className="w-4 h-4" />
-                                )}
+                                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-700" />) : (
+                                  <Smartphone className="w-4 h-4" />)}
                               </button>
-                            </>
-                          )}
+                            </>)}
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(notif.message);
@@ -398,17 +394,14 @@ export const NotificationTemplatesLogApp: React.FC<NotificationTemplatesLogAppPr
                               title="حذف من السجل"
                             >
                               <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                            </button>)}
                         </div>
                       </td>
-                    </tr>
-                  );
+                    </tr>);
                 })}
               </tbody>
             </table>
-          </div>
-        )}
+          </div>)}
       </div>
 
       {/* Message Full View Modal */}
@@ -473,9 +466,7 @@ export const NotificationTemplatesLogApp: React.FC<NotificationTemplatesLogAppPr
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
-    </div>
-  );
+    </div>);
 };

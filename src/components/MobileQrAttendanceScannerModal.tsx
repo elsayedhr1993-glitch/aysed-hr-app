@@ -491,8 +491,7 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.fullNameAr} ({emp.employeeCode || 'EMP'}) - {emp.jobTitle}
-                  </option>
-                ))}
+                  </option>))}
               </select>
             </div>
           </div>
@@ -524,8 +523,7 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
                     >
                       إعادة المحاولة
                     </button>
-                  </div>
-                )}
+                  </div>)}
               </div>
 
               {/* GPS Live Status */}
@@ -540,8 +538,7 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
                     : 'جاري جلب إحداثيات القمر الصناعي...'}
                 </span>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* Mode 2: Simulator & Geofence Verification Studio */}
           {activeMode === 'SIMULATOR' && (
@@ -621,18 +618,15 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
                 className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
               >
                 {isProcessing ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                ) : (
-                  <Radio className="w-4 h-4 text-amber-300" />
-                )}
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />) : (
+                  <Radio className="w-4 h-4 text-amber-300" />)}
                 <span>
                   {simScenario === 'INSIDE' 
                     ? `تنفيذ مسح الـ QR والتحقق من الموقع وتوثيق البصمة (${currentEmp?.fullNameAr})` 
                     : `اختبار محاولة البصمة خارج النطاق (${currentEmp?.fullNameAr})`}
                 </span>
               </button>
-            </div>
-          )}
+            </div>)}
 
           {/* Verification Result Feedback */}
           {lastResult && (
@@ -643,10 +637,8 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
             }`}>
               <div className="flex items-center gap-2 font-bold text-sm">
                 {lastResult.isValid ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
-                )}
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />) : (
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />)}
                 <span>{lastResult.isValid ? 'تم قبول البصمة والتحقق من الموقع بنجاح' : 'تم رفض البصمة'}</span>
               </div>
               <p className="text-[11px] leading-relaxed">
@@ -656,8 +648,7 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
                 <span>المسافة المحسوبة: {lastResult.distanceMeters} متراً</span>
                 <span>الحد الأقصى المسموح: {lastResult.allowedRadiusMeters} متراً</span>
               </div>
-            </div>
-          )}
+            </div>)}
 
           {/* Success Punch & WhatsApp Delivery Box */}
           {punchSuccessDetails && (
@@ -701,11 +692,9 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-emerald-600" />
                     <span>📲 فتح محادثة الواتساب وإرسال التأكيد للموظف مباشرة</span>
-                  </a>
-                )}
+                  </a>)}
               </div>
-            </div>
-          )}
+            </div>)}
 
         </div>
 
@@ -720,6 +709,5 @@ export const MobileQrAttendanceScannerModal: React.FC<MobileQrAttendanceScannerM
         </div>
 
       </div>
-    </div>
-  );
+    </div>);
 };

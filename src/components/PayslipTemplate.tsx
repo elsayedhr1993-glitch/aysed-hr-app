@@ -77,8 +77,7 @@ export const PayslipTemplate: React.FC<PayslipProps> = ({
               <td className="p-2 border border-gray-300">بدلات أخرى</td>
               <td className="p-2 border border-gray-300">إضافي</td>
               <td className="p-2 border border-gray-300 text-left font-mono font-bold">{otherAllowances.toFixed(3)}</td>
-            </tr>
-          )}
+            </tr>)}
         </tbody>
       </table>
 
@@ -98,13 +97,11 @@ export const PayslipTemplate: React.FC<PayslipProps> = ({
               <td className="p-2 border border-gray-300">إجازة بدون راتب / غياب</td>
               <td className="p-2 border border-gray-300">{unpaidDays} يوم</td>
               <td className="p-2 border border-gray-300 text-left font-mono font-bold">- {unpaidDeduction.toFixed(3)}</td>
-            </tr>
-          ) : (
+            </tr>) : (
             <tr>
               <td colSpan={2} className="p-2 border border-gray-300 text-center text-gray-400">لا توجد استقطاعات لهذا الشهر</td>
               <td className="p-2 border border-gray-300 text-left font-mono">0.000</td>
-            </tr>
-          )}
+            </tr>)}
         </tbody>
       </table>
 
@@ -127,6 +124,5 @@ export const PayslipTemplate: React.FC<PayslipProps> = ({
           <div className="border-b border-gray-400 w-48 mx-auto"></div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

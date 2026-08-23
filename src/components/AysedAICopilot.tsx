@@ -132,8 +132,7 @@ export const AysedAICopilot: React.FC<AysedAICopilotProps> = ({
             <div className={`px-4 py-2.5 rounded-2xl max-w-[80%] whitespace-pre-wrap ${msg.role === 'user' ? 'bg-amber-100 text-amber-900 rounded-tr-none' : 'bg-white text-slate-700 border border-slate-200 shadow-sm rounded-tl-none'}`}>
               {msg.content}
             </div>
-          </div>
-        ))}
+          </div>))}
         {isLoading && (
           <div className="flex gap-3">
             <div className="w-8 h-8 rounded-full bg-[#714B67] flex items-center justify-center flex-shrink-0">
@@ -143,8 +142,7 @@ export const AysedAICopilot: React.FC<AysedAICopilotProps> = ({
               <Loader2 className="w-4 h-4 animate-spin text-[#714B67]" />
               <span className="text-sm">جاري التفكير...</span>
             </div>
-          </div>
-        )}
+          </div>)}
         <div ref={messagesEndRef} />
       </div>
 
@@ -187,6 +185,5 @@ export const AysedAICopilot: React.FC<AysedAICopilotProps> = ({
           />
         </div>
       </div>
-    </div>
-  );
+    </div>);
 };

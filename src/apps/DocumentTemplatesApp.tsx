@@ -653,8 +653,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                   {filteredEmployees.map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.fullNameAr} ({emp.jobTitle} - {emp.employeeCode})
-                    </option>
-                  ))}
+                    </option>))}
                 </select>
               </div>
 
@@ -669,8 +668,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                   {allTemplates.map(tpl => (
                     <option key={tpl.id} value={tpl.id}>
                       {tpl.titleAr} ({tpl.templateCode})
-                    </option>
-                  ))}
+                    </option>))}
                 </select>
               </div>
 
@@ -735,8 +733,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                   <p className="text-slate-600 text-[11px]">{selectedEmp.jobTitle} | {selectedEmp.department}</p>
                   <p className="text-slate-500 font-mono text-[10px]">الرقم المدني: {selectedEmp.civilId || '—'}</p>
                   <p className="text-slate-500 font-mono text-[10px]">الراتب الأساسي: {formatKWD(selectedContract?.basicSalary || 800)}</p>
-                </div>
-              )}
+                </div>)}
 
               {/* Issue Action Button */}
               <div className="pt-2">
@@ -805,8 +802,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* TAB 2: TEMPLATES LIBRARY & EDITOR */}
       {activeTab === 'TEMPLATES' && (
@@ -836,8 +832,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                   }`}
                 >
                   {cat.label}
-                </button>
-              ))}
+                </button>))}
 
               <button
                 type="button"
@@ -886,8 +881,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                     {tpl.variables.map(v => (
                       <span key={v} className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
                         {`{{${v}}}`}
-                      </span>
-                    ))}
+                      </span>))}
                   </div>
                 </div>
 
@@ -915,11 +909,9 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              </div>))}
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* TAB 3: ISSUED DOCUMENTS ARCHIVE */}
       {activeTab === 'ARCHIVE' && (
@@ -951,8 +943,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                       <FolderArchive className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="font-bold text-slate-600">لا توجد مستندات صادرة مسجلة في الأرشيف حتى الآن</p>
                     </td>
-                  </tr>
-                ) : (
+                  </tr>) : (
                   generatedDocs.map((doc, idx) => (
                     <tr key={doc.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                       <td className="p-3 font-mono font-bold text-purple-900">{doc.documentNumber}</td>
@@ -973,14 +964,12 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                           <span>عرض وطباعة</span>
                         </button>
                       </td>
-                    </tr>
-                  ))
+                    </tr>))
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        </div>)}
 
       {/* TEMPLATE EDITOR MODAL */}
       {showEditorModal && (
@@ -1051,8 +1040,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                   >
                     <Plus className="w-3 h-3 text-[#714B67]" />
                     <span>{v.label}</span>
-                  </button>
-                ))}
+                  </button>))}
               </div>
             </div>
 
@@ -1085,8 +1073,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
               </button>
             </div>
           </form>
-        </div>
-      )}
+        </div>)}
 
       {/* PRINT PREVIEW MODAL */}
       {showPreviewModal && activeGenDoc && (
@@ -1175,8 +1162,6 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>)}
+    </div>);
 };

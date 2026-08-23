@@ -156,7 +156,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         { id: 'active_emp', label: 'الموظفون على رأس العمل' },
         { id: 'kuwaiti', label: 'المواطنون الكويتيون' },
         { id: 'expats', label: 'العمالة الوافدة (مادة 18)' },
-        { id: 'high_salary', label: 'رواتب تفوق 1,000 د.ك' },
+        { id: 'high_salary', label: 'رواتب تفوق 1, د.ك' },
       ],
       availableGroupBy: [
         { id: 'department', label: 'القسم / الإدارة', field: 'department' },
@@ -177,13 +177,13 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     },
     LEAVE_BALANCE: {
       title: 'تقرير رصيد وحركة الإجازات (Leave Balance Report)',
-      description: 'كشف استحقاق الإجازات (2.5 يوم/شهر)، الرصيد الافتتاحي، الأيام المستهلكة، والرصيد المتبقي',
+      description: 'كشف استحقاق الإجازات (2.5 يوم/شهر)، ، الأيام المستهلكة، والرصيد المتبقي',
       icon: Calendar,
       availableFilters: [
         { id: 'active_only', label: 'الموظفون على رأس العمل' },
         { id: 'has_leaves', label: 'موظفون استهلكوا إجازات' },
         { id: 'no_leaves', label: 'موظفون لم يستهلكوا إجازات' },
-        { id: 'low_balance', label: 'رصيد متبقي أقل من 10 أيام' },
+        { id: 'low_balance', label: 'رصيد متبقي أقل من 1 أيام' },
       ],
       availableGroupBy: [
         { id: 'department', label: 'القسم / الإدارة', field: 'department' },
@@ -193,7 +193,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       ],
       availableMeasures: [
         { id: 'count', label: 'عدد الموظفين', field: 'count' },
-        { id: 'openingBalance', label: 'الرصيد الافتتاحي', field: 'openingBalance', unit: 'يوم' },
+        { id: 'carriedOver', label: 'الافتتاحي (مرحل)', field: 'carriedOver', unit: 'يوم' },
         { id: 'accruedDays', label: 'المكتسب لعام 2026', field: 'accruedDays', unit: 'يوم' },
         { id: 'totalAvailable', label: 'إجمالي الرصيد المتاح', field: 'totalAvailable', unit: 'يوم' },
         { id: 'totalDays', label: 'الأيام المستهلكة الإجمالية', field: 'totalDays', unit: 'يوم' },
@@ -201,7 +201,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         { id: 'remainingDays', label: 'صافي الرصيد المتبقي', field: 'remainingDays', unit: 'يوم' },
         { id: 'excessUnpaid', label: 'إجازة غير مدفوعة (خصم راتب)', field: 'excessUnpaid', unit: 'يوم' },
       ],
-      defaultMeasures: ['count', 'openingBalance', 'accruedDays', 'totalAvailable', 'totalDays', 'paidConsumed', 'remainingDays', 'excessUnpaid'],
+      defaultMeasures: ['count', 'carriedOver', 'accruedDays', 'totalAvailable', 'totalDays', 'paidConsumed', 'remainingDays', 'excessUnpaid'],
       defaultGroupBy: 'department',
     },
     ATTENDANCE_ANALYSIS: {
@@ -233,8 +233,8 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       icon: ShieldCheck,
       availableFilters: [
         { id: 'expired', label: 'وثائق منتهية الصلاحية' },
-        { id: 'expiring_30', label: 'تنتهي خلال 30 يوماً (عاجل)' },
-        { id: 'expiring_60', label: 'تنتهي خلال 60 يوماً' },
+        { id: 'expiring_3', label: 'تنتهي خلال 3 يوماً (عاجل)' },
+        { id: 'expiring_6', label: 'تنتهي خلال 6 يوماً' },
         { id: 'moh_only', label: 'تراخيص وزارة الصحة MOH' },
         { id: 'residency_only', label: 'إقامات العمل مادة 18' },
       ],
@@ -246,7 +246,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       availableMeasures: [
         { id: 'count', label: 'عدد الوثائق', field: 'count' },
         { id: 'expiredCount', label: 'منتهية الصلاحية', field: 'expiredCount' },
-        { id: 'urgentCount', label: 'تنتهي خلال 30 يوم', field: 'urgentCount' },
+        { id: 'urgentCount', label: 'تنتهي خلال 3 يوم', field: 'urgentCount' },
       ],
       defaultMeasures: ['count', 'expiredCount', 'urgentCount'],
       defaultGroupBy: 'category',
@@ -320,7 +320,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     const expiry = new Date(expiryDateStr);
     const today = new Date();
     const diffTime = expiry.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.ceil(diffTime / (1 * 6 * 6 * 24));
   };
 
   // ------------------------------------------------------------------------------------------------
@@ -332,9 +332,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     let list = companyEmployees.map(emp => {
       const contract = companyContracts.find(c => c.employeeId === emp.id && c.status === 'RUNNING') ||
                        companyContracts.find(c => c.employeeId === emp.id) || {
-                         basicSalary: 450,
-                         housingAllowance: 100,
-                         transportAllowance: 50,
+                         basicSalary: 45,
+                         housingAllowance: 1,
+                         transportAllowance: 5,
                          otherAllowance: 0,
                          contractType: 'INDEFINITE'
                        };
@@ -355,7 +355,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         jobTitle: emp.jobTitle || 'موظف',
         nationality: emp.nationality || 'غير محدد',
         bankName: emp.bankName || 'بنك الكويت الوطني (NBK)',
-        iban: emp.iban || 'KW00NBK00000000000000',
+        iban: emp.iban || 'KWNBK',
         basicSalary: basic,
         allowances: allowances,
         grossSalary: gross,
@@ -397,7 +397,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       list = list.filter(i => !i.isKuwaiti);
     }
     if (activeFilters.includes('high_salary')) {
-      list = list.filter(i => i.grossSalary >= 1000);
+      list = list.filter(i => i.grossSalary >= 1);
     }
 
     // Grouping
@@ -454,11 +454,11 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
 
     const grandTotal = {
       count: list.length,
-      basicSalary: list.reduce((a, b) => a + b.basicSalary, 0),
-      allowances: list.reduce((a, b) => a + b.allowances, 0),
-      grossSalary: list.reduce((a, b) => a + b.grossSalary, 0),
-      pifss: list.reduce((a, b) => a + b.pifss, 0),
-      netSalary: list.reduce((a, b) => a + b.netSalary, 0),
+      basicSalary: list.reduce((a, b) => a + (b.basicSalary || 0), 0),
+      allowances: list.reduce((a, b) => a + (b.allowances || 0), 0),
+      grossSalary: list.reduce((a, b) => a + (b.grossSalary || 0), 0),
+      pifss: list.reduce((a, b) => a + (b.pifss || 0), 0),
+      netSalary: list.reduce((a, b) => a + (b.netSalary || 0), 0),
     };
 
     return { list, pivotRows, grandTotal };
@@ -476,7 +476,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         l => !l.isHistorical && l.employeeId === emp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED')
       );
       const rawTakenDays = empLeaves.reduce((sum, l) => sum + (l.totalDays || 0), 0);
-      const totalTakenDays = rawTakenDays > 0 ? rawTakenDays : (isJoinedIn2026OrLater ? 0 : 78.0);
+      const totalTakenDays = rawTakenDays;
       
       const paidConsumed = Math.min(totalTakenDays, totalAvailable);
       const remaining = Math.max(0, totalAvailable - totalTakenDays);
@@ -494,7 +494,6 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         department: emp.department || 'الموارد البشرية والإدارة',
         jobTitle: emp.jobTitle || 'موظف',
         nationality: emp.nationality || 'غير محدد',
-        openingBalance: opening,
         accruedDays: accrued,
         totalAvailable: totalAvailable,
         totalDays: totalTakenDays,
@@ -536,7 +535,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       list = list.filter(i => i.totalDays === 0);
     }
     if (activeFilters.includes('low_balance')) {
-      list = list.filter(i => i.remainingDays < 10);
+      list = list.filter(i => i.remainingDays < 1);
     }
 
     const groups: Record<string, { label: string; items: typeof list; values: Record<string, number> }> = {};
@@ -547,12 +546,12 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         groups[key] = {
           label: key,
           items: [],
-          values: { count: 0, openingBalance: 0, accruedDays: 0, totalAvailable: 0, totalDays: 0, paidConsumed: 0, remainingDays: 0, excessUnpaid: 0 },
+          values: { count: 0, accruedDays: 0, totalAvailable: 0, totalDays: 0, paidConsumed: 0, remainingDays: 0, excessUnpaid: 0 },
         };
       }
       groups[key].items.push(item);
       groups[key].values.count += 1;
-      groups[key].values.openingBalance += item.openingBalance;
+      
       groups[key].values.accruedDays += item.accruedDays;
       groups[key].values.totalAvailable += item.totalAvailable;
       groups[key].values.totalDays += item.totalDays;
@@ -575,7 +574,6 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           recordsCount: 1,
           values: {
             count: 1,
-            openingBalance: child.openingBalance,
             accruedDays: child.accruedDays,
             totalAvailable: child.totalAvailable,
             totalDays: child.totalDays,
@@ -589,7 +587,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
 
     const grandTotal = {
       count: list.length,
-      openingBalance: list.reduce((a, b) => a + b.openingBalance, 0),
+      
       accruedDays: list.reduce((a, b) => a + b.accruedDays, 0),
       totalAvailable: list.reduce((a, b) => a + b.totalAvailable, 0),
       totalDays: list.reduce((a, b) => a + b.totalDays, 0),
@@ -617,8 +615,8 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         employeeCode: emp?.employeeCode || 'EMP',
         department: emp?.department || 'إدارة العمليات',
         date: att.date,
-        checkIn: att.checkIn || '08:00',
-        checkOut: att.checkOut || '16:00',
+        checkIn: att.checkIn || '8:',
+        checkOut: att.checkOut || '16:',
         workHours: att.workHours || 8,
         overtimeHours: att.overtimeHours || 0,
         latenessMinutes: att.latenessMinutes || 0,
@@ -723,9 +721,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           documentNumber: emp.mohLicenseNo || '—',
           expiryDate: emp.mohLicenseExpiry || '2026-12-31',
           daysRemaining: days,
-          urgency: days < 0 ? 'منتهي' : days <= 30 ? 'عاجل (30 يوم)' : days <= 60 ? 'تنبيه (60 يوم)' : 'ساري',
+          urgency: days < 0 ? 'منتهي' : days <= 3 ? 'عاجل (3 يوم)' : days <= 6 ? 'تنبيه (6 يوم)' : 'ساري',
           isExpired: days < 0,
-          isUrgent: days >= 0 && days <= 30,
+          isUrgent: days >= 0 && days <= 3,
         });
       }
 
@@ -741,9 +739,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           documentNumber: emp.civilId,
           expiryDate: emp.civilIdExpiry,
           daysRemaining: days,
-          urgency: days < 0 ? 'منتهي' : days <= 30 ? 'عاجل (30 يوم)' : days <= 60 ? 'تنبيه (60 يوم)' : 'ساري',
+          urgency: days < 0 ? 'منتهي' : days <= 3 ? 'عاجل (3 يوم)' : days <= 6 ? 'تنبيه (6 يوم)' : 'ساري',
           isExpired: days < 0,
-          isUrgent: days >= 0 && days <= 30,
+          isUrgent: days >= 0 && days <= 3,
         });
       }
 
@@ -759,9 +757,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           documentNumber: emp.passportNo,
           expiryDate: emp.passportExpiry,
           daysRemaining: days,
-          urgency: days < 0 ? 'منتهي' : days <= 30 ? 'عاجل (30 يوم)' : days <= 60 ? 'تنبيه (60 يوم)' : 'ساري',
+          urgency: days < 0 ? 'منتهي' : days <= 3 ? 'عاجل (3 يوم)' : days <= 6 ? 'تنبيه (6 يوم)' : 'ساري',
           isExpired: days < 0,
-          isUrgent: days >= 0 && days <= 30,
+          isUrgent: days >= 0 && days <= 3,
         });
       }
     });
@@ -787,9 +785,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         documentNumber: doc.documentNumber || '—',
         expiryDate: doc.expiryDate || '—',
         daysRemaining: days,
-        urgency: days < 0 ? 'منتهي' : days <= 30 ? 'عاجل (30 يوم)' : days <= 60 ? 'تنبيه (60 يوم)' : 'ساري',
+        urgency: days < 0 ? 'منتهي' : days <= 3 ? 'عاجل (3 يوم)' : days <= 6 ? 'تنبيه (6 يوم)' : 'ساري',
         isExpired: days < 0,
-        isUrgent: days >= 0 && days <= 30,
+        isUrgent: days >= 0 && days <= 3,
       });
     });
 
@@ -816,11 +814,11 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     if (activeFilters.includes('expired')) {
       list = list.filter(i => i.isExpired);
     }
-    if (activeFilters.includes('expiring_30')) {
+    if (activeFilters.includes('expiring_3')) {
       list = list.filter(i => i.isUrgent);
     }
-    if (activeFilters.includes('expiring_60')) {
-      list = list.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 60);
+    if (activeFilters.includes('expiring_6')) {
+      list = list.filter(i => i.daysRemaining >= 0 && i.daysRemaining <= 6);
     }
     if (activeFilters.includes('moh_only')) {
       list = list.filter(i => i.category.includes('MOH') || i.category.includes('وزارة الصحة'));
@@ -879,7 +877,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       const contract = companyContracts.find(c => c.employeeId === emp.id && c.status === 'RUNNING') ||
                        companyContracts.find(c => c.employeeId === emp.id);
       
-      const salary = (contract?.basicSalary || 500) + (contract?.housingAllowance || 0) + (contract?.transportAllowance || 0);
+      const salary = (contract?.basicSalary || 5) + (contract?.housingAllowance || 0) + (contract?.transportAllowance || 0);
       const isKuwaiti = emp.isKuwaiti || emp.nationality?.includes('كويت');
 
       return {
@@ -893,7 +891,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         status: emp.status === 'ACTIVE' ? 'نشط' : 'إجازة / منتهي',
         isKuwaiti: isKuwaiti,
         totalSalaries: salary,
-        joinDate: emp.joinDate || '2024-01-01',
+        joinDate: emp.joinDate || '224-1-1',
       };
     });
 
@@ -1005,25 +1003,23 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           { key: 'employeeName', label: 'اسم الموظف' },
           { key: 'department', label: 'القسم' },
           { key: 'jobTitle', label: 'المسمى الوظيفي' },
-          { key: 'openingBalance', label: 'الافتتاحي', align: 'center' },
+          { key: 'carriedOver', label: 'الافتتاحي', align: 'center' },
           { key: 'accruedDays', label: 'مكتسب 2026', align: 'center' },
           { key: 'totalDays', label: 'المستهلك', align: 'center' },
           { key: 'remainingDays', label: 'الرصيد المتبقي', align: 'center', render: (row) => (
-            <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
-              row.remainingDays >= 15 ? 'bg-emerald-100 text-emerald-800' :
-              row.remainingDays > 0 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+            <span className={`font-mono font-bold px-2 py-.5 rounded text-xs ${
+              row.remainingDays >= 15 ? 'bg-emerald-1 text-emerald-8' :
+              row.remainingDays > 0 ? 'bg-amber-1 text-amber-8' : 'bg-rose-1 text-rose-8'
             }`}>
               {row.remainingDays} يوم
-            </span>
-          )},
+            </span>)},
           { key: 'leaveStatus', label: 'حالة الرصيد', align: 'center', render: (row) => (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              row.leaveStatus === 'رصيد كافٍ' ? 'bg-emerald-100 text-emerald-800' :
-              row.leaveStatus === 'رصيد منخفض' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+            <span className={`px-2 py-.5 rounded-full text-[1px] font-bold ${
+              row.leaveStatus === 'رصيد كافٍ' ? 'bg-emerald-1 text-emerald-8' :
+              row.leaveStatus === 'رصيد منخفض' ? 'bg-amber-1 text-amber-8' : 'bg-rose-1 text-rose-8'
             }`}>
               {row.leaveStatus}
-            </span>
-          )},
+            </span>)},
         ];
       case 'ATTENDANCE_ANALYSIS':
         return [
@@ -1036,13 +1032,12 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           { key: 'overtimeHours', label: 'إضافي (ساعة)', align: 'center' },
           { key: 'latenessMinutes', label: 'تأخير (دقيقة)', align: 'center' },
           { key: 'status', label: 'الحالة', align: 'center', render: (row) => (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              row.status === 'حاضر' ? 'bg-emerald-100 text-emerald-800' :
-              row.status === 'متأخر' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+            <span className={`px-2 py-.5 rounded-full text-[1px] font-bold ${
+              row.status === 'حاضر' ? 'bg-emerald-1 text-emerald-8' :
+              row.status === 'متأخر' ? 'bg-amber-1 text-amber-8' : 'bg-rose-1 text-rose-8'
             }`}>
               {row.status}
-            </span>
-          )},
+            </span>)},
         ];
       case 'MOH_DOCS_EXPIRY':
         return [
@@ -1052,18 +1047,16 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           { key: 'documentNumber', label: 'الرقم المرجعي' },
           { key: 'expiryDate', label: 'تاريخ الانتهاء', align: 'center' },
           { key: 'daysRemaining', label: 'الأيام المتبقية', align: 'center', render: (row) => (
-            <span className={`font-mono font-bold ${row.daysRemaining < 0 ? 'text-rose-600' : row.daysRemaining <= 30 ? 'text-amber-600' : 'text-slate-700'}`}>
+            <span className={`font-mono font-bold ${row.daysRemaining < 0 ? 'text-rose-6' : row.daysRemaining <= 3 ? 'text-amber-6' : 'text-slate-7'}`}>
               {row.daysRemaining < 0 ? `منتهي منذ ${Math.abs(row.daysRemaining)} يوم` : `${row.daysRemaining} يوم`}
-            </span>
-          )},
+            </span>)},
           { key: 'urgency', label: 'المستوى', align: 'center', render: (row) => (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-              row.isExpired ? 'bg-rose-100 text-rose-800' :
-              row.isUrgent ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+            <span className={`px-2 py-.5 rounded-full text-[1px] font-bold ${
+              row.isExpired ? 'bg-rose-1 text-rose-8' :
+              row.isUrgent ? 'bg-amber-1 text-amber-8' : 'bg-emerald-1 text-emerald-8'
             }`}>
               {row.urgency}
-            </span>
-          )},
+            </span>)},
         ];
       case 'WORKFORCE_DEMO':
         return [
@@ -1104,27 +1097,27 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    XLSX.writeFile(wb, `${activeCategory}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `${activeCategory}_${new Date().toISOString().slice(0, 1)}.xlsx`);
   };
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto font-sans" dir="rtl">
       {/* Top Header & Main Action Bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white border border-slate-2 rounded-2xl p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 bg-[#714B67] text-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+          <div className="w-11 h-11 bg-[#714B67] text-white rounded-xl flex items-center justify-center shadow-sm shrink-">
             <BarChart3 className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black text-slate-900">
+              <h1 className="text-base sm:text-lg font-black text-slate-9">
                 منظومة التقارير والتحليلات (Odoo Reporting & Pivot Analysis Engine)
               </h1>
-              <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">
+              <span className="text-[1px] bg-purple-1 text-purple-8 px-2 py-.5 rounded font-bold">
                 Odoo 18 Matrix
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-5 mt-.5">
               تحليل ديناميكي للجداول المحورية، الرسوم البيانية، ومطابقة لوائح وقوانين العمل والتأمينات في الكويت
             </p>
           </div>
@@ -1134,7 +1127,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleDirectExportXLSX}
-            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 bg-emerald-7 hover:bg-emerald-6 text-white text-xs px-3.5 py-2 rounded-xl font-bold transition shadow-xs cursor-pointer"
             title="تصدير جدول البيانات إلى Excel"
           >
             <FileSpreadsheet className="w-4 h-4" />
@@ -1170,32 +1163,31 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
               }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
                 isActive 
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
+                  ? 'bg-slate-9 text-white border-slate-9 shadow-sm' 
+                  : 'bg-white text-slate-7 border-slate-2 hover:bg-slate-1/8 hover:text-slate-9'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-amber-4' : 'text-slate-4'}`} />
               <span>{config.title.split('(')[0].trim()}</span>
-            </button>
-          );
+            </button>);
         })}
       </div>
 
       {/* Sub-Header with View Mode Switcher (Pivot / Graph / List) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-100/60 p-2 rounded-xl border border-slate-200/80">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 pr-2">
-          <span className="w-2 h-2 rounded-full bg-purple-600" />
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-1/6 p-2 rounded-xl border border-slate-2/8">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-7 pr-2">
+          <span className="w-2 h-2 rounded-full bg-purple-6" />
           <span>{currentConfig.description}</span>
         </div>
 
         {/* View Switchers Buttons */}
-        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-300 shadow-2xs">
+        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-3 shadow-2xs">
           <button
             onClick={() => setViewMode('PIVOT')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'PIVOT' 
                 ? 'bg-[#714B67] text-white shadow-2xs' 
-                : 'text-slate-600 hover:bg-slate-100'
+                : 'text-slate-6 hover:bg-slate-1'
             }`}
             title="الجدول المحوري (Pivot Matrix)"
           >
@@ -1208,7 +1200,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'GRAPH' 
                 ? 'bg-[#714B67] text-white shadow-2xs' 
-                : 'text-slate-600 hover:bg-slate-100'
+                : 'text-slate-6 hover:bg-slate-1'
             }`}
             title="الرسوم البيانية (Graph View)"
           >
@@ -1221,7 +1213,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               viewMode === 'LIST' 
                 ? 'bg-[#714B67] text-white shadow-2xs' 
-                : 'text-slate-600 hover:bg-slate-100'
+                : 'text-slate-6 hover:bg-slate-1'
             }`}
             title="القائمة التفصيلية (List View)"
           >
@@ -1274,8 +1266,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
             groupByLabel={currentConfig.availableGroupBy.find(g => g.id === effectiveGroupBy)?.label || 'القسم'}
             activeMeasures={effectiveMeasures}
             reportTitle={currentConfig.title}
-          />
-        )}
+          />)}
 
         {viewMode === 'GRAPH' && (
           <OdooGraphView
@@ -1283,8 +1274,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
             activeMeasures={effectiveMeasures}
             reportTitle={currentConfig.title}
             groupByLabel={currentConfig.availableGroupBy.find(g => g.id === effectiveGroupBy)?.label || 'القسم'}
-          />
-        )}
+          />)}
 
         {viewMode === 'LIST' && (
           <OdooReportListView
@@ -1293,8 +1283,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
             reportTitle={currentConfig.title}
             totalRecords={activeDataset.list.length}
             summaryRow={activeDataset.grandTotal}
-          />
-        )}
+          />)}
       </div>
 
       {/* Odoo Report Print Wizard Modal (ir.actions.report) */}
@@ -1334,6 +1323,5 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         payslips={companyPayslips}
         documents={companyDocuments}
       />
-    </div>
-  );
+    </div>);
 };
