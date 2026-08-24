@@ -33,7 +33,7 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
   });
 
   const selectedEmp = employees.find(e => e.id === formData.employeeId);
-  const selectedContract = selectedEmp ? contracts.find(c => c.employeeId === selectedEmp.id && (c.status === 'RUNNING' || c.status === 'ACTIVE' || (c.status as any) === 'active')) : null;
+  const selectedContract = selectedEmp ? contracts.find(c => c.employeeId === selectedEmp.id && (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE' || (c.status as string) === 'active')) : null;
 
   // Recompute available balance if employee changes or when opening
   const totalAvailable = useMemo(() => {

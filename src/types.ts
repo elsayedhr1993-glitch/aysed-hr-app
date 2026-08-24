@@ -89,7 +89,13 @@ export interface Employee {
   pinCode?: string;     // رمز PIN للحضور في أودو (Attendance PIN Code)
   currentYearAccruedLeaves?: number;
   approvedTakenLeavesCurrentYear?: number;
-   unpaid_days_count?: number;   // إجمالي الأيام بدون راتب (Odoo Computed: unpaid_days_count)
+  carriedOverLeave2025?: number; // الرصيد المرحل من عام 2025
+  carriedOverBalance?: number;   // الرصيد المرحل الإجمالي
+  openingBalance?: number;       // الرصيد الافتتاحي
+  openingLeaveBalance?: number;  // رصيد الإجازات الافتتاحي
+  days_carried_over?: number;
+  aysed_carried_over?: number;
+  unpaid_days_count?: number;   // إجمالي الأيام بدون راتب (Odoo Computed: unpaid_days_count)
   paid_days_remaining?: number; // رصيد الإجازات المتبقي (Odoo Computed: paid_days_remaining)
   lastAccrualDate?: string;     // تاريخ آخر ترحيل آلي لرصيد الإجازات (YYYY-MM أو YYYY-MM-DD)
   accrualHistory?: Array<{

@@ -583,8 +583,9 @@ export function isEmployeeHiredIn2026OrLater(
 export function getCarriedOverBalance(emp: any): number {
   if (!emp) return 0.0;
 
-  const v2025 = Number(emp.carriedOverLeave2025 ?? emp.carriedOver_2025);
-  const vBal = Number(emp.carriedOverBalance ?? emp.carriedOverLeaveBalance ?? emp.aysed_carried_over);
+  // 1. Direct fields on employee object
+  const v2025 = Number(emp.carriedOverLeave2025 ?? emp.carriedOver_2025 ?? emp.carriedOver2025);
+  const vBal = Number(emp.carriedOverBalance ?? emp.carriedOverLeaveBalance ?? emp.aysed_carried_over ?? emp.openingLeaveBalance ?? emp.openingBalance ?? emp.initialLeaveBalance ?? emp.carriedOver);
 
   if (!isNaN(v2025) && v2025 > 0) return v2025;
   if (!isNaN(vBal) && vBal > 0) return vBal;
@@ -595,6 +596,30 @@ export function getCarriedOverBalance(emp: any): number {
   if (emp.carriedOverBalance !== undefined && emp.carriedOverBalance !== null && !isNaN(Number(emp.carriedOverBalance))) {
     return Number(emp.carriedOverBalance);
   }
+  if (emp.openingBalance !== undefined && emp.openingBalance !== null && !isNaN(Number(emp.openingBalance))) {
+    return Number(emp.openingBalance);
+  }
+  if (emp.openingLeaveBalance !== undefined && emp.openingLeaveBalance !== null && !isNaN(Number(emp.openingLeaveBalance))) {
+    return Number(emp.openingLeaveBalance);
+  }
+
+  // 2. Check localStorage allocations table for any regular opening allocation
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const rawAllocs = window.localStorage.getItem('manara_leave_allocations_data');
+      if (rawAllocs) {
+        const parsed = JSON.parse(rawAllocs);
+        if (Array.isArray(parsed)) {
+          const empRegular = parsed.filter((a: any) => a.employeeId === emp.id && a.allocationType === 'regular');
+          if (empRegular.length > 0) {
+            const sum = empRegular.reduce((s: number, a: any) => s + (Number(a.numberOfDays) || 0), 0);
+            if (sum > 0) return sum;
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
   return 0.0;
 }
 

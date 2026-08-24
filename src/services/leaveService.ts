@@ -201,6 +201,7 @@ export function computeFifoLeaveAllocations(
 
 /**
  * Ensures baseline allocations exist for an employee (e.g. 2025 Opening Balance + 2026 Monthly Accruals)
+ * Strictly preserves any user-created or edited allocations.
  */
 export function buildEmployeeBaselineAllocations(
   emp: Employee,
@@ -213,9 +214,9 @@ export function buildEmployeeBaselineAllocations(
   const result: HrLeaveAllocation[] = [...currentEmpAllocations];
 
   const openingVal = getGlobalOpeningBalance(emp);
-  const hasOpeningAlloc = result.some(a => a.allocationType === 'regular' && (a.name?.includes('2025') || a.name?.includes('افتتاحي') || a.dateFrom?.startsWith('2025') || (is2026Joined && openingVal <= 0)));
+  const hasRegularAlloc = result.some(a => a.allocationType === 'regular');
 
-  if (!hasOpeningAlloc) {
+  if (!hasRegularAlloc) {
     result.unshift({
       id: `alloc-open-${emp.id}-2025`,
       name: (is2026Joined && openingVal <= 0) ? 'رصيد افتتاحي (موظف جديد 2026)' : 'رصيد إجازات افتتاحي مرحل من 2025 (Regular Opening Balance)',
@@ -232,26 +233,25 @@ export function buildEmployeeBaselineAllocations(
       createdAt: '2026-01-01T00:00:00.000Z'
     });
   } else {
-    // Ensure regular opening allocation reflects openingVal if openingVal > 0
+    // If regular allocations exist, NEVER overwrite user-defined numberOfDays to 0 if they set it.
+    // If openingVal > 0 and an allocation has 0 or undefined, update it to openingVal.
     result.forEach(a => {
       if (a.allocationType === 'regular') {
-        if (openingVal > 0) {
-          if (a.numberOfDays === 0 || a.numberOfDays === undefined) {
-            a.numberOfDays = openingVal;
-            a.remainingDays = Math.max(0, openingVal - (a.consumedDays || 0));
-          }
-        } else if (is2026Joined) {
-          a.numberOfDays = 0;
-          a.remainingDays = 0;
+        if (openingVal > 0 && (a.numberOfDays === 0 || a.numberOfDays === undefined)) {
+          a.numberOfDays = openingVal;
+          a.remainingDays = Math.max(0, openingVal - (a.consumedDays || 0));
+        } else if (a.numberOfDays !== undefined && a.numberOfDays > 0) {
+          // Keep the user-defined days and compute remaining accurately
+          a.remainingDays = Math.max(0, (a.numberOfDays || 0) - (a.consumedDays || 0));
         }
       }
     });
   }
 
-  // Ensure August 2026 Accrual dynamically prorated based on hire date
+  // Ensure 2026 Accrual dynamically prorated based on hire date
   const accruedDays = getGlobalAccrued2026(emp);
   const monthsCount = Math.round(accruedDays / 2.5);
-  const hasAccrual = result.some(a => a.allocationType === 'accrual' && (a.name?.includes('2026') || a.name?.includes('أغسطس') || a.name?.includes('استحقاق')));
+  const hasAccrual = result.some(a => a.allocationType === 'accrual');
   if (!hasAccrual) {
     result.push({
       id: `alloc-accrued-${emp.id}-2026-aug`,
@@ -269,11 +269,13 @@ export function buildEmployeeBaselineAllocations(
       createdAt: '2026-08-01T00:00:00.000Z'
     });
   } else {
-    // Ensure existing accrual total matches dynamic calculation
+    // Ensure existing accrual total matches dynamic calculation if not customized
     result.forEach(a => {
       if (a.allocationType === 'accrual') {
-        a.numberOfDays = accruedDays;
-        a.remainingDays = Number((accruedDays - (a.consumedDays || 0)).toFixed(2));
+        if (a.numberOfDays === undefined || a.numberOfDays === 0) {
+          a.numberOfDays = accruedDays;
+        }
+        a.remainingDays = Number(Math.max(0, (a.numberOfDays || 0) - (a.consumedDays || 0)).toFixed(2));
       }
     });
   }

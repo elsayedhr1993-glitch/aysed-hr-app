@@ -35,7 +35,8 @@ import { supabase } from './lib/supabase';
 import { HRProvider, useHR } from './context/HRContext';
 import { EmployeeProvider, StoreContext, useStoreContext, useEmployeeContext } from './context/EmployeeContext';
 import { LeaveService, runAutomatedLeaveAccrual, getAccrualMonthNameAr } from './services/leaveService';
-export { HRProvider, useHR, EmployeeProvider, StoreContext, useStoreContext, useEmployeeContext, LeaveService };
+import { TenantDatabaseService } from './services/tenantDataService';
+export { HRProvider, useHR, EmployeeProvider, StoreContext, useStoreContext, useEmployeeContext, LeaveService, TenantDatabaseService };
 
 function MainActionManager() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -824,21 +825,24 @@ function MainActionManager() {
 
   const handleSaveEmployee = async (emp: Employee) => {
     const isExisting = employees.some(e => e.id === emp.id);
+    const targetCompId = emp.companyId || activeCompany?.id || 'comp-1';
+    const empWithComp = { ...emp, companyId: targetCompId };
+
     setEmployees(prev => {
       const idx = prev.findIndex(e => e.id === emp.id);
-      const updated = idx >= 0 ? prev.map(e => e.id === emp.id ? emp : e) : [emp, ...prev];
+      const updated = idx >= 0 ? prev.map(e => e.id === emp.id ? empWithComp : e) : [empWithComp, ...prev];
       setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, updated);
       return updated;
     });
     try {
-      await setDoc(doc(db, "employees", emp.id), cleanFirestoreData(emp));
+      await TenantDatabaseService.saveEmployee(empWithComp, targetCompId);
       toast.success("تم حفظ بيانات الموظف بنجاح");
       addAuditLog({
         action: isExisting ? 'UPDATE' : 'CREATE',
         entity: 'EMPLOYEE',
         entityId: emp.id,
         details: `${isExisting ? 'تعديل ملف' : 'إضافة موظف جديد'}: ${emp.fullNameAr} (${emp.employeeCode})`,
-        companyId: emp.companyId || activeCompany?.id || 'comp-1'
+        companyId: targetCompId
       });
     } catch(e) {
       console.error(e);
@@ -847,14 +851,16 @@ function MainActionManager() {
   };
 
   const handleSaveContract = async (cnt: Contract) => {
+    const targetCompId = cnt.companyId || activeCompany?.id || 'comp-1';
+    const completeContract = { ...cnt, companyId: targetCompId };
     setContracts(prev => {
       const idx = prev.findIndex(c => c.id === cnt.id);
-      const updated = idx >= 0 ? prev.map(c => c.id === cnt.id ? cnt : c) : [cnt, ...prev];
+      const updated = idx >= 0 ? prev.map(c => c.id === cnt.id ? completeContract : c) : [completeContract, ...prev];
       setPersistentData(MANARA_STORAGE_KEYS.CONTRACTS, updated);
       return updated;
     });
     try {
-      await setDoc(doc(db, "contracts", cnt.id), cleanFirestoreData(cnt));
+      await TenantDatabaseService.saveContract(completeContract, targetCompId);
       toast.success("تم حفظ العقد بنجاح");
     } catch (e) {
       console.error(e);
@@ -921,7 +927,8 @@ function MainActionManager() {
     }
 
     try {
-      await setDoc(doc(db, "leaves", lv.id), cleanFirestoreData(lv));
+      const targetCompId = lv.companyId || activeCompany?.id || 'comp-1';
+      await TenantDatabaseService.saveLeave(lv, targetCompId);
       toast.success("تم تسجيل طلب الإجازة بنجاح");
     } catch (e) {
       console.error(e);
@@ -1068,14 +1075,16 @@ function MainActionManager() {
   };
 
   const handleSaveAttendance = async (rec: AttendanceRecord) => {
+    const targetCompId = rec.companyId || activeCompany?.id || 'comp-1';
+    const completeRec = { ...rec, companyId: targetCompId };
     setAttendance(prev => {
       const idx = prev.findIndex(a => a.id === rec.id);
-      const updated = idx >= 0 ? prev.map(a => a.id === rec.id ? rec : a) : [rec, ...prev];
+      const updated = idx >= 0 ? prev.map(a => a.id === rec.id ? completeRec : a) : [completeRec, ...prev];
       setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, updated);
       return updated;
     });
     try {
-      await setDoc(doc(db, "attendance", rec.id), cleanFirestoreData(rec));
+      await TenantDatabaseService.saveAttendance(completeRec, targetCompId);
       toast.success("تم حفظ سجل البصمة والحضور");
     } catch (e) {
       console.error(e);
@@ -1083,19 +1092,21 @@ function MainActionManager() {
   };
 
   const handleSaveAttendanceBatch = async (records: AttendanceRecord[]) => {
+    const targetCompId = activeCompany?.id || 'comp-1';
     setAttendance(prev => {
       const copy = [...prev];
       records.forEach(rec => {
-        const idx = copy.findIndex(a => a.id === rec.id);
-        if (idx >= 0) copy[idx] = rec;
-        else copy.push(rec);
+        const fullRec = { ...rec, companyId: rec.companyId || targetCompId };
+        const idx = copy.findIndex(a => a.id === fullRec.id);
+        if (idx >= 0) copy[idx] = fullRec;
+        else copy.push(fullRec);
       });
       setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, copy);
       return copy;
     });
     try {
       for (const rec of records) {
-        await setDoc(doc(db, "attendance", rec.id), cleanFirestoreData(rec));
+        await TenantDatabaseService.saveAttendance({ ...rec, companyId: rec.companyId || targetCompId }, targetCompId);
       }
       toast.success(`تم حفظ ومعالجة ${records.length} سجل حضور بنجاح`);
     } catch (e) {
@@ -1108,14 +1119,16 @@ function MainActionManager() {
   };
 
   const handleSavePayslip = async (p: Payslip) => {
+    const targetCompId = p.companyId || activeCompany?.id || 'comp-1';
+    const completePayslip = { ...p, companyId: targetCompId };
     setPayslips(prev => {
       const idx = prev.findIndex(x => x.id === p.id);
-      const updated = idx >= 0 ? prev.map(x => x.id === p.id ? p : x) : [p, ...prev];
+      const updated = idx >= 0 ? prev.map(x => x.id === p.id ? completePayslip : x) : [completePayslip, ...prev];
       setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, updated);
       return updated;
     });
     try {
-      await setDoc(doc(db, "payslips", p.id), cleanFirestoreData(p));
+      await TenantDatabaseService.savePayslip(completePayslip, targetCompId);
       toast.success("تم حفظ مسير الراتب بنجاح");
     } catch (e) {
       console.error(e);
@@ -1955,6 +1968,7 @@ function MainActionManager() {
                     isActive: completeCompany.status !== 'suspended',
                     updatedAt: new Date().toISOString()
                   };
+                  await TenantDatabaseService.saveTenant(completeCompany);
                   await setDoc(doc(db, "companies", compId), cleanFirestoreData(companyDocData), { merge: true });
                   
                   // Also create or update matching subscription

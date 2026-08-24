@@ -22,7 +22,7 @@ export async function exportElementToPdf(
     }
 
     // Scroll to top to ensure complete render
-    window.scrollTo(0,);
+    window.scrollTo(0, 0);
 
     const canvas = await html2canvasPro(element, {
       scale: 2, // High resolution (Retina/Print quality)

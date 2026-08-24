@@ -343,7 +343,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
       </div>
 
       {/* SEARCH BAR FOR TABLE */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 mb-4 flex items-center gap-2">
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm mb-4 flex items-center gap-2">
         <Search className="w-4 h-4 text-slate-400" />
         <input
           type="text"
@@ -371,20 +371,20 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-[#714B67] text-white font-bold">
+          <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+            <table className="w-full text-right text-xs table-auto">
+              <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                 <tr>
-                  <th className="p-2.5">رقم المسير</th>
-                  <th className="p-2.5">الموظف</th>
-                  <th className="p-2.5">الرقم المدني</th>
-                  <th className="p-2.5">الراتب الأساسي</th>
-                  <th className="p-2.5">البدلات الثابتة</th>
-                  <th className="p-2.5">الإضافي</th>
-                  <th className="p-2.5 text-rose-200">الخصومات والسلف</th>
-                  <th className="p-2.5 bg-emerald-800">صافي الراتب (Net KWD)</th>
-                  <th className="p-2.5">الحالة</th>
-                  <th className="p-2.5 text-center">الإجراءات والطباعة</th>
+                  <th className="p-3 w-28 whitespace-nowrap">رقم المسير</th>
+                  <th className="p-3 min-w-[200px] whitespace-nowrap">الموظف</th>
+                  <th className="p-3 w-32 whitespace-nowrap">الرقم المدني</th>
+                  <th className="p-3 w-28 whitespace-nowrap">الراتب الأساسي</th>
+                  <th className="p-3 w-28 whitespace-nowrap">البدلات الثابتة</th>
+                  <th className="p-3 w-24 whitespace-nowrap">الإضافي</th>
+                  <th className="p-3 w-32 whitespace-nowrap text-rose-200">الخصومات والسلف</th>
+                  <th className="p-3 w-36 whitespace-nowrap bg-emerald-800">صافي الراتب (Net KWD)</th>
+                  <th className="p-3 w-32 whitespace-nowrap">الحالة</th>
+                  <th className="p-3 w-36 whitespace-nowrap text-center">الإجراءات والطباعة</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -400,35 +400,35 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                     
                     return (
                       <tr key={p.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
-                        <td className="p-2.5 font-mono font-bold text-slate-600">{p.id}</td>
-                        <td className="p-2.5 font-bold text-slate-900">
+                        <td className="p-3 font-mono font-bold text-slate-600">{p.id}</td>
+                        <td className="p-3 font-bold text-slate-900">
                           {emp ? (
                             <div>
                               <p className="text-slate-900">{emp.fullNameAr}</p>
                               <p className="text-[10px] text-slate-400 font-mono">{emp.employeeCode} | {emp.jobTitle}</p>
                             </div>) : 'مجهول'}
                         </td>
-                        <td className="p-2.5 font-mono text-slate-700 dir-ltr">{emp?.civilId || '—'}</td>
-                        <td className="p-2.5 font-mono font-bold text-slate-800 dir-ltr">{formatKWD(p.basicSalary)}</td>
-                        <td className="p-2.5 font-mono text-slate-700 dir-ltr">{formatKWD(p.allowances)}</td>
-                        <td className="p-2.5 font-mono text-sky-700 font-semibold dir-ltr">{formatKWD(p.overtimeAmount || 0)}</td>
-                        <td className="p-2.5 font-mono font-bold text-rose-600 dir-ltr">
+                        <td className="p-3 font-mono text-slate-700 dir-ltr">{emp?.civilId || '—'}</td>
+                        <td className="p-3 font-mono font-bold text-slate-800 dir-ltr">{formatKWD(p.basicSalary)}</td>
+                        <td className="p-3 font-mono text-slate-700 dir-ltr">{formatKWD(p.allowances)}</td>
+                        <td className="p-3 font-mono text-sky-700 font-semibold dir-ltr">{formatKWD(p.overtimeAmount || 0)}</td>
+                        <td className="p-3 font-mono font-bold text-rose-600 dir-ltr">
                           {totalDeductionsEmp > 0 ? formatKWD(totalDeductionsEmp) : '0.000 KWD'}
                         </td>
-                        <td className="p-2.5 font-mono font-black text-emerald-800 bg-emerald-50/60 dir-ltr text-sm">
+                        <td className="p-3 font-mono font-black text-emerald-800 bg-emerald-50/60 dir-ltr text-sm">
                           {formatKWD(p.netSalary)}
                         </td>
-                        <td className="p-2.5">
-                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1">
+                        <td className="p-3">
+                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>معتمد للتحويل</span>
                           </span>
                         </td>
-                        <td className="p-2.5 text-center">
+                        <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => setSelectedPayslipForPrint(p)}
-                              className="bg-[#714B67] hover:bg-[#583950] text-white text-[11px] font-bold px-2.5 py-1 rounded shadow flex items-center gap-1 transition cursor-pointer"
+                              className="bg-[#714B67] hover:bg-[#583950] text-white text-[11px] font-bold px-2.5 py-1 rounded shadow-xs flex items-center gap-1 transition cursor-pointer"
                               title="طباعة إشعار الراتب PDF"
                             >
                               <Printer className="w-3.5 h-3.5" />
@@ -437,7 +437,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                             {onOpenNotificationModal && emp && (
                               <button
                                 onClick={() => onOpenNotificationModal(emp, 'PAYROLL_SALARY', { payslip: p })}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2 py-1 rounded shadow flex items-center gap-1 transition cursor-pointer"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow-xs flex items-center gap-1 transition cursor-pointer"
                                 title="إرسال كشف الراتب عبر الواتساب للموظف"
                               >
                                 <Smartphone className="w-3.5 h-3.5" />
@@ -466,21 +466,21 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-[#714B67] text-white font-bold">
+          <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+            <table className="w-full text-right text-xs table-auto">
+              <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                 <tr>
-                  <th className="p-2.5">كود الموظف</th>
-                  <th className="p-2.5">اسم الموظف</th>
-                  <th className="p-2.5">الرقم المدني</th>
-                  <th className="p-2.5">المسمى الوظيفي</th>
-                  <th className="p-2.5">الراتب الأساسي</th>
-                  <th className="p-2.5">بدل السكن</th>
-                  <th className="p-2.5">بدل النقل</th>
-                  <th className="p-2.5">بدلات أخرى</th>
-                  <th className="p-2.5 bg-purple-900">إجمالي الراتب الشامل</th>
-                  
-                  <th className="p-2.5 text-center">إدارة الهيكل</th>
+                  <th className="p-3 w-28 whitespace-nowrap">كود الموظف</th>
+                  <th className="p-3 min-w-[200px] whitespace-nowrap">اسم الموظف</th>
+                  <th className="p-3 w-32 whitespace-nowrap">الرقم المدني</th>
+                  <th className="p-3 w-36 whitespace-nowrap">المسمى الوظيفي</th>
+                  <th className="p-3 w-28 whitespace-nowrap">الراتب الأساسي</th>
+                  <th className="p-3 w-28 whitespace-nowrap">بدل السكن</th>
+                  <th className="p-3 w-28 whitespace-nowrap">بدل النقل</th>
+                  <th className="p-3 w-28 whitespace-nowrap">بدلات أخرى</th>
+                  <th className="p-3 w-36 whitespace-nowrap bg-purple-900">إجمالي الراتب الشامل</th>
+                  <th className="p-3 w-32 whitespace-nowrap">التأمينات</th>
+                  <th className="p-3 w-32 whitespace-nowrap text-center">إدارة الهيكل</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -494,31 +494,31 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
 
                   return (
                     <tr key={emp.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
-                      <td className="p-2.5 font-mono font-bold text-slate-600">{emp.employeeCode}</td>
-                      <td className="p-2.5 font-bold text-slate-900">
+                      <td className="p-3 font-mono font-bold text-slate-600">{emp.employeeCode}</td>
+                      <td className="p-3 font-bold text-slate-900">
                         {emp.fullNameAr}
                         <span className="block text-[10px] text-slate-400">{emp.fullNameEn}</span>
                       </td>
-                      <td className="p-2.5 font-mono text-slate-700 dir-ltr">{emp.civilId}</td>
-                      <td className="p-2.5 font-semibold text-slate-800">{emp.jobTitle}</td>
-                      <td className="p-2.5 font-mono font-bold text-slate-900 dir-ltr">{formatKWD(basic)}</td>
-                      <td className="p-2.5 font-mono text-slate-700 dir-ltr">{formatKWD(housing)}</td>
-                      <td className="p-2.5 font-mono text-slate-700 dir-ltr">{formatKWD(transport)}</td>
-                      <td className="p-2.5 font-mono text-slate-700 dir-ltr">{formatKWD(other)}</td>
-                      <td className="p-2.5 font-mono font-black text-purple-900 bg-purple-50 dir-ltr text-sm">
+                      <td className="p-3 font-mono text-slate-700 dir-ltr">{emp.civilId}</td>
+                      <td className="p-3 font-semibold text-slate-800">{emp.jobTitle}</td>
+                      <td className="p-3 font-mono font-bold text-slate-900 dir-ltr">{formatKWD(basic)}</td>
+                      <td className="p-3 font-mono text-slate-700 dir-ltr">{formatKWD(housing)}</td>
+                      <td className="p-3 font-mono text-slate-700 dir-ltr">{formatKWD(transport)}</td>
+                      <td className="p-3 font-mono text-slate-700 dir-ltr">{formatKWD(other)}</td>
+                      <td className="p-3 font-mono font-black text-purple-900 bg-purple-50 dir-ltr text-sm">
                         {formatKWD(gross)}
                       </td>
-                      <td className="p-2.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          emp.isKuwaiti ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          emp.isKuwaiti ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'
                         }`}>
                           {emp.isKuwaiti ? '🇰🇼 خاضع للتأمينات' : 'غير خاضع'}
                         </span>
                       </td>
-                      <td className="p-2.5 text-center">
+                      <td className="p-3 text-center">
                         <button
                           onClick={() => handleOpenEditStructure(emp)}
-                          className="bg-purple-700 hover:bg-purple-800 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow flex items-center gap-1 mx-auto transition cursor-pointer"
+                          className="bg-purple-700 hover:bg-purple-800 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow-xs flex items-center gap-1 mx-auto transition cursor-pointer"
                         >
                           <Edit className="w-3.5 h-3.5" />
                           <span>تعديل الهيكل</span>
@@ -530,8 +530,6 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
             </table>
           </div>
         </div>)}
-
-      
 
       {/* SUB-TAB 4: WPS BANK EXPORT (ملف حماية الأجور والبنك) */}
       {activeSubTab === 'WPS' && (
@@ -550,7 +548,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handleExportWPS}
-                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-lg shadow flex items-center gap-1.5 transition cursor-pointer text-xs"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer text-xs"
               >
                 <Download className="w-4 h-4" />
                 <span>تحميل ملف WSI (.txt)</span>
@@ -558,7 +556,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
 
               <button
                 onClick={handleExportBankCSV}
-                className="bg-sky-700 hover:bg-sky-800 text-white font-bold px-4 py-2 rounded-lg shadow flex items-center gap-1.5 transition cursor-pointer text-xs"
+                className="bg-sky-700 hover:bg-sky-800 text-white font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer text-xs"
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>تصدير Excel للبنك (.csv)</span>
@@ -566,64 +564,66 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
             </div>
           </div>
 
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-800 text-white font-bold">
-                <tr>
-                  <th className="p-3">الموظف</th>
-                  <th className="p-3">الرقم المدني</th>
-                  <th className="p-3">اسم البنك</th>
-                  <th className="p-3">رقم الحساب IBAN</th>
-                  <th className="p-3 text-left font-mono">الصافي المحول (KWD)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {monthPayslips.length === 0 ? (
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+              <table className="w-full text-right text-xs table-auto">
+                <thead className="bg-slate-800 text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-slate-400">
-                      لا توجد كشوف رواتب مولدة لهذا الشهر لعرضها في ملف WPS.
-                    </td>
-                  </tr>) : (
-                  monthPayslips.map((p, index) => {
-                    const emp = employees.find(e => e.id === p.employeeId);
-                    const bankName = emp?.bankName || activeCompany?.bankName || 'بنك الكويت الوطني (NBK)';
-                    return (
-                      <tr key={p.id} className={index % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/70 hover:bg-slate-100/60'}>
-                        <td className="p-3 font-bold text-slate-900">
-                          {emp?.fullNameAr || 'مجهول'}
-                          <span className="block text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</span>
-                        </td>
-                        <td className="p-3 font-mono dir-ltr text-slate-700">{emp?.civilId || '—'}</td>
-                        <td className="p-3">
-                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border inline-flex items-center gap-1.5 ${getBankBadgeStyle(bankName)}`}>
-                            <Landmark className="w-3.5 h-3.5 opacity-70" />
-                            <span>{bankName}</span>
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono text-slate-800 dir-ltr font-medium">{emp?.iban || activeCompany?.iban || 'KW00 0000 0000 0000 0000 0000'}</td>
-                        <td className="p-3 font-mono font-black text-emerald-700 dir-ltr text-left text-sm">
-                          {formatKWD(p.netSalary)}
-                        </td>
-                      </tr>);
-                  })
-                )}
-              </tbody>
-              {/* Total Summary Footer for Reconciliation */}
-              {monthPayslips.length > 0 && (
-                <tfoot className="bg-slate-900 text-white font-bold text-xs">
-                  <tr>
-                    <td colSpan={2} className="p-3">
-                      إجمالي التحويلات ({monthPayslips.length} موظف):
-                    </td>
-                    <td colSpan={2} className="p-3 text-slate-300 text-[11px]">
-                      مطابقة مالية معتمدة لملف حماية الأجور (WSI)
-                    </td>
-                    <td className="p-3 text-left font-mono font-black text-emerald-400 text-base dir-ltr">
-                      {formatKWD(totalNet)}
-                    </td>
+                    <th className="p-3 min-w-[200px] whitespace-nowrap">الموظف</th>
+                    <th className="p-3 w-36 whitespace-nowrap">الرقم المدني</th>
+                    <th className="p-3 w-48 whitespace-nowrap">اسم البنك</th>
+                    <th className="p-3 min-w-[220px] whitespace-nowrap">رقم الحساب IBAN</th>
+                    <th className="p-3 w-36 whitespace-nowrap text-left font-mono">الصافي المحول (KWD)</th>
                   </tr>
-                </tfoot>)}
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {monthPayslips.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-slate-400">
+                        لا توجد كشوف رواتب مولدة لهذا الشهر لعرضها في ملف WPS.
+                      </td>
+                    </tr>) : (
+                    monthPayslips.map((p, index) => {
+                      const emp = employees.find(e => e.id === p.employeeId);
+                      const bankName = emp?.bankName || activeCompany?.bankName || 'بنك الكويت الوطني (NBK)';
+                      return (
+                        <tr key={p.id} className={index % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/70 hover:bg-slate-100/60'}>
+                          <td className="p-3 font-bold text-slate-900">
+                            {emp?.fullNameAr || 'مجهول'}
+                            <span className="block text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</span>
+                          </td>
+                          <td className="p-3 font-mono dir-ltr text-slate-700">{emp?.civilId || '—'}</td>
+                          <td className="p-3">
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border inline-flex items-center gap-1.5 ${getBankBadgeStyle(bankName)}`}>
+                              <Landmark className="w-3.5 h-3.5 opacity-70" />
+                              <span>{bankName}</span>
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-slate-800 dir-ltr font-medium">{emp?.iban || activeCompany?.iban || 'KW00 0000 0000 0000 0000 0000'}</td>
+                          <td className="p-3 font-mono font-black text-emerald-700 dir-ltr text-left text-sm">
+                            {formatKWD(p.netSalary)}
+                          </td>
+                        </tr>);
+                    })
+                  )}
+                </tbody>
+                {/* Total Summary Footer for Reconciliation */}
+                {monthPayslips.length > 0 && (
+                  <tfoot className="bg-slate-900 text-white font-bold text-xs sticky bottom-0 z-10 shadow-xs">
+                    <tr>
+                      <td colSpan={2} className="p-3">
+                        إجمالي التحويلات ({monthPayslips.length} موظف):
+                      </td>
+                      <td colSpan={2} className="p-3 text-slate-300 text-[11px]">
+                        مطابقة مالية معتمدة لملف حماية الأجور (WSI)
+                      </td>
+                      <td className="p-3 text-left font-mono font-black text-emerald-400 text-base dir-ltr">
+                        {formatKWD(totalNet)}
+                      </td>
+                    </tr>
+                  </tfoot>)}
+              </table>
+            </div>
           </div>
         </div>)}
 

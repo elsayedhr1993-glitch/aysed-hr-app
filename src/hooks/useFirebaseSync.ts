@@ -82,7 +82,8 @@ export const useFirebaseSync = (
   setJobTitles?: any,
   setCompanies?: any,
   setNotifications?: any,
-  setSubscriptions?: any
+  setSubscriptions?: any,
+  setCommencements?: any
 ) => {
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -113,10 +114,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id } as any));
-            if (remote.length > 0) {
-              setEmployees(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, remote);
-            }
+            setEmployees(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, remote);
           }
         },
         err => {
@@ -130,10 +129,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id } as any));
-            if (remote.length > 0) {
-              setContracts(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.CONTRACTS, remote);
-            }
+            setContracts(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.CONTRACTS, remote);
           }
         },
         err => {
@@ -147,10 +144,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setLeaves(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.LEAVES, remote);
-            }
+            setLeaves(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.LEAVES, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'leaves')
@@ -162,10 +157,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setAttendance(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, remote);
-            }
+            setAttendance(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'attendance')
@@ -177,10 +170,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setPayslips(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, remote);
-            }
+            setPayslips(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'payslips')
@@ -192,10 +183,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setDocuments(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.DOCUMENTS, remote);
-            }
+            setDocuments(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.DOCUMENTS, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'documents')
@@ -207,10 +196,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setCustodies(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.CUSTODIES, remote);
-            }
+            setCustodies(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.CUSTODIES, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'custodies')
@@ -222,10 +209,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setLoans(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.LOANS, remote);
-            }
+            setLoans(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.LOANS, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'loans')
@@ -237,10 +222,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setWarnings(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.WARNINGS, remote);
-            }
+            setWarnings(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.WARNINGS, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'warnings')
@@ -252,10 +235,8 @@ export const useFirebaseSync = (
         snap => {
           if (!isSuperAdminPlatformMode) {
             const remote = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-            if (remote.length > 0) {
-              setEmployeeNotes(remote);
-              setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEE_NOTES, remote);
-            }
+            setEmployeeNotes(remote);
+            setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEE_NOTES, remote);
           }
         },
         err => handleFirestoreError(err, OperationType.GET, 'employeeNotes')

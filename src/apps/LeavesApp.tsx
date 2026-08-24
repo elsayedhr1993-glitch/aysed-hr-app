@@ -223,6 +223,24 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
     return true;
   });
 
+  // Filtered employee balances for FIFO Balances tab
+  const filteredEmployeeBalances = useMemo(() => {
+    return companyEmployees
+      .filter(emp => {
+        if (!activeSearchTerm) return true;
+        return emp.fullNameAr.includes(activeSearchTerm) || emp.employeeCode.includes(activeSearchTerm) || (emp.civilId && emp.civilId.includes(activeSearchTerm));
+      })
+      .map(emp => {
+        const empAllocs = buildEmployeeBaselineAllocations(emp, allocations);
+        const fifo = computeFifoLeaveAllocations(emp, empAllocs, companyLeaves);
+        const totalOpening = fifo.allocations.filter(a => a.allocationType === 'regular').reduce((s, a) => s + (a.numberOfDays || 0), 0);
+        const totalAccrued = fifo.allocations.filter(a => a.allocationType === 'accrual').reduce((s, a) => s + (a.numberOfDays || 0), 0);
+        const totalTaken = fifo.totalConsumed;
+        const netAvailable = fifo.netAvailable;
+        return { emp, fifo, totalOpening, totalAccrued, totalTaken, netAvailable };
+      });
+  }, [companyEmployees, activeSearchTerm, allocations, companyLeaves]);
+
   const formatDaysDisplay = (days: number | undefined | null): string => {
     const val = Number(days || 0);
     if (val === 0) return '0 يوم';
@@ -400,27 +418,56 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
     const consumed = existingAlloc ? (existingAlloc.consumedDays || 0) : 0;
     const totalDays = Number(editingAllocation.numberOfDays);
     const isUpdating = Boolean(existingId);
+    const allocType = editingAllocation.allocationType || 'regular';
 
     const newAlloc: HrLeaveAllocation = {
       id: existingId || `alloc-${Date.now()}`,
-      name: editingAllocation.name || `تخصيص رصيد إجازة سنوية (${totalDays} يوم)`,
+      name: editingAllocation.name || (allocType === 'regular' ? `رصيد إجازات مرحل من 2025 (${totalDays} يوم)` : `تخصيص رصيد إجازة (${totalDays} يوم)`),
       employeeId: editingAllocation.employeeId,
       companyId: activeCompany?.id || 'comp-1',
       leaveType: 'ANNUAL',
-      allocationType: editingAllocation.allocationType || 'regular',
+      allocationType: allocType,
       numberOfDays: totalDays,
       consumedDays: consumed,
       remainingDays: Math.max(0, totalDays - consumed),
-      dateFrom: editingAllocation.dateFrom || new Date().toISOString().split('T')[0],
+      dateFrom: editingAllocation.dateFrom || (allocType === 'regular' ? '2025-12-31' : new Date().toISOString().split('T')[0]),
       dateTo: editingAllocation.dateTo || existingAlloc?.dateTo || '',
       expiryDate: editingAllocation.expiryDate || existingAlloc?.expiryDate || editingAllocation.dateTo || '',
       state: 'validate',
-      notes: editingAllocation.notes || existingAlloc?.notes || 'تخصيص رصيد إجازات معتمد',
+      notes: editingAllocation.notes || existingAlloc?.notes || (allocType === 'regular' ? 'رصيد مرحل معتمد من نهاية عام 2025' : 'تخصيص رصيد إجازات معتمد'),
       createdAt: existingAlloc?.createdAt || new Date().toISOString()
     };
 
-    setAllocations(prev => [newAlloc, ...prev.filter(a => a.id !== newAlloc.id)]);
-    toast.success(isUpdating ? `تم تحديث التخصيص (${totalDays} يوم) وإعادة احتساب الأرصدة بنجاح` : `تم حفظ تخصيص الرصيد (${totalDays} يوم) للموظف`);
+    // Update the employee object so carriedOverLeave2025 / carriedOverBalance is permanently saved
+    const targetEmp = employees.find(e => e.id === newAlloc.employeeId);
+    if (targetEmp && onSaveEmployee && allocType === 'regular') {
+      const updatedEmp: Employee = {
+        ...targetEmp,
+        carriedOverLeave2025: totalDays,
+        carriedOverBalance: totalDays,
+        openingBalance: totalDays,
+        openingLeaveBalance: totalDays,
+        days_carried_over: totalDays,
+        aysed_carried_over: totalDays
+      } as any;
+      onSaveEmployee(updatedEmp);
+    }
+
+    setAllocations(prev => {
+      // If saving a regular allocation, replace any existing regular allocation for this employee
+      const filtered = prev.filter(a => {
+        if (a.id === newAlloc.id) return false;
+        if (allocType === 'regular' && a.employeeId === newAlloc.employeeId && a.allocationType === 'regular') {
+          return false;
+        }
+        return true;
+      });
+      const nextAllocs = [newAlloc, ...filtered];
+      setPersistentData(MANARA_STORAGE_KEYS.LEAVE_ALLOCATIONS, nextAllocs);
+      return nextAllocs;
+    });
+
+    toast.success(isUpdating ? `تم تحديث التخصيص (${totalDays} يوم) وإعادة احتساب الأرصدة بنجاح` : `تم حفظ تخصيص الرصيد (${totalDays} يوم) للموظف بنجاح`);
     setEditingAllocation(null);
   };
 
@@ -663,127 +710,129 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-[#714B67] text-white font-bold">
-                <tr>
-                  <th className="p-3">الموظف</th>
-                  <th className="p-3">نوع الإجازة</th>
-                  <th className="p-3">الفترة</th>
-                  <th className="p-3 text-center">المدة الإجمالية</th>
-                  <th className="p-3 text-center">مدفوعة / بدون راتب</th>
-                  <th className="p-3">البيان</th>
-                  <th className="p-3 text-center">الحالة</th>
-                  <th className="p-3 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredLeaves.length === 0 ? (
+            <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+              <table className="w-full text-right text-xs table-auto">
+                <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-500 font-bold">
-                      لا توجد طلبات إجازة مطابقة حالياً
-                    </td>
-                  </tr>) : (
-                  filteredLeaves.map((lev, index) => {
-                    const emp = employees.find(e => e.id === lev.employeeId);
-                    return (
-                      <tr key={`${lev.id}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
-                        <td className="p-3 font-bold text-slate-900">
-                          <div>{emp ? emp.fullNameAr : 'مجهول'}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
-                        </td>
-                        <td className="p-3">
-                          <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[11px]">
-                            {lev.leaveType === 'ANNUAL' ? '🌴 سنوية اعتيادية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType === 'UNPAID' ? '🚫 بدون راتب' : lev.leaveType === 'COMPENSATORY' ? '🔄 يوم تعويضي' : lev.leaveType}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono text-slate-700">{lev.startDate} إلى {lev.endDate}</td>
-                        <td className="p-3 text-center font-mono font-bold text-[#714B67] text-sm">
-                          {lev.totalDays} يوم
-                        </td>
-                        <td className="p-3 text-center font-mono">
-                          <div className="flex items-center justify-center gap-1">
-                            <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-200">
-                              {lev.paidDays ?? lev.totalDays} مدفوع
+                    <th className="p-3 w-44 whitespace-nowrap">الموظف</th>
+                    <th className="p-3 w-36 whitespace-nowrap">نوع الإجازة</th>
+                    <th className="p-3 w-44 whitespace-nowrap">الفترة</th>
+                    <th className="p-3 w-28 text-center whitespace-nowrap">المدة الإجمالية</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">مدفوعة / بدون راتب</th>
+                    <th className="p-3 min-w-[180px] whitespace-nowrap">البيان</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">الحالة</th>
+                    <th className="p-3 w-44 text-center whitespace-nowrap">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredLeaves.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-500 font-bold">
+                        لا توجد طلبات إجازة مطابقة حالياً
+                      </td>
+                    </tr>) : (
+                    filteredLeaves.map((lev, index) => {
+                      const emp = employees.find(e => e.id === lev.employeeId);
+                      return (
+                        <tr key={`${lev.id}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
+                          <td className="p-3 font-bold text-slate-900">
+                            <div>{emp ? emp.fullNameAr : 'مجهول'}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
+                          </td>
+                          <td className="p-3">
+                            <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[11px] border border-slate-200">
+                              {lev.leaveType === 'ANNUAL' ? '🌴 سنوية اعتيادية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType === 'UNPAID' ? '🚫 بدون راتب' : lev.leaveType === 'COMPENSATORY' ? '🔄 يوم تعويضي' : lev.leaveType}
                             </span>
-                            {Number(lev.excessDays || 0) > 0 && (
-                              <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-bold border border-rose-200">
-                                {lev.excessDays} بدون راتب
-                              </span>)}
-                          </div>
-                        </td>
-                        <td className="p-3 text-slate-600 max-w-xs truncate">{lev.reason}</td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
-                            lev.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                            lev.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
-                            lev.status === 'DRAFT' ? 'bg-slate-100 text-slate-800' :
-                            'bg-amber-100 text-amber-800'
-                          }`}>
-                            {lev.status === 'APPROVED' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                            <span>{
-                              lev.status === 'APPROVED' ? 'معتمدة' : 
-                              lev.status === 'REJECTED' ? 'مرفوضة' : 
-                              lev.status === 'PENDING_MANAGER' ? 'بانتظار المدير' :
-                              lev.status === 'PENDING_HR' ? 'بانتظار الموارد البشرية' :
-                              lev.status === 'SUBMITTED' ? 'بانتظار الاعتماد' :
-                              'مسودة'
-                            }</span>
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {lev.status === 'DRAFT' && (
+                          </td>
+                          <td className="p-3 font-mono text-slate-700">{lev.startDate} إلى {lev.endDate}</td>
+                          <td className="p-3 text-center font-mono font-bold text-[#714B67] text-sm">
+                            {lev.totalDays} يوم
+                          </td>
+                          <td className="p-3 text-center font-mono">
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold border border-emerald-200">
+                                {lev.paidDays ?? lev.totalDays} مدفوع
+                              </span>
+                              {Number(lev.excessDays || 0) > 0 && (
+                                <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-bold border border-rose-200">
+                                  {lev.excessDays} بدون راتب
+                                </span>)}
+                            </div>
+                          </td>
+                          <td className="p-3 text-slate-600 max-w-xs truncate">{lev.reason}</td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                              lev.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                              lev.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                              lev.status === 'DRAFT' ? 'bg-slate-100 text-slate-800 border border-slate-200' :
+                              'bg-amber-100 text-amber-800 border border-amber-200'
+                            }`}>
+                              {lev.status === 'APPROVED' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                              <span>{
+                                lev.status === 'APPROVED' ? 'معتمدة' : 
+                                lev.status === 'REJECTED' ? 'مرفوضة' : 
+                                lev.status === 'PENDING_MANAGER' ? 'بانتظار المدير' :
+                                lev.status === 'PENDING_HR' ? 'بانتظار الموارد البشرية' :
+                                lev.status === 'SUBMITTED' ? 'بانتظار الاعتماد' :
+                                'مسودة'
+                              }</span>
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {lev.status === 'DRAFT' && (
+                                <button
+                                  onClick={() => onUpdateLeaveStatus(lev.id, 'PENDING_MANAGER')}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>تقديم</span>
+                                </button>)}
+                              {(lev.status === 'PENDING_MANAGER' || lev.status === 'SUBMITTED') && (
+                                <button
+                                  onClick={() => onUpdateLeaveStatus(lev.id, 'PENDING_HR')}
+                                  className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>اعتماد المدير</span>
+                                </button>)}
+                              {lev.status === 'PENDING_HR' && (
+                                <button
+                                  onClick={() => onUpdateLeaveStatus(lev.id, 'APPROVED')}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>اعتماد نهائي</span>
+                                </button>)}
+                              {(lev.status === 'PENDING_MANAGER' || lev.status === 'PENDING_HR' || lev.status === 'SUBMITTED') && 
+                                <button
+                                  onClick={() => onUpdateLeaveStatus(lev.id, 'REJECTED')}
+                                  className="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border border-rose-200"
+                                >
+                                  <span>رفض</span>
+                                </button>
+  }
                               <button
-                                onClick={() => onUpdateLeaveStatus(lev.id, 'PENDING_MANAGER')}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                onClick={() => setEditingLeave(lev)}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer border border-slate-200"
                               >
-                                <span>تقديم</span>
-                              </button>)}
-                            {(lev.status === 'PENDING_MANAGER' || lev.status === 'SUBMITTED') && (
-                              <button
-                                onClick={() => onUpdateLeaveStatus(lev.id, 'PENDING_HR')}
-                                className="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                              >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>اعتماد المدير</span>
-                              </button>)}
-                            {lev.status === 'PENDING_HR' && (
-                              <button
-                                onClick={() => onUpdateLeaveStatus(lev.id, 'APPROVED')}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                              >
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>اعتماد نهائي</span>
-                              </button>)}
-                            {(lev.status === 'PENDING_MANAGER' || lev.status === 'PENDING_HR' || lev.status === 'SUBMITTED') && 
-                              <button
-                                onClick={() => onUpdateLeaveStatus(lev.id, 'REJECTED')}
-                                className="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                              >
-                                <span>رفض</span>
+                                عرض / تعديل
                               </button>
-}
-                            <button
-                              onClick={() => setEditingLeave(lev)}
-                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer"
-                            >
-                              عرض / تعديل
-                            </button>
-                            {onDeleteLeave && (
-                              <button
-                                onClick={() => onDeleteLeave(lev.id)}
-                                className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                                title="حذف الطلب ورد الرصيد تلقائياً"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>)}
-                          </div>
-                        </td>
-                      </tr>);
-                  })
-                )}
-              </tbody>
-            </table>
+                              {onDeleteLeave && (
+                                <button
+                                  onClick={() => onDeleteLeave(lev.id)}
+                                  className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                  title="حذف الطلب ورد الرصيد تلقائياً"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>)}
+                            </div>
+                          </td>
+                        </tr>);
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>)}
 
@@ -827,105 +876,106 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-[#714B67] text-white font-bold">
-                <tr>
-                  <th className="p-3">الموظف</th>
-                  <th className="p-3">مسمى التخصيص (Allocation Description)</th>
-                  <th className="p-3 text-center">النوع (Type)</th>
-                  <th className="p-3 text-center">تاريخ السريان</th>
-                  <th className="p-3 text-center">الأيام المخصصة</th>
-                  <th className="p-3 text-center">المستهلك (FIFO)</th>
-                  <th className="p-3 text-center">المتبقي</th>
-                  <th className="p-3 text-center">الحالة</th>
-                  <th className="p-3 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredAllocations.length === 0 ? (
+            <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+              <table className="w-full text-right text-xs table-auto">
+                <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-500 font-bold">
-                      لا توجد سجلات تخصيص رصيد مسجلة حالياً
-                    </td>
-                  </tr>) : (
-                  filteredAllocations.map((alloc, idx) => {
-                    const emp = employees.find(e => e.id === alloc.employeeId);
-                    const empFifo = emp ? computeFifoLeaveAllocations(emp, buildEmployeeBaselineAllocations(emp, allocations), companyLeaves) : null;
-                    const liveAlloc = empFifo?.allocations.find(a => a.id === alloc.id) || alloc;
-                    const consumed = liveAlloc.consumedDays || 0;
-                    const total = liveAlloc.numberOfDays || 0;
-                    const remaining = Math.max(0, total - consumed);
-                    const percent = total > 0 ? Math.min(100, Math.round((consumed / total) * 100)) : 0;
+                    <th className="p-3 w-44 whitespace-nowrap">الموظف</th>
+                    <th className="p-3 min-w-[200px] whitespace-nowrap">مسمى التخصيص (Allocation Description)</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">النوع (Type)</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">تاريخ السريان</th>
+                    <th className="p-3 w-28 text-center whitespace-nowrap">الأيام المخصصة</th>
+                    <th className="p-3 w-28 text-center whitespace-nowrap">المستهلك (FIFO)</th>
+                    <th className="p-3 w-28 text-center whitespace-nowrap">المتبقي</th>
+                    <th className="p-3 w-28 text-center whitespace-nowrap">الحالة</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredAllocations.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-slate-500 font-bold">
+                        لا توجد سجلات تخصيص رصيد مسجلة حالياً
+                      </td>
+                    </tr>) : (
+                    filteredAllocations.map((alloc, idx) => {
+                      const emp = employees.find(e => e.id === alloc.employeeId);
+                      const empFifo = emp ? computeFifoLeaveAllocations(emp, buildEmployeeBaselineAllocations(emp, allocations), companyLeaves) : null;
+                      const liveAlloc = empFifo?.allocations.find(a => a.id === alloc.id) || alloc;
+                      const consumed = liveAlloc.consumedDays || 0;
+                      const total = liveAlloc.numberOfDays || 0;
+                      const remaining = Math.max(0, total - consumed);
 
-                    return (
-                      <tr key={`${alloc.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
-                        <td className="p-3">
-                          <div className="font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
-                        </td>
-                        <td className="p-3 font-bold text-slate-800">
-                          {alloc.name}
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            alloc.allocationType === 'regular' 
-                              ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                              : 'bg-purple-100 text-purple-900 border border-purple-200'
-                          }`}>
-                            {alloc.allocationType === 'regular' ? 'ثابت / افتتاحي' : 'استحقاق شهري (2.5)'}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center font-mono text-slate-600">{alloc.dateFrom || '—'}</td>
-                        <td className="p-3 text-center font-mono font-bold text-slate-900 text-sm">
-                          {alloc.numberOfDays} يوم
-                        </td>
-                        <td className="p-3 text-center font-mono">
-                          <span className={consumed > 0 ? 'text-rose-700 font-bold' : 'text-slate-400'}>
-                            {consumed.toFixed(1)} يوم
-                          </span>
-                        </td>
-                        <td className="p-3 text-center font-mono">
-                          <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            {remaining.toFixed(1)} يوم
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                            معتمد (Validated)
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {emp && (
+                      return (
+                        <tr key={`${alloc.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
+                          </td>
+                          <td className="p-3 font-bold text-slate-800">
+                            {alloc.name}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              alloc.allocationType === 'regular' 
+                                ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                                : 'bg-purple-100 text-purple-900 border border-purple-200'
+                            }`}>
+                              {alloc.allocationType === 'regular' ? 'ثابت / افتتاحي' : 'استحقاق شهري (2.5)'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center font-mono text-slate-600">{alloc.dateFrom || '—'}</td>
+                          <td className="p-3 text-center font-mono font-bold text-slate-900 text-sm">
+                            {alloc.numberOfDays} يوم
+                          </td>
+                          <td className="p-3 text-center font-mono">
+                            <span className={consumed > 0 ? 'text-rose-700 font-bold' : 'text-slate-400'}>
+                              {consumed.toFixed(1)} يوم
+                            </span>
+                          </td>
+                          <td className="p-3 text-center font-mono">
+                            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              {remaining.toFixed(1)} يوم
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200">
+                              معتمد (Validated)
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {emp && (
+                                <button
+                                  onClick={() => setSelectedFifoEmployee(emp)}
+                                  className="p-1 text-purple-700 hover:bg-purple-50 rounded transition cursor-pointer font-bold text-[11px] flex items-center gap-0.5 border border-purple-200"
+                                  title="عرض كشف استهلاك FIFO"
+                                >
+                                  <Layers className="w-3.5 h-3.5" />
+                                  <span>FIFO</span>
+                                </button>)}
                               <button
-                                onClick={() => setSelectedFifoEmployee(emp)}
-                                className="p-1 text-purple-700 hover:bg-purple-50 rounded transition cursor-pointer font-bold text-[11px] flex items-center gap-0.5"
-                                title="عرض كشف استهلاك FIFO"
+                                onClick={() => setEditingAllocation(alloc)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
+                                title="تعديل التخصيص"
                               >
-                                <Layers className="w-3.5 h-3.5" />
-                                <span>FIFO</span>
-                              </button>)}
-                            <button
-                              onClick={() => setEditingAllocation(alloc)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
-                              title="تعديل التخصيص"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteAllocation(alloc.id)}
-                              className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                              title="حذف التخصيص"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>);
-                  })
-                )}
-              </tbody>
-            </table>
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAllocation(alloc.id)}
+                                className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                title="حذف التخصيص"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>);
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>)}
 
@@ -953,107 +1003,112 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-[#714B67] text-white font-bold">
-                <tr>
-                  <th className="p-3 text-center">#</th>
-                  <th className="p-3">الموظف</th>
-                  <th className="p-3 text-center"> (Opening Balance)</th>
-                  <th className="p-3 text-center">المكتسب لعام 2026 (Accrued 2026)</th>
-                  <th className="p-3 text-center">المستهلك (Taken Days)</th>
-                  <th className="p-3 text-center">الرصيد المتاح الصافي (Net Available Days)</th>
-                  <th className="p-3 text-center">حالة الترحيل الشهري</th>
-                  <th className="p-3 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {companyEmployees.length === 0 ? (
+            <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+              <table className="w-full text-right text-xs table-auto">
+                <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-400 font-bold">
-                      لا يوجد موظفين مسجلين في الشركة
-                    </td>
-                  </tr>) : (
-                  companyEmployees.map((emp, idx) => {
-                    const empFifo = computeFifoLeaveAllocations(
-                      emp,
-                      buildEmployeeBaselineAllocations(emp, allocations),
-                      companyLeaves
-                    );
-
-                    const openingAllocs = empFifo.allocations.filter(a => a.allocationType === 'regular');
-                    const accrualAllocs = empFifo.allocations.filter(a => a.allocationType === 'accrual');
-                    const openingDays = openingAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
-                    const accrualDays = accrualAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
-
-                    const targetMonthKey = getAccrualMonthKey();
-                    const isAccruedForCurrentMonth = emp.lastAccrualDate && emp.lastAccrualDate.slice(0, 7) === targetMonthKey;
-
-                    return (
-                      <tr key={`${emp.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white hover:bg-slate-50/50' : 'bg-slate-50/70 hover:bg-slate-50'}>
-                        <td className="p-3 font-mono text-slate-400 text-center">{idx + 1}</td>
-                        <td className="p-3">
-                          <div className="font-bold text-slate-900">{emp.fullNameAr}</div>
-                          <div className="text-[10px] text-slate-500">{emp.jobTitle} • {emp.employeeCode}</div>
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-slate-700">
-                          {formatDaysDisplay(openingDays)}
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-purple-900">
-                          {formatDaysDisplay(accrualDays)}
-                        </td>
-                        <td className="p-3 text-center font-mono font-bold text-rose-700">
-                          {formatDaysDisplay(empFifo.totalConsumed)}
-                        </td>
-                        <td className="p-3 text-center font-mono">
-                          <span className={`inline-block px-2.5 py-1 rounded font-black border ${
-                            empFifo.netAvailable <= 0 
-                              ? 'bg-slate-100 text-slate-700 border-slate-300 font-bold' 
-                              : empFifo.netAvailable < 5 
-                                ? 'bg-amber-50 text-amber-800 border-amber-200' 
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                            {formatDaysDisplay(empFifo.netAvailable)}
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          {isAccruedForCurrentMonth ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>{emp.lastAccrualDate} (مكتسب)</span>
-                            </span>) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                              <Clock className="w-3 h-3 text-amber-600" />
-                              <span>{emp.lastAccrualDate || 'معلق للشهر'}</span>
-                            </span>)}
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => setSelectedFifoEmployee(emp)}
-                              className="bg-purple-700 hover:bg-purple-800 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1"
-                              title="عرض كشف استهلاك دفعات الرصيد FIFO"
-                            >
-                              <Layers className="w-3.5 h-3.5 text-amber-300" />
-                              <span>كشف FIFO</span>
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setSettlementEmpId(emp.id);
-                                setActiveSubTab('SETTLEMENT');
-                              }}
-                              className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer flex items-center gap-1"
-                            >
-                              <Printer className="w-3.5 h-3.5 text-amber-300" />
-                              <span>تسوية</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>);
-                  })
-                )}
-              </tbody>
-            </table>
+                    <th className="p-3 w-12 text-center whitespace-nowrap">#</th>
+                    <th className="p-3 min-w-[200px] whitespace-nowrap">الموظف</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">الرصيد الافتتاحي / المرحل</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">المكتسب لعام 2026</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">المستهلك (Taken Days)</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">الرصيد المتاح الصافي</th>
+                    <th className="p-3 w-40 text-center whitespace-nowrap">حالة الترحيل الشهري</th>
+                    <th className="p-3 w-40 text-center whitespace-nowrap">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {companyEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-400 font-bold">
+                        لا يوجد موظفين مسجلين في الشركة
+                      </td>
+                    </tr>) : (
+                    filteredEmployeeBalances.map((item, idx) => {
+                      const { emp, totalOpening, totalAccrued, totalTaken, netAvailable } = item;
+                      return (
+                        <tr key={emp.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
+                          <td className="p-3 text-center font-mono text-slate-400">{idx + 1}</td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900">{emp.fullNameAr}</div>
+                            <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+                              <span>{emp.employeeCode}</span>
+                              <span>•</span>
+                              <span>{emp.jobTitle}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center font-mono text-slate-700">
+                            {formatDaysDisplay(totalOpening)}
+                          </td>
+                          <td className="p-3 text-center font-mono text-purple-700 font-bold">
+                            {formatDaysDisplay(totalAccrued)}
+                          </td>
+                          <td className="p-3 text-center font-mono text-rose-700 font-bold">
+                            {formatDaysDisplay(totalTaken)}
+                          </td>
+                          <td className="p-3 text-center font-mono">
+                            <span className="font-black text-sm text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              {formatDaysDisplay(netAvailable)}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center text-[10px] text-slate-500">
+                            <span className="bg-purple-50 text-purple-800 px-2 py-0.5 rounded font-mono border border-purple-100">
+                              2.5 يوم / 28 شهرياً
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => {
+                                  const currentOpening = getCarriedOverBalance(emp);
+                                  setEditingAllocation({
+                                    employeeId: emp.id,
+                                    companyId: emp.companyId || activeCompany?.id || 'comp-1',
+                                    allocationType: 'regular',
+                                    leaveType: 'ANNUAL',
+                                    numberOfDays: currentOpening > 0 ? currentOpening : 15,
+                                    dateFrom: '2025-12-31',
+                                    name: 'رصيد إجازات مرحل من 2025 (Carried-Over Balance)',
+                                    notes: 'رصيد مرحل معتمد من نهاية عام 2025',
+                                  });
+                                }}
+                                className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="تخصيص وتعديل الرصيد المرحل من 2025"
+                              >
+                                <Award className="w-3 h-3 text-amber-700" />
+                                <span>الرصيد المرحل</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedFifoEmployee(emp)}
+                                className="bg-[#714B67] hover:bg-[#5a3b52] text-white px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                <Layers className="w-3 h-3 text-amber-300" />
+                                <span>بطاقة FIFO</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingLeave({
+                                    employeeId: emp.id,
+                                    companyId: emp.companyId,
+                                    leaveType: 'ANNUAL',
+                                    startDate: new Date().toISOString().split('T')[0],
+                                    endDate: new Date().toISOString().split('T')[0],
+                                    status: 'APPROVED',
+                                    reason: 'تسجيل إجازة سريعة للموظف',
+                                  });
+                                }}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer border border-slate-200"
+                              >
+                                طلب إجازة
+                              </button>
+                            </div>
+                          </td>
+                        </tr>);
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>)}
 
@@ -1093,80 +1148,84 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-[#714B67] text-white font-bold">
-                <tr>
-                  <th className="p-3">السنة</th>
-                  <th className="p-3">الموظف</th>
-                  <th className="p-3">نوع الإجازة</th>
-                  <th className="p-3">الفترة</th>
-                  <th className="p-3 text-center">الأيام</th>
-                  <th className="p-3">الملاحظات</th>
-                  <th className="p-3 text-center">النوع / التصنيف</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {historicalLeavesList.length === 0 ? (
+            <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+              <table className="w-full text-right text-xs table-auto">
+                <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">
-                      لا توجد سجلات تاريخية مسجلة حالياً
-                    </td>
-                  </tr>) : (
-                  historicalLeavesList.map((lev, idx) => {
-                    const emp = employees.find(e => e.id === lev.employeeId);
-                    return (
-                      <tr key={`${lev.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
-                        <td className="p-3 font-mono font-bold text-purple-900">{lev.historicalYear || (lev.startDate ? new Date(lev.startDate).getFullYear() : '2026')}</td>
-                        <td className="p-3 font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</td>
-                        <td className="p-3">
-                          <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[10px]">
-                            {lev.leaveType === 'ANNUAL' ? '🌴 سنوية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType}
-                          </span>
-                        </td>
-                        <td className="p-3 font-mono">{lev.startDate} إلى {lev.endDate}</td>
-                        <td className="p-3 text-center font-mono font-bold text-[#714B67]">{lev.totalDays} يوم</td>
-                        <td className="p-3 text-slate-600">{lev.reason}</td>
-                        <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            lev.isHistorical ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'
-                          }`}>
-                            {lev.isHistorical ? 'أرشيف سابق' : 'حركة فعلية 2026'}
-                          </span>
-                        </td>
-                      </tr>);
-                  })
-                )}
-              </tbody>
-            </table>
+                    <th className="p-3 w-20 whitespace-nowrap">السنة</th>
+                    <th className="p-3 w-48 whitespace-nowrap">الموظف</th>
+                    <th className="p-3 w-36 whitespace-nowrap">نوع الإجازة</th>
+                    <th className="p-3 w-44 whitespace-nowrap">الفترة</th>
+                    <th className="p-3 w-24 text-center whitespace-nowrap">الأيام</th>
+                    <th className="p-3 min-w-[200px] whitespace-nowrap">الملاحظات</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">النوع / التصنيف</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {historicalLeavesList.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-500 font-bold">
+                        لا توجد سجلات تاريخية مسجلة حالياً
+                      </td>
+                    </tr>) : (
+                    historicalLeavesList.map((lev, idx) => {
+                      const emp = employees.find(e => e.id === lev.employeeId);
+                      return (
+                        <tr key={`${lev.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
+                          <td className="p-3 font-mono font-bold text-purple-900">{lev.historicalYear || (lev.startDate ? new Date(lev.startDate).getFullYear() : '2026')}</td>
+                          <td className="p-3 font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</td>
+                          <td className="p-3">
+                            <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[10px] border border-slate-200">
+                              {lev.leaveType === 'ANNUAL' ? '🌴 سنوية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono">{lev.startDate} إلى {lev.endDate}</td>
+                          <td className="p-3 text-center font-mono font-bold text-[#714B67]">{lev.totalDays} يوم</td>
+                          <td className="p-3 text-slate-600">{lev.reason}</td>
+                          <td className="p-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                              lev.isHistorical ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                            }`}>
+                              {lev.isHistorical ? 'أرشيف سابق' : 'حركة فعلية 2026'}
+                            </span>
+                          </td>
+                        </tr>);
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>)}
 
       {/* Sub-Tab 6: Holidays */}
       {activeSubTab === 'HOLIDAYS' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-[#714B67] text-white font-bold">
-              <tr>
-                <th className="p-3">#</th>
-                <th className="p-3">تاريخ العطلة</th>
-                <th className="p-3">المناسبة</th>
-                <th className="p-3 text-center">النوع</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {getCompensatedHolidays2026().map((h, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'}>
-                  <td className="p-3 font-mono text-slate-400">{i + 1}</td>
-                  <td className="p-3 font-mono font-bold text-slate-800">{h.date}</td>
-                  <td className="p-3 font-bold text-[#714B67]">{h.name}</td>
-                  <td className="p-3 text-center">
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">
-                      عطلة رسمية مدفوعة الأجر
-                    </span>
-                  </td>
-                </tr>))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+            <table className="w-full text-right text-xs table-auto">
+              <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
+                <tr>
+                  <th className="p-3 w-16 text-center whitespace-nowrap">#</th>
+                  <th className="p-3 w-36 whitespace-nowrap">تاريخ العطلة</th>
+                  <th className="p-3 min-w-[200px] whitespace-nowrap">المناسبة</th>
+                  <th className="p-3 w-44 text-center whitespace-nowrap">النوع</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {getCompensatedHolidays2026().map((h, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
+                    <td className="p-3 font-mono text-slate-400 text-center">{i + 1}</td>
+                    <td className="p-3 font-mono font-bold text-slate-800">{h.date}</td>
+                    <td className="p-3 font-bold text-[#714B67]">{h.name}</td>
+                    <td className="p-3 text-center">
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-200">
+                        عطلة رسمية مدفوعة الأجر
+                      </span>
+                    </td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
         </div>)}
 
       {/* Official Leave Modal Rendered Here */}
@@ -1203,16 +1262,105 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
             </header>
 
             <div className="p-5 space-y-4 text-xs">
+              {/* Quick Template Presets */}
+              <div>
+                <label className="block font-bold text-slate-800 mb-1.5">نماذج التخصيص السريعة (Quick Presets):</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emp = companyEmployees.find(e => e.id === editingAllocation.employeeId);
+                      const currentBal = emp ? getCarriedOverBalance(emp) : 0;
+                      setEditingAllocation({
+                        ...editingAllocation,
+                        allocationType: 'regular',
+                        name: 'رصيد إجازات مرحل من 2025 (Carried-Over Balance)',
+                        dateFrom: '2025-12-31',
+                        numberOfDays: currentBal > 0 ? currentBal : (editingAllocation.numberOfDays || 15),
+                        notes: 'رصيد مرحل معتمد من نهاية عام 2025'
+                      });
+                    }}
+                    className={`p-2 rounded-xl border text-center transition cursor-pointer ${
+                      editingAllocation.allocationType === 'regular' && (editingAllocation.name?.includes('مرحل') || editingAllocation.dateFrom?.startsWith('2025'))
+                        ? 'bg-amber-100/80 border-amber-400 text-amber-950 font-bold shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-amber-50'
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">✨ رصيد مرحل 2025</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Carried-Over Balance</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAllocation({
+                        ...editingAllocation,
+                        allocationType: 'regular',
+                        name: 'تخصيص رصيد سنوي معتمد (Annual Leave)',
+                        dateFrom: '2026-01-01',
+                        numberOfDays: 30,
+                        notes: 'تخصيص رصيد سنوي معتمد 30 يوم'
+                      });
+                    }}
+                    className={`p-2 rounded-xl border text-center transition cursor-pointer ${
+                      editingAllocation.allocationType === 'regular' && !editingAllocation.name?.includes('مرحل') && !editingAllocation.dateFrom?.startsWith('2025')
+                        ? 'bg-purple-100/80 border-purple-400 text-purple-950 font-bold shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">📅 رصيد سنوي (30)</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Annual Regular</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAllocation({
+                        ...editingAllocation,
+                        allocationType: 'accrual',
+                        name: 'استحقاق شهري إضافي (2.5 يوم)',
+                        dateFrom: '2026-08-01',
+                        numberOfDays: 2.5,
+                        notes: 'استحقاق شهري وفق المادة 70'
+                      });
+                    }}
+                    className={`p-2 rounded-xl border text-center transition cursor-pointer ${
+                      editingAllocation.allocationType === 'accrual'
+                        ? 'bg-emerald-100/80 border-emerald-400 text-emerald-950 font-bold shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">⚡ استحقاق شهري</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">2.5 يوم/شهر</div>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-800 mb-1">الموظف المعني *</label>
                 <select
                   value={editingAllocation.employeeId || ''}
-                  onChange={e => setEditingAllocation({ ...editingAllocation, employeeId: e.target.value })}
+                  onChange={e => {
+                    const empId = e.target.value;
+                    const emp = companyEmployees.find(x => x.id === empId);
+                    const openingDays = emp ? getCarriedOverBalance(emp) : 0;
+                    setEditingAllocation({ 
+                      ...editingAllocation, 
+                      employeeId: empId,
+                      numberOfDays: editingAllocation.allocationType === 'regular' && openingDays > 0 ? openingDays : (editingAllocation.numberOfDays ?? 30)
+                    });
+                  }}
                   className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#714B67] outline-none"
                 >
                   <option value="">-- اختر الموظف --</option>
-                  {companyEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeCode})</option>))}
+                  {companyEmployees.map(emp => {
+                    const carriedBal = getCarriedOverBalance(emp);
+                    return (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.fullNameAr} ({emp.employeeCode}) {carriedBal > 0 ? `[رصيد مرحل: ${carriedBal} يوم]` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

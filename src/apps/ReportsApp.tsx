@@ -494,6 +494,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         department: emp.department || 'الموارد البشرية والإدارة',
         jobTitle: emp.jobTitle || 'موظف',
         nationality: emp.nationality || 'غير محدد',
+        carriedOver: opening,
         accruedDays: accrued,
         totalAvailable: totalAvailable,
         totalDays: totalTakenDays,
@@ -546,12 +547,12 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         groups[key] = {
           label: key,
           items: [],
-          values: { count: 0, accruedDays: 0, totalAvailable: 0, totalDays: 0, paidConsumed: 0, remainingDays: 0, excessUnpaid: 0 },
+          values: { count: 0, carriedOver: 0, accruedDays: 0, totalAvailable: 0, totalDays: 0, paidConsumed: 0, remainingDays: 0, excessUnpaid: 0 },
         };
       }
       groups[key].items.push(item);
       groups[key].values.count += 1;
-      
+      groups[key].values.carriedOver += (item.carriedOver || 0);
       groups[key].values.accruedDays += item.accruedDays;
       groups[key].values.totalAvailable += item.totalAvailable;
       groups[key].values.totalDays += item.totalDays;
@@ -574,6 +575,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           recordsCount: 1,
           values: {
             count: 1,
+            carriedOver: child.carriedOver || 0,
             accruedDays: child.accruedDays,
             totalAvailable: child.totalAvailable,
             totalDays: child.totalDays,
@@ -587,7 +589,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
 
     const grandTotal = {
       count: list.length,
-      
+      carriedOver: list.reduce((a, b) => a + (b.carriedOver || 0), 0),
       accruedDays: list.reduce((a, b) => a + b.accruedDays, 0),
       totalAvailable: list.reduce((a, b) => a + b.totalAvailable, 0),
       totalDays: list.reduce((a, b) => a + b.totalDays, 0),
@@ -1003,20 +1005,20 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           { key: 'employeeName', label: 'اسم الموظف' },
           { key: 'department', label: 'القسم' },
           { key: 'jobTitle', label: 'المسمى الوظيفي' },
-          { key: 'carriedOver', label: 'الافتتاحي', align: 'center' },
+          { key: 'carriedOver', label: 'الافتتاحي (مرحل)', align: 'center' },
           { key: 'accruedDays', label: 'مكتسب 2026', align: 'center' },
           { key: 'totalDays', label: 'المستهلك', align: 'center' },
           { key: 'remainingDays', label: 'الرصيد المتبقي', align: 'center', render: (row) => (
-            <span className={`font-mono font-bold px-2 py-.5 rounded text-xs ${
-              row.remainingDays >= 15 ? 'bg-emerald-1 text-emerald-8' :
-              row.remainingDays > 0 ? 'bg-amber-1 text-amber-8' : 'bg-rose-1 text-rose-8'
+            <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
+              row.remainingDays >= 15 ? 'bg-emerald-100 text-emerald-800' :
+              row.remainingDays > 0 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
             }`}>
               {row.remainingDays} يوم
             </span>)},
           { key: 'leaveStatus', label: 'حالة الرصيد', align: 'center', render: (row) => (
-            <span className={`px-2 py-.5 rounded-full text-[1px] font-bold ${
-              row.leaveStatus === 'رصيد كافٍ' ? 'bg-emerald-1 text-emerald-8' :
-              row.leaveStatus === 'رصيد منخفض' ? 'bg-amber-1 text-amber-8' : 'bg-rose-1 text-rose-8'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              row.leaveStatus === 'رصيد كافٍ' ? 'bg-emerald-100 text-emerald-800' :
+              row.leaveStatus === 'رصيد منخفض' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
             }`}>
               {row.leaveStatus}
             </span>)},
@@ -1032,9 +1034,9 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           { key: 'overtimeHours', label: 'إضافي (ساعة)', align: 'center' },
           { key: 'latenessMinutes', label: 'تأخير (دقيقة)', align: 'center' },
           { key: 'status', label: 'الحالة', align: 'center', render: (row) => (
-            <span className={`px-2 py-.5 rounded-full text-[1px] font-bold ${
-              row.status === 'حاضر' ? 'bg-emerald-1 text-emerald-8' :
-              row.status === 'متأخر' ? 'bg-amber-1 text-amber-8' : 'bg-rose-1 text-rose-8'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              row.status === 'حاضر' ? 'bg-emerald-100 text-emerald-800' :
+              row.status === 'متأخر' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
             }`}>
               {row.status}
             </span>)},
@@ -1047,13 +1049,13 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           { key: 'documentNumber', label: 'الرقم المرجعي' },
           { key: 'expiryDate', label: 'تاريخ الانتهاء', align: 'center' },
           { key: 'daysRemaining', label: 'الأيام المتبقية', align: 'center', render: (row) => (
-            <span className={`font-mono font-bold ${row.daysRemaining < 0 ? 'text-rose-6' : row.daysRemaining <= 3 ? 'text-amber-6' : 'text-slate-7'}`}>
+            <span className={`font-mono font-bold ${row.daysRemaining < 0 ? 'text-rose-600' : row.daysRemaining <= 30 ? 'text-amber-600' : 'text-slate-700'}`}>
               {row.daysRemaining < 0 ? `منتهي منذ ${Math.abs(row.daysRemaining)} يوم` : `${row.daysRemaining} يوم`}
             </span>)},
           { key: 'urgency', label: 'المستوى', align: 'center', render: (row) => (
-            <span className={`px-2 py-.5 rounded-full text-[1px] font-bold ${
-              row.isExpired ? 'bg-rose-1 text-rose-8' :
-              row.isUrgent ? 'bg-amber-1 text-amber-8' : 'bg-emerald-1 text-emerald-8'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              row.isExpired ? 'bg-rose-100 text-rose-800' :
+              row.isUrgent ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
             }`}>
               {row.urgency}
             </span>)},
@@ -1163,25 +1165,25 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
               }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
                 isActive 
-                  ? 'bg-slate-9 text-white border-slate-9 shadow-sm' 
-                  : 'bg-white text-slate-7 border-slate-2 hover:bg-slate-1/8 hover:text-slate-9'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-amber-4' : 'text-slate-4'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
               <span>{config.title.split('(')[0].trim()}</span>
             </button>);
         })}
       </div>
 
       {/* Sub-Header with View Mode Switcher (Pivot / Graph / List) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-1/6 p-2 rounded-xl border border-slate-2/8">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-7 pr-2">
-          <span className="w-2 h-2 rounded-full bg-purple-6" />
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 pr-2">
+          <span className="w-2 h-2 rounded-full bg-purple-600" />
           <span>{currentConfig.description}</span>
         </div>
 
         {/* View Switchers Buttons */}
-        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-3 shadow-2xs">
+        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-300 shadow-2xs">
           <button
             onClick={() => setViewMode('PIVOT')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
@@ -1316,6 +1318,8 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         totalRecords={activeDataset.list.length}
         activeFiltersLabels={activeFilters.map(f => currentConfig.availableFilters.find(x => x.id === f)?.label || f)}
         wizardConfig={wizardConfig}
+        selectedEmployeeId={selectedEmployeeId || wizardConfig.selectedEmployeeId}
+        activeList={activeDataset.list}
         employees={companyEmployees}
         contracts={companyContracts}
         leaves={companyLeaves}

@@ -418,8 +418,12 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       pinCode: editingEmp.pinCode?.trim() || undefined,
       parentId: editingEmp.parentId || undefined,
       coachId: editingEmp.coachId || undefined,
-      
-      
+      carriedOverLeave2025: Number(editingEmp.carriedOverLeave2025 ?? editingEmp.carriedOverBalance ?? 0),
+      carriedOverBalance: Number(editingEmp.carriedOverBalance ?? editingEmp.carriedOverLeave2025 ?? 0),
+      openingBalance: Number(editingEmp.openingBalance ?? editingEmp.carriedOverLeave2025 ?? 0),
+      openingLeaveBalance: Number(editingEmp.openingLeaveBalance ?? editingEmp.carriedOverLeave2025 ?? 0),
+      days_carried_over: Number(editingEmp.carriedOverLeave2025 ?? editingEmp.carriedOverBalance ?? 0),
+      lastAccrualDate: editingEmp.lastAccrualDate || undefined,
     };
 
     onSaveEmployee(empToSave);
@@ -504,8 +508,66 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
         </div>
       </div>
 
+      {/* Top Bar / Stats Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between min-h-[72px]">
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">إجمالي الموظفين</p>
+            <p className="text-xl font-bold text-slate-900 mt-0.5 font-mono">{companyEmps.filter(e => !e.isDeleted).length}</p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center text-[#714B67]">
+            <Users size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between min-h-[72px]">
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">الموظفون النشطون</p>
+            <p className="text-xl font-bold text-emerald-600 mt-0.5 font-mono">
+              {companyEmps.filter(e => !e.isDeleted && e.status === 'ACTIVE').length}
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+            <CheckCircle size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between min-h-[72px]">
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">في إجازة اليوم</p>
+            <p className="text-xl font-bold text-amber-600 mt-0.5 font-mono">
+              {companyEmps.filter(emp => {
+                if (emp.isDeleted) return false;
+                const today = new Date().toISOString().split('T')[0];
+                return leaves.some(l => 
+                  l.employeeId === emp.id && 
+                  l.status === 'APPROVED' && 
+                  l.startDate <= today && 
+                  (l.endDate || l.startDate) >= today
+                );
+              }).length}
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+            <Calendar size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between min-h-[72px]">
+          <div>
+            <p className="text-[11px] text-slate-500 font-semibold">سجلات الأرشيف</p>
+            <p className="text-xl font-bold text-slate-600 mt-0.5 font-mono">
+              {softDeletedEmps.length}
+            </p>
+          </div>
+          <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+            <Folder size={18} />
+          </div>
+        </div>
+      </div>
+
       {/* Search & Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 mb-6 shadow-xs p-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-xl border border-slate-200 mb-4 shadow-sm p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 px-3 py-1.5 focus-within:border-[#714B67] transition">
             <Search className="w-4 h-4 text-slate-400 mr-2" />
@@ -514,7 +576,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               placeholder="البحث السريع (الاسم، الكود، الرقم المدني، المسمى)..."
               value={localSearchTerm}
               onChange={(e) => setLocalSearchTerm(e.target.value)}
-              className="bg-transparent outline-none text-xs w-64 text-slate-700 placeholder:text-slate-400"
+              className="bg-transparent outline-none text-xs w-64 text-slate-700 placeholder:text-slate-400 font-medium"
             />
             {localSearchTerm && (
               <button onClick={() => setLocalSearchTerm('')} className="text-slate-400 hover:text-slate-600 p-0.5">
@@ -525,7 +587,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
           <div className="relative">
             <button 
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
             >
               <Filter className="w-3.5 h-3.5 text-[#714B67]" />
               <span>الفلترة: {odooFilter === 'ALL' ? 'الكل' : odooFilter === 'ACTIVE' ? 'النشطين' : odooFilter === 'ON_LEAVE' ? 'في إجازة' : 'المؤرشفين'}</span>
@@ -542,7 +604,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
           <div className="relative">
             <button 
               onClick={() => setIsGroupByMenuOpen(!isGroupByMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
             >
               <List className="w-3.5 h-3.5 text-[#714B67]" />
               <span>تجميع حسب: {odooGroupBy === 'NONE' ? 'بدون' : odooGroupBy === 'DEPARTMENT' ? 'الإدارة' : 'المدير'}</span>
@@ -559,7 +621,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
       {/* Empty State */}
       {filteredEmps.length === 0 && (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center my-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center my-6 shadow-sm min-h-[300px] flex flex-col items-center justify-center">
           <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4 text-[#714B67]">
             <Users className="w-8 h-8" />
           </div>
@@ -585,7 +647,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               <div
                 key={emp.id}
                 onClick={() => handleOpenEditEmployee(emp)}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition p-4 flex flex-col justify-between cursor-pointer relative group"
+                className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-4 flex flex-col justify-between cursor-pointer relative group min-h-[220px]"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -608,7 +670,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     </span>
                   </div>
 
-                  <div className="space-y-1.5 text-xs text-slate-600 mb-4 bg-slate-50 p-2.5 rounded-xl">
+                  <div className="space-y-1.5 text-xs text-slate-600 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <div className="flex items-center justify-between">
                       <span className="text-slate-400">الكود:</span>
                       <span className="font-mono font-bold text-slate-700">{emp.employeeCode}</span>
@@ -626,7 +688,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
                   <div className="flex items-center gap-2">
-                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-mono text-[10px]">
+                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-mono text-[10px] border border-purple-100">
                       🏷️ بصمة: {emp.biometricId || emp.badgeId || 'غير محدد'}
                     </span>
                   </div>
@@ -634,7 +696,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     {onSelectEmployeeForLeaves && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); onSelectEmployeeForLeaves(emp.id); }}
-                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition"
+                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition cursor-pointer"
                         title="الإجازات"
                       >
                         <Calendar className="w-4 h-4" />
@@ -647,7 +709,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                           toast.success('تم أرشفة الموظف بنجاح');
                         }
                       }}
-                      className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition"
+                      className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition cursor-pointer"
                       title="أرشفة / حذف"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -660,64 +722,66 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
       {/* LIST VIEW */}
       {localViewMode === 'LIST' && filteredEmps.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-[#714B67] text-white font-bold">
-              <tr>
-                <th className="p-3">كود النظام</th>
-                <th className="p-3">معرف البصمة (Badge ID)</th>
-                <th className="p-3">اسم الموظف</th>
-                <th className="p-3">الرقم المدني</th>
-                <th className="p-3">المسمى الوظيفي والقسم</th>
-                <th className="p-3">الجنسية</th>
-                <th className="p-3">تاريخ الالتحاق</th>
-                <th className="p-3 text-center">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEmps.map((emp, index) => (
-                <tr key={emp.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} hover:bg-slate-100/80 transition`}>
-                  <td className="p-3 font-mono font-bold text-slate-600">{emp.employeeCode}</td>
-                  <td className="p-3 font-mono">
-                    <span className="bg-purple-100 text-purple-900 border border-purple-200 px-2 py-0.5 rounded font-bold text-[11px]">
-                      {emp.biometricId || emp.badgeId || '—'}
-                    </span>
-                  </td>
-                  <td className="p-3 font-bold text-slate-900 cursor-pointer" onClick={() => handleOpenEditEmployee(emp)}>
-                    <div className="flex items-center gap-2 hover:text-[#714B67] transition">
-                      {emp.avatarUrl ? (
-                        <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-7 h-7 rounded-full object-cover" />) : (
-                        <div className="w-7 h-7 rounded-full bg-[#714B67]/10 flex items-center justify-center text-[#714B67] font-bold">
-                          {emp.fullNameAr.charAt(0)}
-                        </div>)}
-                      <span>{emp.fullNameAr}</span>
-                    </div>
-                  </td>
-                  <td className="p-3 font-mono dir-ltr text-right">{emp.civilId}</td>
-                  <td className="p-3">
-                    <div className="font-semibold text-slate-800">{emp.jobTitle}</div>
-                    <div className="text-[11px] text-slate-500">{emp.department}</div>
-                  </td>
-                  <td className="p-3">{emp.nationality}</td>
-                  <td className="p-3 font-mono">{emp.joinDate}</td>
-                  <td className="p-3 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button onClick={() => handleOpenEditEmployee(emp)} className="p-1 hover:bg-slate-200 rounded text-slate-700" title="تعديل">
-                        <Edit2 className="w-4 h-4 text-[#714B67]" />
-                      </button>
-                      <button onClick={() => {
-                        if (onSoftDeleteEmployee) {
-                          onSoftDeleteEmployee(emp.id, 'حذف من القائمة');
-                          toast.success('تم أرشفة الموظف بنجاح');
-                        }
-                      }} className="p-1 hover:bg-rose-50 rounded text-rose-600" title="حذف">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>))}
-            </tbody>
-          </table>
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto max-h-[70vh] odoo-scrollbar">
+            <table className="w-full text-right text-xs table-auto">
+              <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
+                <tr>
+                  <th className="p-3 w-28 whitespace-nowrap">كود النظام</th>
+                  <th className="p-3 w-36 whitespace-nowrap">معرف البصمة (Badge ID)</th>
+                  <th className="p-3 min-w-[200px] whitespace-nowrap">اسم الموظف</th>
+                  <th className="p-3 w-36 whitespace-nowrap">الرقم المدني</th>
+                  <th className="p-3 min-w-[180px] whitespace-nowrap">المسمى الوظيفي والقسم</th>
+                  <th className="p-3 w-28 whitespace-nowrap">الجنسية</th>
+                  <th className="p-3 w-32 whitespace-nowrap">تاريخ الالتحاق</th>
+                  <th className="p-3 w-24 text-center whitespace-nowrap">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredEmps.map((emp, index) => (
+                  <tr key={emp.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} hover:bg-slate-100/80 transition`}>
+                    <td className="p-3 font-mono font-bold text-slate-600">{emp.employeeCode}</td>
+                    <td className="p-3 font-mono">
+                      <span className="bg-purple-100 text-purple-900 border border-purple-200 px-2 py-0.5 rounded font-bold text-[11px]">
+                        {emp.biometricId || emp.badgeId || '—'}
+                      </span>
+                    </td>
+                    <td className="p-3 font-bold text-slate-900 cursor-pointer" onClick={() => handleOpenEditEmployee(emp)}>
+                      <div className="flex items-center gap-2 hover:text-[#714B67] transition">
+                        {emp.avatarUrl ? (
+                          <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-7 h-7 rounded-full object-cover border border-slate-200" />) : (
+                          <div className="w-7 h-7 rounded-full bg-[#714B67]/10 flex items-center justify-center text-[#714B67] font-bold">
+                            {emp.fullNameAr.charAt(0)}
+                          </div>)}
+                        <span>{emp.fullNameAr}</span>
+                      </div>
+                    </td>
+                    <td className="p-3 font-mono dir-ltr text-right">{emp.civilId}</td>
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-800">{emp.jobTitle}</div>
+                      <div className="text-[11px] text-slate-500">{emp.department}</div>
+                    </td>
+                    <td className="p-3">{emp.nationality}</td>
+                    <td className="p-3 font-mono">{emp.joinDate}</td>
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button onClick={() => handleOpenEditEmployee(emp)} className="p-1 hover:bg-slate-200 rounded text-slate-700 cursor-pointer transition" title="تعديل">
+                          <Edit2 className="w-4 h-4 text-[#714B67]" />
+                        </button>
+                        <button onClick={() => {
+                          if (onSoftDeleteEmployee) {
+                            onSoftDeleteEmployee(emp.id, 'حذف من القائمة');
+                            toast.success('تم أرشفة الموظف بنجاح');
+                          }
+                        }} className="p-1 hover:bg-rose-50 rounded text-rose-600 cursor-pointer transition" title="حذف">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>))}
+              </tbody>
+            </table>
+          </div>
         </div>)}
 
       {/* EDIT / CREATE EMPLOYEE MODAL */}
@@ -1249,9 +1313,28 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     />
                   </div>
 
-                  
-
-                  
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">الرصيد المرحل / الافتتاحي للإجازات (أيام)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={editingEmp.carriedOverLeave2025 ?? editingEmp.carriedOverBalance ?? ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setEditingEmp({
+                          ...editingEmp,
+                          carriedOverLeave2025: val,
+                          carriedOverBalance: val,
+                          openingBalance: val,
+                          openingLeaveBalance: val
+                        });
+                      }}
+                      placeholder="0"
+                      className="w-full bg-amber-50/60 border border-amber-300 rounded-xl px-3.5 py-2 text-xs text-amber-900 font-bold font-mono outline-none focus:border-[#714B67]"
+                    />
+                    <p className="text-[10px] text-amber-700 font-medium mt-0.5">رصيد الإجازات المعتمد المرحل من السنوات السابقة لعام 2025</p>
+                  </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">حالة الموظف</label>

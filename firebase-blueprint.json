@@ -1,36 +1,94 @@
 {
-  "collections": [
-    {
-      "name": "users",
-      "fields": {
-        "email": "string",
-        "role": "string",
-        "createdAt": "timestamp"
-      }
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User credentials and tenant mapping",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "companyId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
     },
-    {
-      "name": "companies",
-      "fields": {
-        "nameAr": "string",
-        "nameEn": "string",
-        "isPrimary": "boolean"
-      }
+    "Company": {
+      "title": "Company",
+      "description": "Multi-tenant company or clinic profile",
+      "type": "object",
+      "properties": {
+        "nameAr": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "commercialRegNo": { "type": "string" },
+        "civilIdCompany": { "type": "string" },
+        "bankName": { "type": "string" },
+        "iban": { "type": "string" },
+        "wsiCode": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["nameAr"]
     },
-    {
-      "name": "employees",
-      "fields": {
-        "companyId": "string",
-        "fullNameAr": "string",
-        "civilId": "string"
-      }
+    "Employee": {
+      "title": "Employee",
+      "description": "Tenant employee demographic and job profile",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "employeeCode": { "type": "string" },
+        "fullNameAr": { "type": "string" },
+        "civilId": { "type": "string" },
+        "nationality": { "type": "string" },
+        "department": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["companyId", "fullNameAr", "civilId"]
     },
-    {
-      "name": "contracts",
-      "fields": {
-        "employeeId": "string",
-        "companyId": "string",
-        "basicSalary": "number"
-      }
+    "Leave": {
+      "title": "Leave",
+      "description": "Employee leave request record",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "type": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "days": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["companyId", "employeeId", "startDate", "endDate"]
+    },
+    "PayrollRun": {
+      "title": "PayrollRun",
+      "description": "Monthly payroll processing and WPS transfer archive",
+      "type": "object",
+      "properties": {
+        "companyId": { "type": "string" },
+        "month": { "type": "string" },
+        "totalNetSalary": { "type": "number" },
+        "employeeCount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["companyId", "month", "totalNetSalary"]
     }
-  ]
+  },
+  "firestore": {
+    "/companies/{companyId}": {
+      "schema": { "$ref": "Company" },
+      "description": "Collection of all enterprise tenants/companies"
+    },
+    "/employees/{employeeId}": {
+      "schema": { "$ref": "Employee" },
+      "description": "Collection of employees associated with tenants"
+    },
+    "/leaves/{leaveId}": {
+      "schema": { "$ref": "Leave" },
+      "description": "Collection of employee leave requests"
+    },
+    "/payroll_runs/{payrollRunId}": {
+      "schema": { "$ref": "PayrollRun" },
+      "description": "Collection of tenant payroll run archives"
+    }
+  }
 }

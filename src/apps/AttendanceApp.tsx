@@ -80,7 +80,7 @@ export const AttendanceApp: React.FC<AttendanceAppProps> = ({
           if (emp) {
             const punchDate = p.date || todayIsoDate;
             const punchTime = p.time || '08:00';
-            const existingRec = (attendanceRecords || []).find(r => r.employeeId === emp.id && r.date === punchDate);
+            const existingRec = (attendance || []).find(r => r.employeeId === emp.id && r.date === punchDate);
 
             const updatedRec: AttendanceRecord = {
               id: existingRec?.id || `att-live-${emp.id}-${punchDate}`,
