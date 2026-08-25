@@ -171,7 +171,7 @@ export interface LeaveRequest {
   id: string;
   employeeId: string;
   companyId: string;
-  leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY' | 'HAJJ' | 'UNPAID' | 'COMPASSIONATE' | 'HOURLY_PERMISSION' | 'COMPENSATORY';
+  leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY' | 'HAJJ' | 'UNPAID' | 'COMPASSIONATE' | 'BEREAVEMENT' | 'HOURLY_PERMISSION' | 'COMPENSATORY';
   startDate: string;
   endDate: string;
   totalDays: number;
@@ -195,6 +195,12 @@ export interface LeaveRequest {
   leaveAmount?: number;
   totalAvailableBalance?: number;
   excessDays?: number;         // أيام زائدة بدون راتب (تخصم من مدة الخدمة فقط بخصم مالي 0.000 د.ك)
+  // Kuwait Labor Law Article 77 (Bereavement Leave / إجازة عزاء ووفاة)
+  bereavementDegree?: 'FIRST' | 'SECOND' | 'OTHER'; // درجة القرابة: الأولى أو الثانية وفق المادة 77
+  bereavementRelation?: string;                     // صلة القرابة (الأب، الأم، الزوج، الزوجة، الابن، الأخ، الجد...)
+  bereavementStatutoryDays?: number;                // 3 أيام إجازة عزاء مدفوعة بالكامل (المادة 77 - خصم 0 من السنوية)
+  isSplitBereavement?: boolean;                     // دمج إجازة الوفاة بالسنوية في حال تمديد الفترة (مثلاً 14 يوم)
+  annualDeductedDays?: number;                      // الأيام المخصومة من الرصيد السنوي بعد استنفاد الـ 3 أيام
   managerOverride?: boolean;   // تجاوز قيود النظام من قبل المدير للإجازات التي تتجاوز 30 يوماً
   managerOverrideNote?: string;// بيان وموافقة المدير لتجاوز حد 30 يوماً
   allocationBreakdown?: Array<{
@@ -213,7 +219,7 @@ export interface HrLeaveAllocation {
   name: string; // e.g. "تخصيص رصيد سنوي افتتاحي" or "استحقاق شهري آلي 2.5 يوم"
   employeeId: string;
   companyId: string;
-  leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY' | 'HAJJ' | 'UNPAID' | 'COMPASSIONATE' | 'HOURLY_PERMISSION' | 'COMPENSATORY';
+  leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY' | 'HAJJ' | 'UNPAID' | 'COMPASSIONATE' | 'BEREAVEMENT' | 'HOURLY_PERMISSION' | 'COMPENSATORY';
   allocationType: 'regular' | 'accrual'; // 'regular' for fixed opening balance, 'accrual' for monthly plan
   accrualMonthKey?: string; // e.g. '2026-08'
   numberOfDays: number; // إجمالي الأيام المخصصة
@@ -228,6 +234,174 @@ export interface HrLeaveAllocation {
 }
 
 export type LeaveAllocation = HrLeaveAllocation;
+
+// -------------------------------------------------------------------------
+// Universal Multi-Item Leave Settlement & Encashment Engine
+// -------------------------------------------------------------------------
+export type SettlementItemCategory = 
+  | 'SALARY_PRORATED' 
+  | 'OVERTIME' 
+  | 'STATUTORY_ALLOWANCE' 
+  | 'CONSUMED_LEAVE' 
+  | 'LEAVE_ENCASHMENT' 
+  | 'TICKET_ALLOWANCE' 
+  | 'HOUSING_ALLOWANCE' 
+  | 'TRANSPORT_ALLOWANCE' 
+  | 'OTHER_EARNING' 
+  | 'LOAN_DEDUCTION' 
+  | 'SALARY_ADVANCE' 
+  | 'UNPAID_EXCESS_DAYS' 
+  | 'ADMIN_DEDUCTION' 
+  | 'OTHER_DEDUCTION';
+
+export interface UniversalSettlementItem {
+  id: string;
+  category: SettlementItemCategory;
+  name: string;
+  type: 'EARNING' | 'DEDUCTION';
+  quantity: number; // e.g. 15 days, 10 hours, 1 ticket
+  unit: 'days' | 'hours' | 'fixed' | 'tickets';
+  rate: number; // e.g. daily wage, hourly wage, or fixed rate
+  amount: number; // quantity * rate (or custom fixed amount)
+  notes?: string;
+  isStatutoryNonDeductible?: boolean; // For statutory leaves like Bereavement (Art 77) with 0 balance deduction
+  isEncashment?: boolean; // For leave balance cash liquidation
+  isEditable?: boolean;
+}
+
+export interface UniversalSettlementInput {
+  voucherNumber?: string;
+  companyId: string;
+  employeeId: string;
+  settlementDate: string;
+  settlementMode?: 'LEAVE_WITH_TRAVEL' | 'ENCASHMENT_LIQUIDATION' | 'CUSTOM';
+  departureDate?: string;
+  returnDate?: string;
+  
+  basicSalary: number;
+  allowances: number;
+  grossSalary: number;
+  dailyWage: number;
+  hourlyWage: number;
+  
+  carriedOverBalance: number;
+  accruedBalance: number;
+  totalAvailableBalance: number;
+  
+  requestedLeaveDays: number;
+  statutoryLeaveDays: number;
+  consumedLeaveDays: number;
+  unpaidLeaveDays: number;
+  
+  includeProratedSalary: boolean;
+  workedDaysInMonth: number;
+  proratedSalaryDivisor: number; // default 26
+  
+  includeOvertime: boolean;
+  overtimeHours: number;
+  overtimeMultiplier: number; // default 1.25 or 1.5
+  
+  includeEncashment: boolean;
+  encashmentDays: number;
+  
+  ticketAllowance: number;
+  housingAllowance: number;
+  loanDeduction: number;
+  salaryAdvanceDeduction: number;
+  adminDeduction: number;
+  customItems: UniversalSettlementItem[];
+  
+  paymentMethod: 'BANK_TRANSFER' | 'CASH' | 'CHEQUE';
+  bankName?: string;
+  iban?: string;
+  notes?: string;
+  preparedBy?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+}
+
+export interface UniversalSettlementResult {
+  voucherNumber: string;
+  settlementDate: string;
+  settlementMode?: 'LEAVE_WITH_TRAVEL' | 'ENCASHMENT_LIQUIDATION' | 'CUSTOM';
+  dailyWage: number;
+  hourlyWage: number;
+  
+  carriedOverBalance: number;
+  accruedBalance: number;
+  totalAvailableBefore: number;
+  statutoryLeaveDays: number;
+  consumedLeaveDays: number;
+  encashedLeaveDays: number;
+  unpaidLeaveDays: number;
+  remainingBalanceAfter: number;
+  
+  items: UniversalSettlementItem[];
+  totalEarnings: number;
+  totalDeductions: number;
+  netSettlementPayout: number;
+  
+  // Legacy / print compatibility fields
+  aysed_carried_over: number;
+  aysed_opening_balance: number;
+  aysed_accrued_2026: number;
+  aysed_total_available: number;
+  aysed_paid_days: number;
+  aysed_unpaid_days: number;
+  aysed_daily_wage: number;
+  aysed_leave_cash: number;
+  aysed_ticket_allowance: number;
+  aysed_allowances: number;
+  aysed_deductions: number;
+  aysed_net_payable: number;
+}
+
+export interface LeaveSettlementVoucher {
+  id: string;
+  voucherNumber: string;
+  companyId: string;
+  employeeId: string;
+  employeeName: string;
+  employeeCode: string;
+  civilId: string;
+  jobTitle: string;
+  department: string;
+  joinDate: string;
+  settlementDate: string;
+  departureDate?: string;
+  returnDate?: string;
+  settlementMode?: 'LEAVE_WITH_TRAVEL' | 'ENCASHMENT_LIQUIDATION' | 'CUSTOM';
+  status: 'draft' | 'validated' | 'paid' | 'cancelled' | 'settled_locked';
+  
+  basicSalary: number;
+  grossSalary: number;
+  dailyWage: number;
+  hourlyWage: number;
+  
+  carriedOverBalance: number;
+  accruedBalance: number;
+  totalAvailableBefore: number;
+  consumedLeaveDays: number;
+  statutoryLeaveDays: number;
+  encashedLeaveDays: number;
+  unpaidLeaveDays: number;
+  remainingBalanceAfter: number;
+  
+  items: UniversalSettlementItem[];
+  totalEarnings: number;
+  totalDeductions: number;
+  netSettlementPayout: number;
+  
+  paymentMethod: 'BANK_TRANSFER' | 'CASH' | 'CHEQUE';
+  bankName?: string;
+  iban?: string;
+  notes?: string;
+  preparedBy?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface BiometricDevice {
   id: string;

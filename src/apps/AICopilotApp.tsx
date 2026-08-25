@@ -30,7 +30,7 @@ export const AICopilotApp: React.FC<AICopilotAppProps> = ({
 }) => {
   const companyEmployees = (employees || []).filter(e => e.companyId === (activeCompany?.id || 'comp-1'));
   const companyContracts = (contracts || []).filter(c => c.companyId === (activeCompany?.id || 'comp-1'));
-  const companyLeaves = (leaves || []).filter(l => l.companyId === (activeCompany?.id || 'comp-1'));
+  const companyLeaves = (leaves || []).filter(l => !activeCompany || activeCompany.id === 'comp-1' || l.companyId === activeCompany.id || !l.companyId || l.companyId === 'comp-1');
 
   const [inputPrompt, setInputPrompt] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);

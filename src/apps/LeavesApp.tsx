@@ -29,7 +29,7 @@ import {
   Calculator, FileText, Search, 
   History, Printer, Trash2, DollarSign,
   Filter, X, Info, AlertCircle, RefreshCw, Layers, Award,
-  Sparkles, ChevronRight, UserCheck, ShieldCheck, Edit3
+  Sparkles, ChevronRight, UserCheck, ShieldCheck, Edit3, Lock
 } from 'lucide-react';
 
 interface LeavesAppProps {
@@ -125,7 +125,12 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
       reason: req.reason || '',
       status: req.status || 'DRAFT',
       createdAt: (req as any).createdAt || new Date().toISOString(),
-      isHistorical: false
+      isHistorical: false,
+      bereavementDegree: req.bereavementDegree,
+      bereavementRelation: req.bereavementRelation,
+      bereavementStatutoryDays: req.bereavementStatutoryDays,
+      isSplitBereavement: req.isSplitBereavement,
+      annualDeductedDays: req.annualDeductedDays
     };
     onSaveLeave(newLeave);
     setEditingLeave(null);
@@ -151,7 +156,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
 
   const rawCompanyEmployees = (employees || []).filter(e => !e.isDeleted && (!activeCompany || activeCompany.id === 'comp-1' || e.companyId === activeCompany.id || !e.companyId));
   const companyEmployees = rawCompanyEmployees.length > 0 ? rawCompanyEmployees : (employees || []).filter(e => !e.isDeleted);
-  const companyLeaves = (leaves || []).filter(l => l.companyId === (activeCompany?.id || 'comp-1'));
+  const companyLeaves = (leaves || []).filter(l => !activeCompany || activeCompany.id === 'comp-1' || l.companyId === activeCompany.id || !l.companyId || l.companyId === 'comp-1');
   const activeSearchTerm = localSearch || searchTerm;
 
   // Ensure baseline allocations exist for all active employees
@@ -711,7 +716,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
-              <table className="w-full text-right text-xs table-auto">
+              <table className="w-full text-right text-xs table-auto min-w-[950px]">
                 <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
                     <th className="p-3 w-44 whitespace-nowrap">الموظف</th>
@@ -732,7 +737,10 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                       </td>
                     </tr>) : (
                     filteredLeaves.map((lev, index) => {
-                      const emp = employees.find(e => e.id === lev.employeeId);
+                      const emp = employees.find(e => e.id === lev.employeeId || e.employeeCode === lev.employeeId) || {
+                        fullNameAr: lev.employeeId ? `موظف (${lev.employeeId})` : 'موظف غير محدد',
+                        employeeCode: lev.employeeId || '—'
+                      } as Employee;
                       return (
                         <tr key={`${lev.id}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
                           <td className="p-3 font-bold text-slate-900">
@@ -740,8 +748,19 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                             <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
                           </td>
                           <td className="p-3">
-                            <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[11px] border border-slate-200">
-                              {lev.leaveType === 'ANNUAL' ? '🌴 سنوية اعتيادية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType === 'UNPAID' ? '🚫 بدون راتب' : lev.leaveType === 'COMPENSATORY' ? '🔄 يوم تعويضي' : lev.leaveType}
+                            <span className={`px-2 py-0.5 rounded font-bold text-[11px] border ${
+                              lev.leaveType === 'BEREAVEMENT' || lev.leaveType === 'COMPASSIONATE'
+                                ? 'bg-slate-900 text-amber-300 border-slate-700'
+                                : 'bg-slate-100 text-slate-800 border-slate-200'
+                            }`}>
+                              {lev.leaveType === 'ANNUAL' ? '🌴 سنوية اعتيادية' : 
+                               lev.leaveType === 'BEREAVEMENT' || lev.leaveType === 'COMPASSIONATE' 
+                                 ? (lev.isSplitBereavement ? `🖤 عزاء وسنوية (م. 77)` : `🖤 إجازة عزاء (م. 77)`) 
+                                 : lev.leaveType === 'SICK' ? '🏥 مرضية' 
+                                 : lev.leaveType === 'UNPAID' ? '🚫 بدون راتب' 
+                                 : lev.leaveType === 'COMPENSATORY' ? '🔄 يوم تعويضي' 
+                                 : lev.leaveType === 'MATERNITY' ? '👶 أمومة' 
+                                 : lev.leaveType}
                             </span>
                           </td>
                           <td className="p-3 font-mono text-slate-700">{lev.startDate} إلى {lev.endDate}</td>
@@ -877,18 +896,18 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
-              <table className="w-full text-right text-xs table-auto">
+              <table className="w-full text-right text-xs table-auto min-w-[1100px]">
                 <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
                     <th className="p-3 w-44 whitespace-nowrap">الموظف</th>
-                    <th className="p-3 min-w-[200px] whitespace-nowrap">مسمى التخصيص (Allocation Description)</th>
-                    <th className="p-3 w-36 text-center whitespace-nowrap">النوع (Type)</th>
+                    <th className="p-3 min-w-[240px] whitespace-nowrap">مسمى التخصيص (Allocation Description)</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">النوع (Type)</th>
                     <th className="p-3 w-32 text-center whitespace-nowrap">تاريخ السريان</th>
                     <th className="p-3 w-28 text-center whitespace-nowrap">الأيام المخصصة</th>
                     <th className="p-3 w-28 text-center whitespace-nowrap">المستهلك (FIFO)</th>
-                    <th className="p-3 w-28 text-center whitespace-nowrap">المتبقي</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">المتبقي</th>
                     <th className="p-3 w-28 text-center whitespace-nowrap">الحالة</th>
-                    <th className="p-3 w-32 text-center whitespace-nowrap">الإجراءات</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -899,20 +918,25 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                       </td>
                     </tr>) : (
                     filteredAllocations.map((alloc, idx) => {
-                      const emp = employees.find(e => e.id === alloc.employeeId);
+                      const emp = employees.find(e => e.id === alloc.employeeId || e.employeeCode === alloc.employeeId) || {
+                        id: alloc.employeeId,
+                        fullNameAr: alloc.employeeId ? `موظف (${alloc.employeeId})` : 'موظف غير محدد',
+                        employeeCode: alloc.employeeId || '—'
+                      } as Employee;
                       const empFifo = emp ? computeFifoLeaveAllocations(emp, buildEmployeeBaselineAllocations(emp, allocations), companyLeaves) : null;
                       const liveAlloc = empFifo?.allocations.find(a => a.id === alloc.id) || alloc;
                       const consumed = liveAlloc.consumedDays || 0;
                       const total = liveAlloc.numberOfDays || 0;
                       const remaining = Math.max(0, total - consumed);
+                      const isValidated = alloc.state === 'validate' || !alloc.state;
 
                       return (
                         <tr key={`${alloc.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
                           <td className="p-3">
-                            <div className="font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{emp?.employeeCode}</div>
+                            <div className="font-bold text-slate-900">{emp.fullNameAr}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{emp.employeeCode}</div>
                           </td>
-                          <td className="p-3 font-bold text-slate-800">
+                          <td className="p-3 font-bold text-slate-800 max-w-sm whitespace-normal break-words leading-relaxed">
                             {alloc.name}
                           </td>
                           <td className="p-3 text-center">
@@ -925,49 +949,58 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                             </span>
                           </td>
                           <td className="p-3 text-center font-mono text-slate-600">{alloc.dateFrom || '—'}</td>
-                          <td className="p-3 text-center font-mono font-bold text-slate-900 text-sm">
-                            {alloc.numberOfDays} يوم
+                          <td className="p-3 text-center font-mono font-bold text-slate-900 text-sm whitespace-nowrap">
+                            {formatDaysDisplay(alloc.numberOfDays)}
                           </td>
-                          <td className="p-3 text-center font-mono">
+                          <td className="p-3 text-center font-mono whitespace-nowrap">
                             <span className={consumed > 0 ? 'text-rose-700 font-bold' : 'text-slate-400'}>
-                              {consumed.toFixed(1)} يوم
+                              {formatDaysDisplay(consumed)}
                             </span>
                           </td>
-                          <td className="p-3 text-center font-mono">
-                            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              {remaining.toFixed(1)} يوم
+                          <td className="p-3 text-center font-mono whitespace-nowrap tabular-nums">
+                            <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 inline-block">
+                              {formatDaysDisplay(remaining)}
                             </span>
                           </td>
-                          <td className="p-3 text-center">
+                          <td className="p-3 text-center whitespace-nowrap">
                             <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200">
                               معتمد (Validated)
                             </span>
                           </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
                               {emp && (
                                 <button
-                                  onClick={() => setSelectedFifoEmployee(emp)}
-                                  className="p-1 text-purple-700 hover:bg-purple-50 rounded transition cursor-pointer font-bold text-[11px] flex items-center gap-0.5 border border-purple-200"
+                                  onClick={() => setSelectedFifoEmployee(emp as Employee)}
+                                  className="p-1.5 text-purple-700 hover:bg-purple-50 rounded transition cursor-pointer font-bold text-[11px] flex items-center gap-0.5 border border-purple-200"
                                   title="عرض كشف استهلاك FIFO"
                                 >
                                   <Layers className="w-3.5 h-3.5" />
                                   <span>FIFO</span>
-                                </button>)}
-                              <button
-                                onClick={() => setEditingAllocation(alloc)}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
-                                title="تعديل التخصيص"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteAllocation(alloc.id)}
-                                className="p-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                                title="حذف التخصيص"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                                </button>
+                              )}
+                              {!isValidated ? (
+                                <>
+                                  <button
+                                    onClick={() => setEditingAllocation(alloc)}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer border border-blue-200"
+                                    title="تعديل التخصيص"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteAllocation(alloc.id)}
+                                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer border border-rose-200"
+                                    title="حذف التخصيص"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 font-bold px-2.5 py-1 bg-slate-100 rounded border border-slate-200 flex items-center gap-1" title="السجل معتمد ومقفل للحفاظ على سلامة دفتر الأستاذ">
+                                  <Lock className="w-3 h-3 text-slate-600" /> مقفل
+                                </span>
+                              )}
                             </div>
                           </td>
                         </tr>);
@@ -1004,17 +1037,17 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
-              <table className="w-full text-right text-xs table-auto">
+              <table className="w-full text-right text-xs table-auto min-w-[980px]">
                 <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                   <tr>
-                    <th className="p-3 w-12 text-center whitespace-nowrap">#</th>
-                    <th className="p-3 min-w-[200px] whitespace-nowrap">الموظف</th>
-                    <th className="p-3 w-36 text-center whitespace-nowrap">الرصيد الافتتاحي / المرحل</th>
-                    <th className="p-3 w-36 text-center whitespace-nowrap">المكتسب لعام 2026</th>
+                    <th className="p-3 w-10 text-center whitespace-nowrap">#</th>
+                    <th className="p-3 min-w-[180px] whitespace-nowrap">الموظف</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">الرصيد الافتتاحي / المرحل</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">المكتسب لعام 2026</th>
                     <th className="p-3 w-32 text-center whitespace-nowrap">المستهلك (Taken Days)</th>
-                    <th className="p-3 w-36 text-center whitespace-nowrap">الرصيد المتاح الصافي</th>
-                    <th className="p-3 w-40 text-center whitespace-nowrap">حالة الترحيل الشهري</th>
-                    <th className="p-3 w-40 text-center whitespace-nowrap">الإجراءات</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">الرصيد المتاح الصافي</th>
+                    <th className="p-3 w-36 text-center whitespace-nowrap">حالة الترحيل الشهري</th>
+                    <th className="p-3 min-w-[220px] text-center whitespace-nowrap">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1124,6 +1157,8 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
           preSelectedEmployeeId={settlementEmpId}
           onNavigateToTab={(tab) => setActiveSubTab(tab as any)}
           onSaveLeave={onSaveLeave}
+          onUpdateAllocations={setAllocations}
+          onUpdateEmployee={onSaveEmployee}
         />)}
 
       {/* Sub-Tab 5: History Log */}
@@ -1169,11 +1204,17 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                       </td>
                     </tr>) : (
                     historicalLeavesList.map((lev, idx) => {
-                      const emp = employees.find(e => e.id === lev.employeeId);
+                      const emp = employees.find(e => e.id === lev.employeeId || e.employeeCode === lev.employeeId) || {
+                        fullNameAr: lev.employeeId ? `موظف (${lev.employeeId})` : 'موظف غير محدد',
+                        employeeCode: lev.employeeId || '—'
+                      } as Employee;
                       return (
                         <tr key={`${lev.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
                           <td className="p-3 font-mono font-bold text-purple-900">{lev.historicalYear || (lev.startDate ? new Date(lev.startDate).getFullYear() : '2026')}</td>
-                          <td className="p-3 font-bold text-slate-900">{emp ? emp.fullNameAr : 'مجهول'}</td>
+                          <td className="p-3 font-bold text-slate-900">
+                            <div>{emp.fullNameAr}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{emp.employeeCode}</div>
+                          </td>
                           <td className="p-3">
                             <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold text-[10px] border border-slate-200">
                               {lev.leaveType === 'ANNUAL' ? '🌴 سنوية' : lev.leaveType === 'SICK' ? '🏥 مرضية' : lev.leaveType}

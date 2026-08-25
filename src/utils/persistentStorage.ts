@@ -30,6 +30,7 @@ export const MANARA_STORAGE_KEYS = {
   SUBSCRIPTIONS: 'manara_subscriptions_data',
   EMPLOYEE_NOTIFICATIONS: 'manara_employee_notifications_data',
   DAILY_MOVEMENTS: 'manara_daily_movements_data',
+  LEAVE_SETTLEMENT_VOUCHERS: 'manara_leave_settlement_vouchers_data',
   ACTIVE_COMPANY_ID: 'activeCompanyId',
   BG_THEME: 'manara_bg_theme',
   MOTION_ENABLED: 'manara_motion_enabled',

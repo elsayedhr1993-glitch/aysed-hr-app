@@ -82,6 +82,10 @@ export interface LeaveMetricsResult {
   dailyWage: number;
   totalLeavePay: number;
   endingBalance: number;
+  bereavementStatutoryDays?: number;
+  annualDeductedDays?: number;
+  isSplitBereavement?: boolean;
+  explanation?: string;
 }
 
 export const calculateAysedLeaveMetrics = (
@@ -92,7 +96,8 @@ export const calculateAysedLeaveMetrics = (
   joiningDate: string = '2026-01-01',
   previousApprovedLeaves: number = 0,
   publicHolidays: string[] = [],
-  leaveType: string = 'ANNUAL'
+  leaveType: string = 'ANNUAL',
+  bereavementDegree: 'FIRST' | 'SECOND' | 'OTHER' = 'FIRST'
 ): LeaveMetricsResult => {
   const totalAvailable = Math.max(0, Number(netAvailable) || 0);
 
@@ -114,10 +119,36 @@ export const calculateAysedLeaveMetrics = (
   let paidDays = 0;
   let unpaidDays = 0;
   let endingBalance = totalAvailable;
+  let bereavementStatutoryDays = 0;
+  let annualDeductedDays = 0;
+  let isSplitBereavement = false;
+  let explanation = '';
 
-  const isFullyPaidSpecialType = ['COMPENSATORY', 'SICK', 'MATERNITY', 'HAJJ', 'COMPASSIONATE', 'HOURLY_PERMISSION'].includes(leaveType);
+  if (leaveType === 'BEREAVEMENT' || leaveType === 'COMPASSIONATE') {
+    // Kuwait Labor Law Article 77:
+    // 3 days fully paid without deduction from annual balance for 1st & 2nd degree relatives
+    const statutoryCap = (bereavementDegree === 'FIRST' || bereavementDegree === 'SECOND') ? 3 : 0;
+    bereavementStatutoryDays = Math.min(requestedDays, statutoryCap);
+    const remainingDays = Math.max(0, requestedDays - bereavementStatutoryDays);
 
-  if (isFullyPaidSpecialType) {
+    if (remainingDays === 0) {
+      // Within 3 days statutory limit
+      paidDays = requestedDays;
+      unpaidDays = 0;
+      annualDeductedDays = 0;
+      endingBalance = totalAvailable;
+      isSplitBereavement = false;
+      explanation = `إجازة عزاء مستحقة وفق المادة 77 (${bereavementStatutoryDays} أيام مدفوعة بالكامل - خصم 0 من الرصيد السنوي)`;
+    } else {
+      // Extended duration (e.g. 14 days total -> 3 bereavement + 11 annual)
+      isSplitBereavement = true;
+      annualDeductedDays = Math.min(totalAvailable, remainingDays);
+      unpaidDays = Math.max(0, remainingDays - annualDeductedDays);
+      paidDays = bereavementStatutoryDays + annualDeductedDays;
+      endingBalance = Math.max(0, totalAvailable - annualDeductedDays);
+      explanation = `تم تطبيق دمج المادة 77: ${bereavementStatutoryDays} أيام عزاء مدفوعة بالكامل (بدون خصم) + ${annualDeductedDays} يوم مستقطعة من الرصيد السنوي${unpaidDays > 0 ? ` + ${unpaidDays} يوم بدون راتب` : ''}`;
+    }
+  } else if (['COMPENSATORY', 'SICK', 'MATERNITY', 'HAJJ', 'HOURLY_PERMISSION'].includes(leaveType)) {
     paidDays = requestedDays;
     unpaidDays = 0;
     endingBalance = totalAvailable; // Does not deduct from annual leave balance
@@ -144,6 +175,10 @@ export const calculateAysedLeaveMetrics = (
     unpaidDays: Number(unpaidDays.toFixed(2)),
     dailyWage: Number(dailyWage.toFixed(3)),
     totalLeavePay: Number(leavePay.toFixed(3)),
-    endingBalance: Number(endingBalance.toFixed(2))
+    endingBalance: Number(endingBalance.toFixed(2)),
+    bereavementStatutoryDays,
+    annualDeductedDays,
+    isSplitBereavement,
+    explanation
   };
 };

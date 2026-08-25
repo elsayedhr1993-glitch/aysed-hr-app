@@ -4,7 +4,6 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AysedCoreProvider } from './context/AysedCoreProvider';
 import './index.css';
-import './utils/aysedUiTest';
 
 const rootElement = document.getElementById('root');
 if (rootElement) {

@@ -192,7 +192,7 @@ export const DEFAULT_TEMPLATES_SEED: DocumentTemplate[] = [
     category: 'التعيين والتعاقد',
     contentHtml: `<div style="font-family: 'Arial'; padding: 30px; direction: rtl; border: 1px solid #000;">
             <h2 style="text-align: center;">عقد عمل / Employment Contract</h2>
-            <p><strong>الطرف الأول:</strong> شركة المنار (almanar222222)</p>
+            <p><strong>الطرف الأول:</strong> {{company_name_ar}}</p>
             <p><strong>الطرف الثاني:</strong> {{emp_name}}</p>
             <hr>
             <p>1. الأجر الشهري الإجمالي: {{total_salary}} د.ك (يصرف بالكامل بدون استقطاعات تأمينية).</p>
@@ -250,7 +250,7 @@ export const DEFAULT_TEMPLATES_SEED: DocumentTemplate[] = [
     category: 'المعاملات البنكية والرسمية',
     contentHtml: `<div style="font-family: 'Arial'; padding: 30px; direction: rtl;">
             <h2 style="text-align: center;">شهادة راتب وإقرار عمل</h2>
-            <p>تشهد شركة <strong>المنار</strong> بأن السيد/ {{emp_name}} يتقاضى راتباً شهرياً إجمالياً قدره {{total_salary}} د.ك.</p>
+            <p>تشهد إدارة <strong>{{company_name_ar}}</strong> بأن السيد/ {{emp_name}} يتقاضى راتباً شهرياً إجمالياً قدره {{total_salary}} د.ك.</p>
             <p>ويتم صرف الراتب كاملاً دون أي استقطاعات تأمينية أو ديون للشركة حتى تاريخه.</p>
             <br>
             <p style="text-align: left;">مدير عام الشركة: سيد (Sayed)</p>

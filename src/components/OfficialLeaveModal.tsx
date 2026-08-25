@@ -70,7 +70,8 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
       selectedEmp.joinDate || '2026-01-01',
       previousApprovedLeaves,
       publicHolidaysStr,
-      formData.leaveType || 'ANNUAL'
+      formData.leaveType || 'ANNUAL',
+      (formData.bereavementDegree as any) || 'FIRST'
     );
 
     // Map metrics to the expected output for the component
@@ -82,9 +83,13 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
       balanceAfter: metrics.endingBalance,
       dailyWage: metrics.dailyWage,
       paidLeavePay: metrics.totalLeavePay,
-      netPayable: metrics.totalLeavePay
+      netPayable: metrics.totalLeavePay,
+      bereavementStatutoryDays: metrics.bereavementStatutoryDays || 0,
+      annualDeductedDays: metrics.annualDeductedDays || 0,
+      isSplitBereavement: metrics.isSplitBereavement || false,
+      explanation: metrics.explanation || ''
     };
-  }, [selectedEmp, formData.startDate, formData.endDate, formData.leaveType, holidaysList, allocations, allLeaves, selectedContract]);
+  }, [selectedEmp, formData.startDate, formData.endDate, formData.leaveType, formData.bereavementDegree, holidaysList, allocations, allLeaves, selectedContract]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +107,12 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
         paidDays: calcResult.paidDays,
         totalAvailableBalance: calcResult.totalAvailable,
         dailyWage: calcResult.dailyWage,
-        leaveAmount: calcResult.paidLeavePay
+        leaveAmount: calcResult.paidLeavePay,
+        bereavementDegree: formData.bereavementDegree || ((formData.leaveType === 'BEREAVEMENT' || formData.leaveType === 'COMPASSIONATE') ? 'FIRST' : undefined),
+        bereavementRelation: formData.bereavementRelation,
+        bereavementStatutoryDays: calcResult.bereavementStatutoryDays,
+        isSplitBereavement: calcResult.isSplitBereavement,
+        annualDeductedDays: calcResult.annualDeductedDays
       });
     } else {
       onSave(formData);
@@ -184,10 +194,15 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
                       <label className="block text-sm font-semibold text-gray-600 mb-1">نوع الإجازة</label>
                       <select
                         value={formData.leaveType || 'ANNUAL'}
-                        onChange={(e) => setFormData(prev => ({ ...prev, leaveType: e.target.value as any }))}
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#71639e] outline-none"
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          leaveType: e.target.value as any,
+                          bereavementDegree: (e.target.value === 'BEREAVEMENT' || e.target.value === 'COMPASSIONATE') ? (prev.bereavementDegree || 'FIRST') : undefined
+                        }))}
+                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#71639e] outline-none font-bold text-slate-800"
                       >
                         <option value="ANNUAL">إجازة سنوية اعتيادية (Annual Leave)</option>
+                        <option value="BEREAVEMENT">🖤 إجازة وفاة / عزاء - المادة 77 (Bereavement Leave)</option>
                         <option value="COMPENSATORY">🎁 يوم تعويضي / إجازة بديلة (Compensatory Off)</option>
                         <option value="SICK">إجازة مرضية (Sick Leave)</option>
                         <option value="UNPAID">بدون راتب (Unpaid)</option>
@@ -195,6 +210,78 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
                         <option value="OTHER">أخرى (Other)</option>
                       </select>
                     </div>
+
+                    {/* حقول إجازة الوفاة والعزاء وفق المادة 77 */}
+                    {(formData.leaveType === 'BEREAVEMENT' || formData.leaveType === 'COMPASSIONATE') && (
+                      <div className="p-3.5 bg-slate-900 text-white rounded-xl space-y-3 shadow-sm border border-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs flex items-center gap-1.5 text-amber-400">
+                            ⚖️ إجازة وفاة (المادة 77 - قانون العمل الكويتي)
+                          </span>
+                          <span className="text-[10px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-mono">
+                            3 أيام مدفوعة قانوناً
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-300 mb-1">درجة القرابة *</label>
+                            <select
+                              value={formData.bereavementDegree || 'FIRST'}
+                              onChange={(e) => setFormData(prev => ({ ...prev, bereavementDegree: e.target.value as any }))}
+                              className="w-full p-2 bg-slate-800 border border-slate-600 rounded-lg text-xs text-white font-bold outline-none focus:border-amber-400"
+                            >
+                              <option value="FIRST">الدرجة الأولى (أب، أم، زوج/ة، أبناء)</option>
+                              <option value="SECOND">الدرجة الثانية (أجداد، إخوة/أخوات، أحفاد)</option>
+                              <option value="OTHER">قرابة أخرى (تخصم من السنوي)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-300 mb-1">صلة القرابة بالتفصيل</label>
+                            <input
+                              type="text"
+                              value={formData.bereavementRelation || ''}
+                              onChange={(e) => setFormData(prev => ({ ...prev, bereavementRelation: e.target.value }))}
+                              placeholder="مثال: والد الموظف / شقيق الموظف"
+                              className="w-full p-2 bg-slate-800 border border-slate-600 rounded-lg text-xs text-white outline-none focus:border-amber-400"
+                            />
+                          </div>
+                        </div>
+
+                        {/* بطاقة توضيح التقسيم التلقائي للأيام */}
+                        {calcResult && (
+                          <div className="p-2.5 bg-slate-800/80 rounded-lg border border-slate-700 text-[11px] space-y-1.5">
+                            <div className="text-amber-300 font-bold">
+                              {calcResult.totalNetDays <= 3 ? (
+                                <span>✓ تستحق بالكامل كإجازة عزاء رسمية (3 أيام مدفوعة بدون خصم من الرصيد).</span>
+                              ) : (
+                                <span>✓ تمديد الإجازة ودمجها بالسنوية (المادة 77):</span>
+                              )}
+                            </div>
+                            {calcResult.totalNetDays > 3 && (
+                              <div className="grid grid-cols-3 gap-1.5 text-center pt-1 font-mono">
+                                <div className="p-1.5 bg-emerald-950/80 border border-emerald-500/40 rounded text-emerald-300">
+                                  <div className="text-[10px]">عزاء مدفوع</div>
+                                  <div className="font-bold text-xs">{calcResult.bereavementStatutoryDays} أيام</div>
+                                  <div className="text-[8px] text-emerald-400">(0 خصم سنوي)</div>
+                                </div>
+                                <div className="p-1.5 bg-purple-950/80 border border-purple-500/40 rounded text-purple-300">
+                                  <div className="text-[10px]">خصم من السنوي</div>
+                                  <div className="font-bold text-xs">{calcResult.annualDeductedDays} يوم</div>
+                                  <div className="text-[8px] text-purple-400">(من رصيد الموظف)</div>
+                                </div>
+                                <div className="p-1.5 bg-slate-800 border border-slate-600 rounded text-slate-300">
+                                  <div className="text-[10px]">بدون راتب</div>
+                                  <div className="font-bold text-xs">{calcResult.unpaidDays} يوم</div>
+                                  <div className="text-[8px] text-slate-400">(تجاوز الرصيد)</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1">السبب / الملاحظات</label>
@@ -202,7 +289,7 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
                         type="text"
                         value={formData.reason || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                        placeholder="سبب الإجازة..."
+                        placeholder={formData.leaveType === 'BEREAVEMENT' ? "تفاصيل حالة الوفاة والعزاء..." : "سبب الإجازة..."}
                         className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#71639e]"
                       />
                     </div>
@@ -241,20 +328,42 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
 
                 {/* الجانب الأيسر: التحليل المالي والمستحقات */}
                 <div className="space-y-5">
-                  <h3 className="text-md font-bold text-gray-800 border-r-4 border-[#008784] pr-3">💰 التحليل المالي (المادة 70)</h3>
+                  <h3 className="text-md font-bold text-gray-800 border-r-4 border-[#008784] pr-3">💰 التحليل المالي والمستحقات</h3>
                   <div className="bg-gray-50 rounded-xl p-5 space-y-3.5 border border-gray-200/70">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">أجر اليوم الواحد (أساس 26):</span>
                       <span className="font-bold text-gray-800 font-mono">{calcResult ? calcResult.dailyWage.toFixed(3) : '0.000'} د.ك</span>
                     </div>
+
+                    {(formData.leaveType === 'BEREAVEMENT' || formData.leaveType === 'COMPASSIONATE') && (
+                      <div className="flex justify-between text-sm bg-amber-50/80 p-2 rounded-lg border border-amber-200 text-amber-950 font-bold">
+                        <span>أيام إجازة عزاء (مادة 77 - مدفوعة بالكامل):</span>
+                        <span className="font-mono text-amber-900">{calcResult ? calcResult.bereavementStatutoryDays : 0} أيام (خصم 0)</span>
+                      </div>
+                    )}
+
+                    {(formData.leaveType === 'BEREAVEMENT' || formData.leaveType === 'COMPASSIONATE') && (calcResult?.annualDeductedDays || 0) > 0 && (
+                      <div className="flex justify-between text-sm bg-purple-50/80 p-2 rounded-lg border border-purple-200 text-purple-950">
+                        <span>أيام مخصومة من الرصيد السنوي (تمديد):</span>
+                        <span className="font-bold text-purple-800 font-mono">{calcResult ? calcResult.annualDeductedDays.toFixed(2) : '0.00'} يوم</span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">أيام مغطاة بالرصيد:</span>
+                      <span className="text-gray-500">إجمالي الأيام المدفوعة للأجر:</span>
                       <span className="font-bold text-teal-700 font-mono">{calcResult ? calcResult.paidDays.toFixed(2) : '0.00'} يوم</span>
                     </div>
+
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">أيام بدون راتب (تتجاوز الرصيد):</span>
                       <span className="font-bold text-rose-600 font-mono">{calcResult ? calcResult.unpaidDays.toFixed(2) : '0.00'} يوم</span>
                     </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">الرصيد السنوي المتبقي بعد الإجازة:</span>
+                      <span className="font-bold text-indigo-700 font-mono">{calcResult ? calcResult.balanceAfter.toFixed(2) : '0.00'} يوم</span>
+                    </div>
+
                     <div className="pt-3 border-t border-gray-200 flex justify-between items-center">
                       <span className="font-bold text-gray-800 text-base">صافي مستحق الإجازة:</span>
                       <span className="text-2xl font-black text-[#008784] font-mono">{calcResult ? calcResult.netPayable.toFixed(3) : '0.000'} د.ك</span>

@@ -2249,7 +2249,7 @@ pause
                 </div>
                 <div>
                   <h4 className="font-bold text-xs text-slate-900">الأتمتة والربط المباشر مع أجهزة البصمة (Automated Cron Job)</h4>
-                  <p className="text-[11px] text-slate-500">سحب البصمات من ماكينات شركة المنار تلقائياً كل ساعة وتحديث الحضور في أودو</p>
+                  <p className="text-[11px] text-slate-500">سحب البصمات من ماكينات الحضور والانصراف للشركة النشطة تلقائياً كل ساعة وتحديث الحضور في أودو</p>
                 </div>
               </div>
               <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded font-mono font-bold text-[10px]">

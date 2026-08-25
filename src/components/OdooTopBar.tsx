@@ -330,21 +330,21 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         {onOpenAICopilot && (
           <button
             onClick={onOpenAICopilot}
-            className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs px-2 sm:px-2.5 py-1 rounded-md flex items-center gap-1 font-bold transition shadow-xs border border-amber-300 cursor-pointer active:scale-95"
+            className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs px-2 sm:px-2.5 py-1 rounded-md flex items-center gap-1 font-bold transition shadow-xs border border-amber-300 cursor-pointer active:scale-95 shrink-0"
             title="مساعد أودو الذكي (Odoo AI Copilot)"
           >
             <Sparkles className="w-3.5 h-3.5 fill-slate-950 shrink-0" />
-            <span className="hidden lg:inline text-[11px]">اسأل الذكاء الاصطناعي</span>
+            <span className="hidden xl:inline text-[11px] whitespace-nowrap">اسأل الذكاء</span>
           </button>)}
 
         {/* Quick OCR Scanner Trigger */}
         <button
           onClick={onOpenOCRModal}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 sm:px-2.5 py-1 rounded-md flex items-center gap-1 font-medium transition shadow-xs border border-emerald-400/40 cursor-pointer active:scale-95"
+          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 sm:px-2.5 py-1 rounded-md flex items-center gap-1 font-medium transition shadow-xs border border-emerald-400/40 cursor-pointer active:scale-95 shrink-0"
           title="الماسح الضوئي الذكي للهويات والمستندات (OCR Vision)"
         >
           <Scan className="w-3.5 h-3.5 shrink-0" />
-          <span className="hidden xl:inline text-[11px]">OCR الهويات</span>
+          <span className="hidden 2xl:inline text-[11px] whitespace-nowrap">OCR الهويات</span>
         </button>
 
         {/* Ambient Sound / Atmosphere Toggle */}
@@ -591,7 +591,7 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
         </div>
 
         {/* Language Switcher Menu (o_switch_lang_menu) */}
-        <div id="o_switch_lang_menu" className="o_switch_lang_menu flex items-center gap-1.5 px-2 py-1 rounded bg-white/10 text-white text-xs">
+        <div id="o_switch_lang_menu" className="o_switch_lang_menu flex items-center gap-1.5 px-2 py-1 rounded bg-white/10 text-white text-xs shrink-0 whitespace-nowrap">
           <button
             type="button"
             onClick={() => {

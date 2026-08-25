@@ -1,27 +1,89 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Employee, Contract, LeaveRequest, AttendanceRecord, Company } from '../types';
+import { Employee, Contract, LeaveRequest, AttendanceRecord, Company, HrLeaveAllocation, UniversalSettlementItem, LeaveSettlementVoucher } from '../types';
 import { 
   Printer, Calculator, DollarSign, Calendar, User, 
   FileText, ShieldCheck, Download, Loader2, Plus, 
   Archive, ChevronRight, CheckCircle2, History, AlertCircle,
-  Building, Briefcase, Hash, CreditCard, Sparkles, X
+  Building, Briefcase, Hash, CreditCard, Sparkles, X,
+  Trash2, Eye, RefreshCw, Layers, Check, Coins, ArrowRight,
+  TrendingUp, Clock, FileCheck, ArrowDownRight, Tag
 } from 'lucide-react';
 import { printDocument, exportElementToPdf } from '../utils/printUtils';
 import { 
-   
-  get_aysed_official_balance, 
-  getGlobalOpeningBalance, 
-  getGlobalAccrued2026,
-  computeUniversalLeaveLedger,
-  getCarriedOverBalance,
-  getOpeningBalance 
-} from '../utils/kuwaitLaw';
-import { computeFifoLeaveAllocations, buildEmployeeBaselineAllocations } from '../services/leaveService';
-import { computeLeaveRequest } from '../utils/leaveEngine';
+  computeFifoLeaveAllocations, 
+  buildEmployeeBaselineAllocations 
+} from '../services/leaveService';
+import { 
+  calculateKuwaitDailyRate,
+  calculateKuwaitHourlyRate,
+  calculatePhysicalWorkedDays,
+  calculateUniversalLeaveSettlement,
+  getSavedSettlementVouchers,
+  saveSettlementVoucher,
+  deleteSettlementVoucher,
+  liquidateLeaveBalanceInAllocations
+} from '../services/leaveSettlementService';
+import { LeaveClearanceDocument } from './LeaveClearanceDocument';
 import toast from 'react-hot-toast';
 
+interface DecimalInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  className?: string;
+  min?: number;
+  max?: number;
+  placeholder?: string;
+}
+
+const DecimalInput: React.FC<DecimalInputProps> = ({
+  value,
+  onChange,
+  className = '',
+  min,
+  max,
+  placeholder,
+}) => {
+  const [text, setText] = useState<string>(value !== undefined && value !== null ? value.toString() : '0');
+
+  useEffect(() => {
+    if (value !== undefined && value !== null) {
+      const parsedCurrent = parseFloat(text);
+      if (parsedCurrent !== value && text !== '' && text !== '.' && text !== '-.' && text !== '-0') {
+        setText(value.toString());
+      }
+    }
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        const val = e.target.value;
+        if (/^-?\d*\.?\d*$/.test(val) || val === '') {
+          setText(val);
+          if (val === '' || val === '.' || val === '-' || val === '-.') {
+            onChange(0);
+          } else {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              let finalNum = num;
+              if (min !== undefined && finalNum < min) finalNum = min;
+              if (max !== undefined && finalNum > max) finalNum = max;
+              onChange(finalNum);
+            }
+          }
+        }
+      }}
+      className={className}
+    />
+  );
+};
+
 export interface LeaveSettlementCalculatorProps {
-  allocations?: any[];
+  allocations?: HrLeaveAllocation[];
   onOpenLeaveModal?: (empId: string) => void;
   employees: Employee[];
   contracts?: Contract[];
@@ -31,6 +93,8 @@ export interface LeaveSettlementCalculatorProps {
   preSelectedEmployeeId?: string;
   onNavigateToTab?: (tab: string) => void;
   onSaveLeave?: (leave: LeaveRequest) => void;
+  onUpdateAllocations?: (updated: HrLeaveAllocation[]) => void;
+  onUpdateEmployee?: (updated: Employee) => void;
 }
 
 export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps> = ({
@@ -44,9 +108,11 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   preSelectedEmployeeId,
   onNavigateToTab,
   onSaveLeave,
+  onUpdateAllocations,
+  onUpdateEmployee,
 }) => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>(preSelectedEmployeeId || (employees[0]?.id ?? ''));
-  const [activeTab, setActiveTab] = useState<'settlement_calculator' | 'employee_history'>('settlement_calculator');
+  const [activeTab, setActiveTab] = useState<'settlement_calculator' | 'vouchers_archive' | 'employee_history'>('settlement_calculator');
 
   useEffect(() => {
     if (preSelectedEmployeeId) {
@@ -54,48 +120,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     }
   }, [preSelectedEmployeeId]);
   
-  // Form fields
-  const [selectedLeaveId, setSelectedLeaveId] = useState<string>('custom');
-  const [dateFrom, setDateFrom] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [dateTo, setDateTo] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    return d.toISOString().split('T')[0];
-  });
-  const [leaveDaysInput, setLeaveDaysInput] = useState<number>(30);
-  const [ticketAllowanceInput, setTicketAllowanceInput] = useState<number>(150);
-  const [deductionsInput, setDeductionsInput] = useState<number>(0);
-  const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [settlementState, setSettlementState] = useState<'draft' | 'validated' | 'paid'>('draft');
-
-  // Modals for Header actions
-  
-  const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
-  const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
-
-  // New leave form state
-  const [newLeaveType, setNewLeaveType] = useState<string>('ANNUAL');
-  const [newLeaveFrom, setNewLeaveFrom] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [newLeaveTo, setNewLeaveTo] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [newLeaveDays, setNewLeaveDays] = useState<number>(1);
-  const [newLeaveReason, setNewLeaveReason] = useState<string>('');
-
-  // Archive leave form state
-  const [archiveYear, setArchiveYear] = useState<string>('2025');
-  const [archiveDays, setArchiveDays] = useState<number>(15);
-  const [archiveReason, setArchiveReason] = useState<string>('رصيد إجازات مرحل من سنوات سابقة');
-
-  // Custom manual history lines added during session
-  const [manualHistoryLines, setManualHistoryLines] = useState<Array<{
-    id: string;
-    employeeId: string;
-    transaction_date: string;
-    description: string;
-    days_taken: number;
-    amount_paid: number;
-    state: string;
-  }>>([]);
-
+  // Selected Employee & Contract
   const selectedEmp = useMemo(() => {
     return employees.find(e => e.id === selectedEmpId) || employees[0];
   }, [employees, selectedEmpId]);
@@ -106,7 +131,133 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
            contracts.find(c => c.employeeId === selectedEmp.id);
   }, [contracts, selectedEmp]);
 
-  // Approved leaves for current employee
+  // FIFO Leave Balances calculation
+  const empFifo = useMemo(() => {
+    if (!selectedEmp) return null;
+    return computeFifoLeaveAllocations(
+      selectedEmp, 
+      buildEmployeeBaselineAllocations(selectedEmp, allocations || []), 
+      leaves || []
+    );
+  }, [selectedEmp, allocations, leaves]);
+
+  const carriedOverBal = empFifo?.allocations.filter(a => a.allocationType === 'regular').reduce((sum, a) => sum + (a.numberOfDays || 0), 0) || 0;
+  const accruedBalance = empFifo?.allocations.filter(a => a.allocationType === 'accrual').reduce((sum, a) => sum + (a.numberOfDays || 0), 0) || 0;
+  const totalTaken = empFifo?.totalConsumed || 0;
+  const netAvailable = Number((empFifo?.netAvailable || 0).toFixed(2));
+
+  // Wages calculation (Kuwait Labor Law 26-day basis)
+  const basicSalary = selectedContract?.basicSalary || (selectedEmp as any)?.basicSalary || 0;
+  const allowances = selectedContract 
+    ? (selectedContract.housingAllowance || 0) + (selectedContract.transportAllowance || 0) + (selectedContract.otherAllowance || 0)
+    : 0;
+  const grossSalary = basicSalary + allowances;
+  const dailyWage = grossSalary > 0 ? calculateKuwaitDailyRate(grossSalary) : 0;
+  const hourlyWage = dailyWage > 0 ? calculateKuwaitHourlyRate(dailyWage, 8) : 0;
+
+  // Form State: Settlement Mode & Basic parameters
+  const [settlementMode, setSettlementMode] = useState<'LEAVE_WITH_TRAVEL' | 'ENCASHMENT_LIQUIDATION' | 'CUSTOM'>('LEAVE_WITH_TRAVEL');
+  const [settlementDate, setSettlementDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [departureDate, setDepartureDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [returnDate, setReturnDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [selectedLeaveId, setSelectedLeaveId] = useState<string>('custom');
+
+  // Dynamic Financial Items Form Inputs
+  const [consumedLeaveDays, setConsumedLeaveDays] = useState<number>(30);
+  const [statutoryLeaveDays, setStatutoryLeaveDays] = useState<number>(0);
+  const [unpaidLeaveDays, setUnpaidLeaveDays] = useState<number>(0);
+
+  // 1. Pro-rated Salary (حساب الأيام الفعلية السابقة للسفر بدقة بدون تكرار)
+  const [includeProratedSalary, setIncludeProratedSalary] = useState<boolean>(true);
+  const [workedDaysInMonth, setWorkedDaysInMonth] = useState<number>(() => {
+    const today = new Date();
+    const phys = calculatePhysicalWorkedDays(today.toISOString().split('T')[0]);
+    return phys.workingDays > 0 ? phys.workingDays : Math.min(26, Math.max(1, today.getDate() - 1));
+  });
+
+  // Auto-sync worked days when departure date changes
+  const handleDepartureDateChange = (newDateStr: string) => {
+    setDepartureDate(newDateStr);
+    if (includeProratedSalary) {
+      const phys = calculatePhysicalWorkedDays(newDateStr);
+      if (phys.workingDays >= 0) {
+        setWorkedDaysInMonth(phys.workingDays);
+      }
+    }
+  };
+
+  // 2. Overtime
+  const [includeOvertime, setIncludeOvertime] = useState<boolean>(false);
+  const [overtimeHours, setOvertimeHours] = useState<number>(0);
+  const [overtimeMultiplier, setOvertimeMultiplier] = useState<number>(1.25);
+
+  // 3. Leave Encashment (البدل النقدي لرصيد الإجازات المتبقي / تسييل وتصفية الرصيد)
+  const [includeEncashment, setIncludeEncashment] = useState<boolean>(false);
+  const [encashmentDays, setEncashmentDays] = useState<number>(0);
+
+  // Handle switching settlement modes cleanly
+  const handleModeChange = (mode: 'LEAVE_WITH_TRAVEL' | 'ENCASHMENT_LIQUIDATION' | 'CUSTOM') => {
+    setSettlementMode(mode);
+    if (mode === 'ENCASHMENT_LIQUIDATION') {
+      setIncludeEncashment(true);
+      setEncashmentDays(netAvailable);
+      setConsumedLeaveDays(0);
+      setStatutoryLeaveDays(0);
+      setVoucherNotes('تسييل وتصفية رصيد الإجازات بالكامل وصرف البدل النقدي الموحد وفق المادة 70 من قانون العمل الكويتي');
+    } else if (mode === 'LEAVE_WITH_TRAVEL') {
+      setIncludeEncashment(false);
+      setEncashmentDays(0);
+      setConsumedLeaveDays(Math.min(netAvailable, 30));
+      setVoucherNotes('تسوية وتصفية مستحقات إجازة وسفر وفق أحكام قانون العمل الكويتي (المادة 70)');
+    } else {
+      setVoucherNotes('تسوية مستحقات مالية شاملة مخصصة للموظف');
+    }
+  };
+
+  // 4. Other allowances & deductions
+  const [ticketAllowance, setTicketAllowance] = useState<number>(150);
+  const [housingAllowance, setHousingAllowance] = useState<number>(0);
+  const [loanDeduction, setLoanDeduction] = useState<number>(0);
+  const [salaryAdvanceDeduction, setSalaryAdvanceDeduction] = useState<number>(0);
+  const [adminDeduction, setAdminDeduction] = useState<number>(0);
+
+  // Custom Items
+  const [customItems, setCustomItems] = useState<UniversalSettlementItem[]>([]);
+  const [newCustomName, setNewCustomName] = useState<string>('');
+  const [newCustomType, setNewCustomType] = useState<'EARNING' | 'DEDUCTION'>('EARNING');
+  const [newCustomAmount, setNewCustomAmount] = useState<number>(0);
+  const [newCustomNotes, setNewCustomNotes] = useState<string>('');
+  const [showAddCustomModal, setShowAddCustomModal] = useState<boolean>(false);
+
+  // Status and UI state
+  const [settlementState, setSettlementState] = useState<'draft' | 'validated' | 'paid'>('draft');
+  const [paymentMethod, setPaymentMethod] = useState<'BANK_TRANSFER' | 'CASH' | 'CHEQUE'>('BANK_TRANSFER');
+  const [voucherNotes, setVoucherNotes] = useState<string>('تسوية وتصفية مستحقات إجازة وفق أحكام قانون العمل الكويتي (المادة 70)');
+  const [showPrintModal, setShowPrintModal] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
+  // Saved vouchers in persistent storage
+  const [savedVouchers, setSavedVouchers] = useState<LeaveSettlementVoucher[]>(() => {
+    return getSavedSettlementVouchers(activeCompany?.id);
+  });
+  const [viewingVoucher, setViewingVoucher] = useState<LeaveSettlementVoucher | null>(null);
+
+  // Unlock Modal State
+  const [showUnlockModal, setShowUnlockModal] = useState<boolean>(false);
+  const [unlockTarget, setUnlockTarget] = useState<{ id: string; voucherNumber: string } | null>(null);
+  const [unlockReasonInput, setUnlockReasonInput] = useState<string>('');
+
+  // Archive leave modal
+  const [showArchiveModal, setShowArchiveModal] = useState<boolean>(false);
+  const [archiveYear, setArchiveYear] = useState<string>('2025');
+  const [archiveDays, setArchiveDays] = useState<number>(15);
+  const [archiveReason, setArchiveReason] = useState<string>('رصيد إجازات مرحل من سنوات سابقة');
+
+  // Approved leaves for employee
   const employeeLeavesForSettlement = useMemo(() => {
     if (!selectedEmp) return [];
     return leaves.filter(l => l.employeeId === selectedEmp.id && ['APPROVED', 'SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(l.status));
@@ -115,619 +266,1307 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   // Handle selecting a specific approved leave
   const handleSelectLeave = (leaveId: string) => {
     setSelectedLeaveId(leaveId);
-    if (leaveId === 'custom') {
-      return;
-    }
+    if (leaveId === 'custom') return;
     const found = employeeLeavesForSettlement.find(l => l.id === leaveId);
     if (found) {
-      setDateFrom(found.startDate);
-      setDateTo(found.endDate);
-      setLeaveDaysInput(found.totalDays || 30);
+      handleDepartureDateChange(found.startDate);
+      setReturnDate(found.endDate);
+      
+      // If split bereavement or bereavement leave
+      if (found.leaveType === 'BEREAVEMENT' || found.isSplitBereavement) {
+        const statutory = found.bereavementStatutoryDays || 3;
+        setStatutoryLeaveDays(statutory);
+        const regularTaken = found.annualDeductedDays ?? Math.max(0, (found.totalDays || 0) - statutory);
+        setConsumedLeaveDays(regularTaken);
+      } else {
+        setConsumedLeaveDays(found.totalDays || 30);
+        setStatutoryLeaveDays(0);
+      }
+      setUnpaidLeaveDays(found.unpaidDays || found.excessDays || 0);
     }
   };
 
-  // Financial calculations: Kuwait Labor Law Article 70 (Daily wage = Gross Salary / 26)
-  const basicSalary = selectedContract?.basicSalary || (selectedEmp as any)?.basicSalary || 0;
-  const allowances = selectedContract 
-    ? (selectedContract.housingAllowance || 0) + (selectedContract.transportAllowance || 0) + (selectedContract.otherAllowance || 0)
-    : 0;
-  const totalWage = basicSalary + allowances;
-  const dailyWage = totalWage > 0 ? totalWage / 26 : 0;
+  // Voucher number state for session stability
+  const [currentVoucherNumber, setCurrentVoucherNumber] = useState<string>(() => 
+    `LST-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`
+  );
 
-  const empFifo = useMemo(() => {
+  // Refresh saved vouchers on company switch
+  useEffect(() => {
+    setSavedVouchers(getSavedSettlementVouchers(activeCompany?.id));
+  }, [activeCompany?.id]);
+
+  // Compute Universal Settlement Result live
+  const settlementResult = useMemo(() => {
     if (!selectedEmp) return null;
-    return computeFifoLeaveAllocations(selectedEmp, buildEmployeeBaselineAllocations(selectedEmp, allocations || []), leaves || []);
-  }, [selectedEmp, allocations, leaves]);
 
-  const carriedOverBal = empFifo?.allocations.filter(a => a.allocationType === 'regular').reduce((sum, a) => sum + (a.numberOfDays || 0), 0) || 0;
-  const accruedBalance = empFifo?.allocations.filter(a => a.allocationType === 'accrual').reduce((sum, a) => sum + (a.numberOfDays || 0), 0) || 0;
-  const totalTaken = empFifo?.totalConsumed || 0;
-  const netAvailable = empFifo?.netAvailable || 0;
-  const totalAccrued = carriedOverBal + accruedBalance;
+    return calculateUniversalLeaveSettlement({
+      voucherNumber: currentVoucherNumber,
+      companyId: activeCompany?.id || selectedEmp.companyId || 'comp-1',
+      employeeId: selectedEmp.id,
+      settlementMode,
+      settlementDate,
+      departureDate,
+      returnDate,
+      basicSalary,
+      allowances,
+      grossSalary,
+      dailyWage,
+      hourlyWage,
+      carriedOverBalance: carriedOverBal,
+      accruedBalance: accruedBalance,
+      totalAvailableBalance: netAvailable,
+      requestedLeaveDays: consumedLeaveDays + statutoryLeaveDays + unpaidLeaveDays,
+      statutoryLeaveDays,
+      consumedLeaveDays,
+      unpaidLeaveDays,
+      includeProratedSalary,
+      workedDaysInMonth,
+      proratedSalaryDivisor: 26,
+      includeOvertime,
+      overtimeHours,
+      overtimeMultiplier,
+      includeEncashment,
+      encashmentDays,
+      ticketAllowance,
+      housingAllowance,
+      loanDeduction,
+      salaryAdvanceDeduction,
+      adminDeduction,
+      customItems,
+      paymentMethod,
+      bankName: selectedEmp.bankName,
+      iban: selectedEmp.iban,
+      notes: voucherNotes,
+      preparedBy: 'المحاسبة',
+      reviewedBy: 'السيد (Sayed) - HR',
+      approvedBy: 'المدير العام',
+    });
+  }, [
+    selectedEmp, activeCompany, settlementMode, settlementDate, departureDate, returnDate,
+    basicSalary, allowances, grossSalary, dailyWage, hourlyWage,
+    carriedOverBal, accruedBalance, netAvailable, consumedLeaveDays, statutoryLeaveDays, unpaidLeaveDays,
+    includeProratedSalary, workedDaysInMonth,
+    includeOvertime, overtimeHours, overtimeMultiplier,
+    includeEncashment, encashmentDays,
+    ticketAllowance, housingAllowance, loanDeduction, salaryAdvanceDeduction, adminDeduction,
+    customItems, paymentMethod, voucherNotes, currentVoucherNumber
+  ]);
 
-  const settlementData = useMemo(() => {
-    if (!selectedEmp) return null;
-    const grossSalary = selectedContract ? (selectedContract as any).grossSalary : totalWage;
-    const empForCalc = { ...selectedEmp, grossSalary } as Employee & { grossSalary: number };
-
-    const leaveRecord = selectedLeaveId !== 'custom' 
-      ? employeeLeavesForSettlement.find(l => l.id === selectedLeaveId) 
-      : null;
-
-    if (leaveRecord) {
-      const leavePaidDays = leaveRecord.paidDays ?? leaveRecord.totalDays ?? 0;
-      const leaveUnpaidDays = leaveRecord.unpaidDays ?? leaveRecord.excessDays ?? 0;
-      const leaveTotalDays = leaveRecord.totalDays ?? 0;
-      
-      const snapshotAvailable = leaveRecord.totalAvailableBalance ?? leavePaidDays;
-       
-      const dailyWageCalc = leaveRecord.dailyWage ?? (grossSalary / 26);
-      const paidLeavePay = leaveRecord.leaveAmount ?? (Math.round(leavePaidDays * dailyWageCalc * 1000) / 1000);
-      const netPayableCalc = paidLeavePay + (ticketAllowanceInput || 0) - (deductionsInput || 0);
-
-      return {
-        total_accrued: totalAccrued,
-        requested_days: leaveTotalDays,
-        available_paid: snapshotAvailable,
-        aysed_paid_days: leavePaidDays,
-        aysed_unpaid_days: leaveUnpaidDays,
-        daily_wage: dailyWageCalc,
-        paid_amount: paidLeavePay,
-        netPayable: netPayableCalc
-      };
-    } else {
-      if (!dateFrom || !dateTo) return null;
-      const res = computeLeaveRequest(empForCalc, dateFrom, dateTo, [], netAvailable, ticketAllowanceInput);
-      return {
-        total_accrued: totalAccrued,
-        requested_days: res.totalNetDays,
-        available_paid: netAvailable,
-        aysed_paid_days: res.paidDays,
-        aysed_unpaid_days: res.unpaidDays,
-        daily_wage: res.dailyWage,
-        paid_amount: res.paidLeavePay,
-        netPayable: res.netPayable - deductionsInput
-      };
+  // Add custom item
+  const handleAddCustomItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomName || newCustomAmount <= 0) {
+      toast.error('يرجى كتابة اسم البند وتحديد مبلغ أكبر من الصفر');
+      return;
     }
-  }, [selectedEmp, selectedLeaveId, employeeLeavesForSettlement, dateFrom, dateTo, netAvailable, totalAccrued, ticketAllowanceInput, deductionsInput, selectedContract, totalWage]);
 
+    const newItem: UniversalSettlementItem = {
+      id: `custom-${Date.now()}`,
+      category: newCustomType === 'EARNING' ? 'OTHER_EARNING' : 'OTHER_DEDUCTION',
+      name: newCustomName,
+      type: newCustomType,
+      quantity: 1,
+      unit: 'fixed',
+      rate: newCustomAmount,
+      amount: newCustomAmount,
+      notes: newCustomNotes || 'بند مالي مخصص',
+      isEditable: true,
+    };
 
-  const settlementAmount = settlementData?.paid_amount || 0;
-  const netPayable = settlementData?.netPayable || 0;
+    setCustomItems(prev => [...prev, newItem]);
+    setNewCustomName('');
+    setNewCustomAmount(0);
+    setNewCustomNotes('');
+    setShowAddCustomModal(false);
+    toast.success('تمت إضافة البند المالي المخصص بنجاح');
+  };
 
-  // History lines
-  const employeeHistoryLines = useMemo(() => {
-    if (!selectedEmp) return [];
-    const fromLeaves = leaves
-      .filter(l => l.employeeId === selectedEmp.id)
-      .map(l => ({
-        id: l.id,
-        employeeId: l.employeeId,
-        transaction_date: l.startDate || l.createdAt || '2026-01-01',
-        description: `${l.isHistorical ? 'إجازة سابقة مؤرشفة' : 'إجازة ' + (l.leaveType === 'ANNUAL' ? 'سنوية' : l.leaveType === 'SICK' ? 'مرضية' : 'اضطرارية')} (${l.reason || 'تسوية معتمدة'})`,
-        days_taken: l.totalDays || 0,
-        amount_paid: (l.totalDays || 0) * (dailyWage || 0),
-        state: l.status === 'APPROVED' ? 'معتمد' : l.status === 'REJECTED' ? 'مرفوض' : 'قيد المراجعة'
-      }));
+  // Remove custom item
+  const handleRemoveCustomItem = (id: string) => {
+    setCustomItems(prev => prev.filter(item => item.id !== id));
+    toast.success('تم حذف البند المخصص');
+  };
 
-    const sessionAdded = manualHistoryLines.filter(m => m.employeeId === selectedEmp.id);
-    return [...fromLeaves, ...sessionAdded];
-  }, [leaves, selectedEmp, dailyWage, manualHistoryLines]);
+  // Save Voucher Handler
+  const handleSaveVoucher = () => {
+    if (!settlementResult || !selectedEmp) return;
 
+    // Check for duplicate settlement voucher for the same employee
+    const existingLockedVoucher = savedVouchers.find(v => v.employeeId === selectedEmp.id && (v.status === 'settled_locked' || v.status === 'paid'));
+    if (existingLockedVoucher && settlementState !== 'paid') {
+      toast.error(`عذراً، الموظف ${selectedEmp.fullNameAr} لديه بالفعل سند تسوية معتمد ومقفل برقم (${existingLockedVoucher.voucherNumber}). لا يمكن إنشاء سند تسوية تكراري لنفس الموظف إلا بعد إلغاء قفل السند السابق من الأرشيف.`);
+      return;
+    }
+
+    // Automatically liquidate / deduct days if encashment or leave consumption is selected
+    const daysToLiquidate = includeEncashment ? encashmentDays : (consumedLeaveDays > 0 ? consumedLeaveDays : (settlementMode === 'ENCASHMENT_LIQUIDATION' ? netAvailable : 0));
+    if (daysToLiquidate > 0 && onUpdateAllocations) {
+      liquidateLeaveBalanceInAllocations(
+        selectedEmp.id,
+        daysToLiquidate,
+        allocations,
+        onUpdateAllocations,
+        selectedEmp,
+        onUpdateEmployee
+      );
+    }
+
+    const newVoucher: LeaveSettlementVoucher = {
+      id: `voucher-${Date.now()}`,
+      voucherNumber: settlementResult.voucherNumber,
+      companyId: activeCompany?.id || selectedEmp.companyId || 'comp-1',
+      employeeId: selectedEmp.id,
+      employeeName: selectedEmp.fullNameAr,
+      employeeCode: selectedEmp.employeeCode || '',
+      civilId: selectedEmp.civilId || '',
+      jobTitle: selectedEmp.jobTitle || '',
+      department: selectedEmp.department || '',
+      joinDate: selectedEmp.joinDate || '',
+      settlementMode,
+      settlementDate,
+      departureDate,
+      returnDate,
+      status: 'settled_locked', // Locked & Protected State
+      basicSalary,
+      grossSalary,
+      dailyWage,
+      hourlyWage,
+      carriedOverBalance: carriedOverBal,
+      accruedBalance: accruedBalance,
+      totalAvailableBefore: netAvailable,
+      consumedLeaveDays,
+      statutoryLeaveDays,
+      encashedLeaveDays: includeEncashment ? encashmentDays : 0,
+      unpaidLeaveDays,
+      remainingBalanceAfter: settlementResult.remainingBalanceAfter,
+      items: settlementResult.items,
+      totalEarnings: settlementResult.totalEarnings,
+      totalDeductions: settlementResult.totalDeductions,
+      netSettlementPayout: settlementResult.netSettlementPayout,
+      paymentMethod,
+      bankName: selectedEmp.bankName,
+      iban: selectedEmp.iban,
+      notes: voucherNotes,
+      preparedBy: 'المحاسبة',
+      reviewedBy: 'السيد (Sayed) - HR',
+      approvedBy: 'المدير العام',
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedList = saveSettlementVoucher(newVoucher);
+    setSavedVouchers(updatedList);
+    setSettlementState('paid');
+    toast.success(`تم حفظ وقفل سند التسوية رقم (${newVoucher.voucherNumber}) ومزامنة الأيام نهائياً!`);
+  };
+
+  // Execute Encashment & Deduct from Allocations
+  const handleExecuteEncashment = () => {
+    if (!includeEncashment || encashmentDays <= 0) {
+      toast.error('يرجى تفعيل خيار التسييل النقدي وتحديد عدد الأيام أولاً');
+      return;
+    }
+
+    if (!onUpdateAllocations) {
+      toast.error('خاصية تحديث التخصيصات غير مهيأة');
+      return;
+    }
+
+    const res = liquidateLeaveBalanceInAllocations(
+      selectedEmp.id,
+      encashmentDays,
+      allocations,
+      onUpdateAllocations,
+      selectedEmp,
+      onUpdateEmployee
+    );
+
+    if (res.success) {
+      setSettlementState('paid');
+      handleSaveVoucher();
+      toast.success(res.message, { duration: 5000 });
+    } else {
+      toast.error(res.message);
+    }
+  };
+
+  // Manager Rollback / Unlock Settlement
+  const handleDeleteVoucher = (id: string, vNum: string) => {
+    setUnlockTarget({ id, voucherNumber: vNum });
+    setUnlockReasonInput('');
+    setShowUnlockModal(true);
+  };
+
+  const confirmUnlockVoucher = () => {
+    if (!unlockTarget || !unlockReasonInput.trim()) {
+      toast.error('يرجى إدخال سبب إلغاء القفل وصلاحية المدير.');
+      return;
+    }
+    const updated = deleteSettlementVoucher(unlockTarget.id);
+    setSavedVouchers(updated);
+    toast.success(`تم إلغاء قفل وتراجع سند التسوية رقم (${unlockTarget.voucherNumber}) بنجاح. سبب الإلغاء: ${unlockReasonInput}`);
+    setShowUnlockModal(false);
+    setUnlockTarget(null);
+    setUnlockReasonInput('');
+  };
+
+  // Print & PDF Export handlers
   const handlePrint = () => {
-    printDocument('leave-clearance-print-area', `سند_تسوية_إجازة_${selectedEmp?.fullNameAr || 'موظف'}`);
+    printDocument('leave-clearance-print-area', `سند_تسوية_${selectedEmp?.fullNameAr || 'موظف'}`);
   };
 
   const handlePdfExport = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
     try {
-      await exportElementToPdf('leave-clearance-print-area', `سند_تسوية_إجازة_${selectedEmp?.fullNameAr || 'موظف'}`);
+      setIsExporting(true);
+      await exportElementToPdf('leave-clearance-print-area', `سند_تسوية_${selectedEmp?.fullNameAr || 'موظف'}.pdf`);
+      toast.success('تم تصدير مستند التسوية كملف PDF بنجاح');
+    } catch (err) {
+      toast.error('حدث خطأ أثناء تصدير ملف PDF');
     } finally {
       setIsExporting(false);
     }
   };
 
+  // Archive leave creation handler
   const handleCreateArchiveLeave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmp) return;
-    const archiveLine = {
-      id: `arch-${Date.now()}`,
+    if (!selectedEmp || !onSaveLeave) return;
+
+    const newHistLeave: LeaveRequest = {
+      id: `hist-leave-${Date.now()}`,
       employeeId: selectedEmp.id,
-      transaction_date: `${archiveYear}-01-01`,
-      description: `أرشيف إجازات سنة ${archiveYear} (${archiveReason})`,
-      days_taken: Number(archiveDays) || 0,
-      amount_paid: (Number(archiveDays) || 0) * dailyWage,
-      state: 'مؤرشف'
+      companyId: selectedEmp.companyId || activeCompany?.id || 'comp-1',
+      leaveType: 'ANNUAL',
+      startDate: `${archiveYear}-06-01`,
+      endDate: `${archiveYear}-06-30`,
+      totalDays: archiveDays,
+      paidDays: archiveDays,
+      unpaidDays: 0,
+      reason: archiveReason,
+      status: 'APPROVED',
+      isHistorical: true,
+      historicalYear: parseInt(archiveYear) || 2025,
+      createdAt: new Date().toISOString(),
     };
 
-    setManualHistoryLines(prev => [archiveLine, ...prev]);
+    onSaveLeave(newHistLeave);
     setShowArchiveModal(false);
-    toast.success(`تم تسجيل الإجازة الأرشيفية لسنة ${archiveYear} بنجاح`);
+    toast.success(`تم حفظ الإجازة الأرشيفية لسنة ${archiveYear} بنجاح`);
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto font-['Tajawal',sans-serif] select-none text-slate-800" dir="rtl">
+    <div className="space-y-6 font-['Tajawal','Cairo',sans-serif]" dir="rtl">
       
-      {/* Odoo Standard Form View Structure: <form string="تسوية المستحقات"> */}
-      <div className="bg-white border border-slate-300 rounded-xl shadow-xs overflow-hidden">
+      {/* 1. Odoo Enterprise Form Card */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         
-        {/* 1. شريط الأزرار العلوي الرسمي (Header Actions & Statusbar) */}
-        <header className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+        {/* Header Pipeline & Top Action Bar */}
+        <header className="bg-slate-50/90 border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           
-          {/* Action Buttons (Right in RTL) */}
+          {/* Action Buttons Group */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* action_new_leave: تقديم طلب إجازة جديد */}
+            <button
+              type="button"
+              onClick={handleSaveVoucher}
+              className="bg-[#714B67] hover:bg-[#5a3b52] text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            >
+              <FileCheck size={16} className="text-amber-300" />
+              <span>حفظ واعتماد السند الرسمي</span>
+            </button>
+
+            {includeEncashment && encashmentDays > 0 && (
+              <button
+                type="button"
+                onClick={handleExecuteEncashment}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                title="تصفية وصرف البدل النقدي وخصم الأيام من رصيد الموظف الفعلي"
+              >
+                <Coins size={16} className="text-amber-300" />
+                <span>تسييل وصرف البدل النقدي ({encashmentDays} يوم)</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
-                if (selectedEmp && onOpenLeaveModal) {
-                  onOpenLeaveModal(selectedEmp.id);
-                } else if (!selectedEmp) {
-                  toast.error('يرجى اختيار الموظف أولاً');
-                }
+                setViewingVoucher(null);
+                setShowPrintModal(true);
               }}
-              className="bg-[#71639e] hover:bg-[#5e5284] text-white text-xs font-bold px-4 py-2 rounded-md flex items-center gap-2 shadow-xs transition-all cursor-pointer active:scale-95"
+              className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
             >
-              <Plus size={15} />
-              <span>تقديم طلب إجازة جديد</span>
+              <Printer size={15} className="text-[#714B67]" />
+              <span>معاينة وطباعة المستند</span>
             </button>
 
-            {/* action_print_settlement: حاسبة وطباعة التسوية */}
             <button
               type="button"
-              onClick={() => setShowPrintModal(true)}
-              className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold px-4 py-2 rounded-md flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              onClick={() => setShowAddCustomModal(true)}
+              className="bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer"
             >
-              <Printer size={15} className="text-[#71639e]" />
-              <span>حاسبة وطباعة التسوية</span>
-            </button>
-
-            {/* action_archive_leave: تسجيل إجازة أرشيفية */}
-            <button
-              type="button"
-              onClick={() => setShowArchiveModal(true)}
-              className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold px-4 py-2 rounded-md flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-            >
-              <Archive size={15} className="text-slate-500" />
-              <span>تسجيل إجازة أرشيفية</span>
+              <Plus size={14} className="text-[#714B67]" />
+              <span>إضافة بند مالي مخصص</span>
             </button>
           </div>
 
-          {/* Odoo Statusbar Arrow Breadcrumb */}
-          <div className="flex items-center text-xs font-bold border border-slate-300 rounded-md overflow-hidden bg-white shadow-2xs">
+          {/* Odoo State Pipeline (oe_statusbar) */}
+          <div className="flex items-center bg-white border border-slate-300 rounded-xl overflow-hidden text-xs font-bold shadow-2xs">
             <button
+              type="button"
               onClick={() => setSettlementState('draft')}
-              className={`px-3 py-1.5 transition-colors cursor-pointer ${
-                settlementState === 'draft' ? 'bg-[#71639e] text-white' : 'text-slate-600 hover:bg-slate-100'
+              className={`px-3.5 py-2 transition-colors cursor-pointer ${
+                settlementState === 'draft' ? 'bg-[#714B67] text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              مسودة
+              مسودة (Draft)
             </button>
-            <div className="w-[1px] h-full bg-slate-200"></div>
+            <div className="w-[1px] h-6 bg-slate-200"></div>
             <button
+              type="button"
               onClick={() => setSettlementState('validated')}
-              className={`px-3 py-1.5 transition-colors cursor-pointer ${
+              className={`px-3.5 py-2 transition-colors cursor-pointer ${
                 settlementState === 'validated' ? 'bg-[#008784] text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              معتمد
+              معتمد (Validated)
             </button>
-            <div className="w-[1px] h-full bg-slate-200"></div>
+            <div className="w-[1px] h-6 bg-slate-200"></div>
             <button
+              type="button"
               onClick={() => setSettlementState('paid')}
-              className={`px-3 py-1.5 transition-colors cursor-pointer ${
+              className={`px-3.5 py-2 transition-colors cursor-pointer ${
                 settlementState === 'paid' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              تم الصرف
+              تم الصرف والتسييل (Paid)
             </button>
           </div>
         </header>
 
-        {/* 2. الورقة البيضاء الرسمية (Enterprise Sheet) */}
-        <div className="p-8 sm:p-10 bg-white">
+        {/* 2. Enterprise Sheet Area */}
+        <div className="p-6 sm:p-8 space-y-6">
           
-          {/* Top Row: Smart Button Box & Title */}
-          <div className="flex flex-col-reverse md:flex-row items-start justify-between gap-6 pb-6 border-b border-slate-200">
+          {/* Top Row: Employee Selector & Quick KPI Cards */}
+          <div className="flex flex-col lg:flex-row items-start justify-between gap-6 pb-6 border-b border-slate-200">
             
-            {/* الترويسة الرئيسية والوصف القانوني (oe_title) */}
+            {/* Title & Employee Selector */}
             <div className="space-y-2 flex-1">
-              <label htmlFor="employee_id" className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                الموظف المستحق (Employee)
+              <label htmlFor="employee_selector" className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                الموظف المستحق للتسوية والتصفية (Employee)
               </label>
               
               <div className="flex items-center gap-3">
-                <h1 style={{ color: '#71639e' }} className="text-2xl sm:text-3xl font-black">
-                  <select
-                    id="employee_id"
-                    value={selectedEmpId}
-                    onChange={(e) => setSelectedEmpId(e.target.value)}
-                    className="bg-transparent border-b-2 border-[#71639e] text-[#71639e] font-black text-xl sm:text-2xl outline-none cursor-pointer py-1 pr-1 pl-4"
-                  >
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id} className="text-slate-800 font-bold text-base">
-                        {emp.fullNameAr} ({emp.employeeCode || emp.civilId})
-                      </option>))}
-                  </select>
-                </h1>
+                <select
+                  id="employee_selector"
+                  value={selectedEmpId}
+                  onChange={(e) => setSelectedEmpId(e.target.value)}
+                  className="bg-purple-50/60 border border-purple-200 hover:border-[#714B67] text-[#714B67] font-black text-lg sm:text-xl rounded-xl px-4 py-2 outline-none cursor-pointer w-full max-w-md transition shadow-2xs"
+                >
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id} className="text-slate-800 font-bold text-sm">
+                      {emp.fullNameAr} ({emp.employeeCode || emp.civilId}) - {emp.jobTitle || 'موظف'}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <p className="text-slate-500 text-xs font-medium flex items-center gap-2">
-                <ShieldCheck size={14} className="text-[#008784]" />
-                <span>نظام تصفية المستحقات والإجازات وفق قانون العمل الكويتي - المادة (70)</span>
-              </p>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium pt-1">
+                <span className="flex items-center gap-1">
+                  <ShieldCheck size={14} className="text-[#008784]" />
+                  <span>قانون العمل الكويتي (المادة 70 و77)</span>
+                </span>
+                <span>•</span>
+                <span className="font-mono">الرقم المدني: {selectedEmp?.civilId || '-'}</span>
+                <span>•</span>
+                <span>تاريخ المباشرة: {selectedEmp?.joinDate || '-'}</span>
+              </div>
             </div>
 
-            {/* الأزرار الذكية أعلى اليسار / اليمين (Smart Buttons - oe_button_box) */}
-            <div className="flex items-center gap-2 self-end md:self-start">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onNavigateToTab) {
-                    onNavigateToTab('BALANCES');
-                  } else {
-                    setActiveTab('employee_history');
-                  }
-                }}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-lg p-3 flex items-center gap-3 text-right shadow-2xs transition-all cursor-pointer group min-w-[170px]"
-                title="عرض الأرصدة والافتتاحي"
-              >
-                <div className="p-2 bg-[#71639e]/10 text-[#71639e] rounded-md group-hover:bg-[#71639e] group-hover:text-white transition-colors">
-                  <Calendar size={20} />
-                </div>
-                <div>
-                  <span className="block text-xs font-bold text-slate-500">الأرصدة والافتتاحي</span>
-                  <span className="block text-sm font-black text-[#71639e] font-mono mt-0.5">
-                    {netAvailable.toFixed(2)} يوم متاح
-                  </span>
-                </div>
-              </button>
+            {/* Quick KPI Cards Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full lg:w-auto">
+              <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-[#714B67]">صافي الرصيد المتاح</span>
+                <span className="block text-base font-black font-mono text-purple-950 mt-0.5">
+                  {netAvailable.toFixed(2)} يوم
+                </span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-slate-500">الراتب الأساسي</span>
+                <span className="block text-base font-black font-mono text-slate-800 mt-0.5">
+                  {basicSalary.toFixed(3)} د.ك
+                </span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-slate-500">أجر اليوم (÷ 26)</span>
+                <span className="block text-base font-black font-mono text-teal-800 mt-0.5">
+                  {dailyWage.toFixed(3)} د.ك
+                </span>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-slate-500">أجر الساعة (÷ 8)</span>
+                <span className="block text-base font-black font-mono text-slate-700 mt-0.5">
+                  {hourlyWage.toFixed(3)} د.ك
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* 3. التبويبات المنظمة (Notebook Pages) */}
-          <div className="mt-6">
-            
-            {/* Notebook Tabs Header */}
-            <div className="flex items-center border-b border-slate-200 gap-4 mb-6">
-              <button
-                type="button"
-                onClick={() => setActiveTab('settlement_calculator')}
-                className={`pb-3 text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer border-b-2 ${
-                  activeTab === 'settlement_calculator'
-                    ? 'border-[#71639e] text-[#71639e]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Calculator size={16} />
-                <span>حاسبة التسوية الرسمية</span>
-              </button>
+          {/* Navigation Tabs (Notebook Pages) */}
+          <div className="flex items-center border-b border-slate-200 gap-4">
+            <button
+              type="button"
+              onClick={() => setActiveTab('settlement_calculator')}
+              className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer border-b-2 ${
+                activeTab === 'settlement_calculator'
+                  ? 'border-[#714B67] text-[#714B67]'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Calculator size={16} />
+              <span>شيت التسوية الشامل والمتعدد البنود</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('employee_history')}
-                className={`pb-3 text-sm font-bold flex items-center gap-2 transition-colors cursor-pointer border-b-2 ${
-                  activeTab === 'employee_history'
-                    ? 'border-[#71639e] text-[#71639e]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <History size={16} />
-                <span>كشف حركة الموظف والأرشيف ({employeeHistoryLines.length})</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('vouchers_archive')}
+              className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer border-b-2 ${
+                activeTab === 'vouchers_archive'
+                  ? 'border-[#714B67] text-[#714B67]'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileCheck size={16} />
+              <span>أرشيف سندات التسوية المعتمدة ({savedVouchers.length})</span>
+            </button>
 
-            {/* Page 1: حاسبة التسوية الرسمية (settlement_calculator) */}
-            {activeTab === 'settlement_calculator' && (
-              <div className="space-y-8">
-                
-                {/* 2-Column Group Layout */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  
-                  {/* Group 1: تفاصيل الإجازة */}
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-5 space-y-4">
-                    <div className="border-b border-slate-200 pb-2 mb-3 flex items-center justify-between">
-                      <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                        <FileText size={16} className="text-[#71639e]" />
-                        <span>تفاصيل الإجازة</span>
-                      </h3>
-                      <span className="text-[11px] bg-purple-100 text-[#71639e] px-2 py-0.5 rounded font-bold">
-                        Leave Info
-                      </span>
-                    </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('employee_history')}
+              className={`pb-3 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer border-b-2 ${
+                activeTab === 'employee_history'
+                  ? 'border-[#714B67] text-[#714B67]'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <History size={16} />
+              <span>كشف حركة الموظف التاريخية</span>
+            </button>
+          </div>
 
-                    {/* leave_id */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-600">طلب الإجازة المراد تسويته:</label>
-                      <select
-                        value={selectedLeaveId}
-                        onChange={(e) => handleSelectLeave(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-[#71639e]"
-                      >
-                        <option value="custom">-- إجازة محددة مخصصة (إدخال يدوي للأيام) --</option>
-                        {employeeLeavesForSettlement.map(l => (
-                          <option key={l.id} value={l.id}>
-                            إجازة {l.leaveType === 'ANNUAL' ? 'سنوية' : l.leaveType} ({l.startDate} إلى {l.endDate}) - {l.totalDays} يوم
-                          </option>))}
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* date_from */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-600">تاريخ البدء (Date From):</label>
-                        <input
-                          type="date"
-                          value={dateFrom}
-                          onChange={(e) => setDateFrom(e.target.value)}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-[#71639e]"
-                        />
-                      </div>
-
-                      {/* date_to */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-600">تاريخ النهاية (Date To):</label>
-                        <input
-                          type="date"
-                          value={dateTo}
-                          onChange={(e) => setDateTo(e.target.value)}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-[#71639e]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* number_of_days */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-600">عدد أيام الإجازة المطلوبة (للتسوية):</label>
-                        <button
-                          type="button"
-                          onClick={() => setLeaveDaysInput(netAvailable)}
-                          className="text-[11px] text-[#71639e] hover:underline font-bold cursor-pointer"
-                        >
-                          استدعاء كامل الرصيد المتاح ({netAvailable.toFixed(2)} يوم)
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          value={leaveDaysInput}
-                          onChange={(e) => setLeaveDaysInput(Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-black text-slate-800 outline-none focus:border-[#71639e]"
-                        />
-                        <span className="text-xs font-bold text-slate-500 min-w-[30px]">يوم</span>
-                      </div>
-                    </div>
-
-                    {/* Additional allowances & deductions */}
-                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-600">بدل تذاكر السفر (د.ك):</label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={ticketAllowanceInput}
-                          onChange={(e) => setTicketAllowanceInput(Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-[#71639e]"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-600">استقطاعات / سلف (د.ك):</label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={deductionsInput}
-                          onChange={(e) => setDeductionsInput(Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold text-rose-700 outline-none focus:border-rose-400"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Days Breakdown Helper Box */}
-                    <div className="p-3 bg-white rounded-lg border border-slate-200 text-xs space-y-1.5 font-medium">
-                      <div className="flex justify-between text-slate-600">
-                        <span>الرصيد المرحل (Carried-Over):</span>
-                        <span className="font-mono font-bold text-teal-800">{carriedOverBal.toFixed(2)} يوم</span>
-                      </div>
-                      
-                      <div className="flex justify-between text-slate-600">
-                        <span>المكتسب الحالي (Accrued):</span>
-                        <span className="font-mono font-bold text-purple-800">{accruedBalance.toFixed(2)} يوم</span>
-                      </div>
-                      <div className="flex justify-between text-slate-600">
-                        <span>إجمالي المستهلك (Taken):</span>
-                        <span className="font-mono font-bold text-rose-700">{totalTaken.toFixed(2)} يوم</span>
-                      </div>
-                      <div className="flex justify-between text-slate-800 border-t border-slate-200 pt-1 font-bold">
-                        <span>صافي الرصيد المتاح (Net Available):</span>
-                        <span className="font-mono font-black text-[#71639e]">{(settlementData?.available_paid || 0).toFixed(2)} يوم</span>
-                      </div>
-                      <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-100">
-                        <span>أيام مستحقة براتب مدفوع:</span>
-                        <span className="font-mono font-bold text-blue-700">{(settlementData?.aysed_paid_days || 0).toFixed(2)} يوم</span>
-                      </div>
-                      {(settlementData?.aysed_unpaid_days || 0) > 0 && (
-                        <div className="flex justify-between text-rose-600 font-bold">
-                          <span>أيام بدون راتب (تخصم من الخدمة):</span>
-                          <span className="font-mono">{settlementData.aysed_unpaid_days.toFixed(2)} يوم</span>
-                        </div>)}
-                    </div>
+          {/* TAB 1: Universal Multi-Item Settlement Sheet */}
+          {activeTab === 'settlement_calculator' && (
+            <div className="space-y-6">
+              
+              {/* Mode Selection Card */}
+              <div className="bg-gradient-to-r from-purple-50/70 via-slate-50 to-teal-50/70 border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h3 className="font-bold text-xs sm:text-sm text-slate-900 flex items-center gap-2">
+                      <Sparkles size={16} className="text-[#714B67]" />
+                      <span>نوع التسوية وطبيعة الصرف المالي (Settlement Mode)</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      اختر نوع التسوية لتفعيل الحسابات الموحدة بدقة ومنع أي ازدواجية في بنود الراتب والإجازات
+                    </p>
                   </div>
-
-                  {/* Group 2: الاحتساب المالي (أجر اليوم = الراتب ÷ 26) */}
-                  <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-5 space-y-4 flex flex-col justify-between">
-                    <div>
-                      <div className="border-b border-slate-200 pb-2 mb-3 flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                          <DollarSign size={16} className="text-[#008784]" />
-                          <span>الاحتساب المالي (أجر اليوم = الراتب ÷ 26)</span>
-                        </h3>
-                        <span className="text-[11px] bg-teal-100 text-[#008784] px-2 py-0.5 rounded font-bold">
-                          Article 70
-                        </span>
-                      </div>
-
-                      <div className="space-y-2.5 text-xs">
-                        {/* basic_salary */}
-                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
-                          <span className="font-bold text-slate-600">الراتب الأساسي (Basic Salary):</span>
-                          <span className="font-mono font-bold text-slate-800">{basicSalary.toFixed(3)} د.ك</span>
-                        </div>
-
-                        {/* allowances */}
-                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
-                          <span className="font-bold text-slate-600">إجمالي البدلات المعتمدة (Allowances):</span>
-                          <span className="font-mono font-bold text-slate-800">{allowances.toFixed(3)} د.ك</span>
-                        </div>
-
-                        {/* total_wage */}
-                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
-                          <span className="font-bold text-slate-700">إجمالي الراتب الخاضع للاحتساب (Total Wage):</span>
-                          <span className="font-mono font-black text-slate-900 text-sm">{totalWage.toFixed(3)} د.ك</span>
-                        </div>
-
-                        {/* daily_wage */}
-                        <div className="flex items-center justify-between p-2.5 bg-purple-50/70 rounded-lg border border-purple-200">
-                          <div>
-                            <span className="font-bold text-[#71639e] block">أجر اليوم القانوني (Daily Wage):</span>
-                            <span className="text-[10px] text-purple-600 font-mono">قانون العمل: {totalWage.toFixed(3)} ÷ 26</span>
-                          </div>
-                          <span className="font-mono font-black text-[#71639e] text-base">{dailyWage.toFixed(3)} د.ك</span>
-                        </div>
-
-                        {/* settlement_amount */}
-                        <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-200 oe_subtotal_footer_separator font-weight-bold">
-                          <div>
-                            <span className="font-black text-emerald-900 block text-xs">إجمالي مبلغ تسوية الإجازة:</span>
-                            <span className="text-[10px] text-emerald-700 font-mono">{(settlementData?.aysed_paid_days || 0)} يوم × {dailyWage.toFixed(3)} د.ك</span>
-                          </div>
-                          <span style={{ color: '#008784' }} className="font-mono font-black text-lg">
-                            {settlementAmount.toFixed(3)} د.ك
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Net Payable Box */}
-                    <div className="p-4 bg-slate-900 text-white rounded-xl shadow-xs mt-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-bold text-slate-300 block">صافي المستحق النهائي للصرف (NET PAYABLE)</span>
-                          <span className="text-[10px] text-slate-400 font-mono">تسوية الإجازة + تذاكر ({ticketAllowanceInput}) - استقطاعات ({deductionsInput})</span>
-                        </div>
-                        <div className="text-left">
-                          <span className="font-mono font-black text-2xl text-emerald-400">
-                            {netPayable.toFixed(3)} د.ك
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white border border-slate-200 shadow-2xs text-slate-700 w-fit">
+                    {settlementMode === 'LEAVE_WITH_TRAVEL' && '✈️ تسوية إجازة مع سفر ومباشرة'}
+                    {settlementMode === 'ENCASHMENT_LIQUIDATION' && '💰 تسييل وتصفية رصيد موحد'}
+                    {settlementMode === 'CUSTOM' && '⚙️ تسوية شاملة مخصصة'}
+                  </span>
                 </div>
 
-                {/* Footer Document Preview Link */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Printer size={20} className="text-[#71639e]" />
-                    <div>
-                      <span className="text-xs font-bold text-slate-800 block">سند تسوية الإجازة الرسمي جاهز للطباعة والاعتماد</span>
-                      <span className="text-[11px] text-slate-500">يتضمن جدول الأرصدة، الاحتساب المالي، الإقرار القانوني ودورة التوقيعات</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('LEAVE_WITH_TRAVEL')}
+                    className={`p-3 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between ${
+                      settlementMode === 'LEAVE_WITH_TRAVEL'
+                        ? 'bg-[#714B67] text-white border-[#714B67] shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/30'
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>تسوية إجازة وسفر</span>
+                      {settlementMode === 'LEAVE_WITH_TRAVEL' && <Check size={14} className="text-purple-200" />}
                     </div>
-                  </div>
+                    <p className={`text-[10px] mt-1 line-clamp-2 ${settlementMode === 'LEAVE_WITH_TRAVEL' ? 'text-purple-100' : 'text-slate-500'}`}>
+                      راتب أيام العمل الفعلية حتى السفر + بدل أيام الإجازة المستهلكة + التذاكر
+                    </p>
+                  </button>
 
                   <button
                     type="button"
-                    onClick={() => setShowPrintModal(true)}
-                    className="bg-[#71639e] hover:bg-[#5e5284] text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-xs"
+                    onClick={() => handleModeChange('ENCASHMENT_LIQUIDATION')}
+                    className={`p-3 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between ${
+                      settlementMode === 'ENCASHMENT_LIQUIDATION'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'
+                    }`}
                   >
-                    <Printer size={15} />
-                    <span>معاينة وطباعة المستند</span>
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>تسييل وتصفية رصيد موحد</span>
+                      {settlementMode === 'ENCASHMENT_LIQUIDATION' && <Check size={14} className="text-amber-200" />}
+                    </div>
+                    <p className={`text-[10px] mt-1 line-clamp-2 ${settlementMode === 'ENCASHMENT_LIQUIDATION' ? 'text-amber-100' : 'text-slate-500'}`}>
+                      صرف نقدي موحد لرصيد الإجازات المتبقي كاملاً كبند مالي واحد بدون تكرار
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('CUSTOM')}
+                    className={`p-3 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between ${
+                      settlementMode === 'CUSTOM'
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="font-bold text-xs flex items-center justify-between">
+                      <span>تسوية شاملة مخصصة</span>
+                      {settlementMode === 'CUSTOM' && <Check size={14} className="text-slate-300" />}
+                    </div>
+                    <p className={`text-[10px] mt-1 line-clamp-2 ${settlementMode === 'CUSTOM' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      تحكم كامل بجميع البنود والاستقطاعات وحرية إدراج أيام العمل وبدلات مخصصة
+                    </p>
                   </button>
                 </div>
-              </div>)}
+              </div>
 
-            {/* Page 2: كشف حركة الموظف والأرشيف (employee_history) */}
-            {activeTab === 'employee_history' && (
-              <div className="space-y-4">
+              {/* 2-Column Responsive Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
-                {/* Actions above tree */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600">
-                    سجل الإجازات والتسويات التاريخية المسجلة للموظف ({employeeHistoryLines.length} حركة)
-                  </span>
+                {/* Column 1: Financial Line Items Configuration (7 cols) */}
+                <div className="lg:col-span-7 space-y-5">
+                  
+                  {/* Basic Leave & Dates Group */}
+                  <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <h3 className="font-bold text-xs sm:text-sm text-slate-800 flex items-center gap-2">
+                        <FileText size={16} className="text-[#714B67]" />
+                        <span>بيانات الإجازة وتواريخ المغادرة</span>
+                      </h3>
+                      <span className="text-[11px] bg-purple-100 text-[#714B67] font-bold px-2 py-0.5 rounded">
+                        قاعدة 26 يوم
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowArchiveModal(true)}
-                      className="text-xs font-bold text-[#71639e] hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus size={14} />
-                      <span>إضافة سطر أرشيفي جديد</span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">طلب الإجازة المرتبط:</label>
+                        <select
+                          value={selectedLeaveId}
+                          onChange={(e) => handleSelectLeave(e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-bold text-slate-800 outline-none focus:border-[#714B67]"
+                        >
+                          <option value="custom">-- إدخال يدوي مخصص --</option>
+                          {employeeLeavesForSettlement.map(l => (
+                            <option key={l.id} value={l.id}>
+                              {l.leaveType === 'BEREAVEMENT' ? 'إجازة عزاء (م77)' : l.leaveType === 'ANNUAL' ? 'سنوية' : l.leaveType} ({l.startDate} - {l.totalDays} يوم)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">تاريخ المغادرة (Departure):</label>
+                        <input
+                          type="date"
+                          value={departureDate}
+                          onChange={(e) => handleDepartureDateChange(e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800 outline-none focus:border-[#714B67]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-600 mb-1">تاريخ العودة المتوقع:</label>
+                        <input
+                          type="date"
+                          value={returnDate}
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800 outline-none focus:border-[#714B67]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Days Configuration */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">أيام الإجازة السنوية (المستهلكة):</label>
+                        <DecimalInput
+                          min={0}
+                          value={consumedLeaveDays}
+                          onChange={setConsumedLeaveDays}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-black text-slate-900 outline-none focus:border-[#714B67]"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-0.5 block">تخصم من رصيد الإجازات السنوي</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-emerald-800 mb-1">إجازة وفاة / عزاء (المادة 77):</label>
+                        <DecimalInput
+                          min={0}
+                          max={3}
+                          value={statutoryLeaveDays}
+                          onChange={setStatutoryLeaveDays}
+                          className="w-full bg-emerald-50/60 border border-emerald-300 rounded-xl p-2 font-mono font-black text-emerald-950 outline-none focus:border-emerald-500"
+                        />
+                        <span className="text-[10px] text-emerald-700 mt-0.5 block">مدفوعة بالراتب (معفاة من الخصم من الرصيد - 0.000 د.ك إضافي)</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-rose-700 mb-1">أيام بدون راتب (تجاوز):</label>
+                        <DecimalInput
+                          min={0}
+                          value={unpaidLeaveDays}
+                          onChange={setUnpaidLeaveDays}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-black text-rose-700 outline-none focus:border-rose-400"
+                        />
+                        <span className="text-[10px] text-rose-600 mt-0.5 block">تخصم من مدة الخدمة</span>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* 1. Pro-rated Salary Line Item Section */}
+                  <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={includeProratedSalary}
+                          onChange={(e) => setIncludeProratedSalary(e.target.checked)}
+                          className="rounded text-[#714B67] focus:ring-[#714B67] w-4 h-4"
+                        />
+                        <span>احتساب راتب أيام العمل الفعلية للشهر الحالي (Dynamic Base Salary Proration)</span>
+                      </label>
+                      <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        +{includeProratedSalary ? ((workedDaysInMonth * (grossSalary / 26)).toFixed(3)) : '0.000'} د.ك
+                      </span>
+                    </div>
+
+                    {includeProratedSalary && (
+                      <div className="space-y-2 pt-2 border-t border-slate-200 text-xs">
+                        <div className="flex items-center justify-between">
+                          <label className="font-bold text-slate-700">أيام العمل الفعلية السابقة لتاريخ المغادرة:</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const phys = calculatePhysicalWorkedDays(departureDate);
+                              setWorkedDaysInMonth(phys.workingDays);
+                              toast.success(`تمت المزامنة: ${phys.workingDays} يوم عمل فعلي حتى ${departureDate}`);
+                            }}
+                            className="text-[11px] text-[#714B67] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <RefreshCw size={12} />
+                            <span>مزامنة تلقائية مع تاريخ السفر ({calculatePhysicalWorkedDays(departureDate).workingDays} يوم)</span>
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <DecimalInput
+                              min={0}
+                              max={31}
+                              value={workedDaysInMonth}
+                              onChange={setWorkedDaysInMonth}
+                              className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800"
+                            />
+                            <span className="text-[10px] text-slate-500 mt-0.5 block">الراتب الأساسي ÷ 26 × أيام العمل</span>
+                          </div>
+                          <div>
+                            <div className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 font-bold text-slate-800 text-xs flex items-center justify-between">
+                              <span className="text-[#008784] font-black">26 يوم (المادة 70 - إلزامي)</span>
+                              <ShieldCheck size={15} className="text-[#008784]" />
+                            </div>
+                            <span className="text-[10px] text-slate-500 mt-0.5 block">أساس القسمة القانوني الموحد</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-500 bg-slate-100 p-1.5 rounded-lg border border-slate-200">
+                          ℹ️ يتم احتساب الراتب حصرياً عن أيام العمل الفعلية قبل تاريخ المغادرة بمعيار قسمة 26 يوماً القانوني لمنع أي احتساب مزدوج.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Overtime Line Item Section */}
+                  <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={includeOvertime}
+                          onChange={(e) => setIncludeOvertime(e.target.checked)}
+                          className="rounded text-[#714B67] focus:ring-[#714B67] w-4 h-4"
+                        />
+                        <span>بدل العمل الإضافي المعتمد (Overtime Allowance)</span>
+                      </label>
+                      <span className="text-[11px] font-mono font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                        +{includeOvertime ? ((overtimeHours * hourlyWage * overtimeMultiplier).toFixed(3)) : '0.000'} د.ك
+                      </span>
+                    </div>
+
+                    {includeOvertime && (
+                      <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-200">
+                        <div>
+                          <label className="block font-medium text-slate-600 mb-1">عدد ساعات الإضافي المعتمدة:</label>
+                          <DecimalInput
+                            min={0}
+                            value={overtimeHours}
+                            onChange={setOvertimeHours}
+                            className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-medium text-slate-600 mb-1">معامل الإضافي (المادة 66):</label>
+                          <select
+                            value={overtimeMultiplier}
+                            onChange={(e) => setOvertimeMultiplier(parseFloat(e.target.value) || 1.25)}
+                            className="w-full bg-white border border-slate-300 rounded-xl p-2 font-bold text-slate-800"
+                          >
+                            <option value={1.25}>1.25x (إضافي الأيام العادية)</option>
+                            <option value={1.5}>1.50x (إضافي العطل والجمعة)</option>
+                            <option value={2.0}>2.00x (إضافي الأعياد الرسمية)</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Leave Balance Encashment Section */}
+                  <div className="bg-amber-50/60 border border-amber-300 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer font-black text-xs text-amber-950">
+                        <input
+                          type="checkbox"
+                          checked={includeEncashment}
+                          onChange={(e) => {
+                            setIncludeEncashment(e.target.checked);
+                            if (e.target.checked && encashmentDays === 0) {
+                              const remaining = Number(Math.max(0, netAvailable - consumedLeaveDays).toFixed(2));
+                              setEncashmentDays(remaining);
+                            }
+                          }}
+                          className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4"
+                        />
+                        <span>البدل النقدي لرصيد الإجازات المتبقي / تسييل الرصيد (Encashment)</span>
+                      </label>
+                      <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                        +{includeEncashment ? ((encashmentDays * dailyWage).toFixed(3)) : '0.000'} د.ك
+                      </span>
+                    </div>
+
+                    {includeEncashment && (
+                      <div className="space-y-2 pt-2 border-t border-amber-200 text-xs">
+                        <div className="flex items-center justify-between">
+                          <label className="font-bold text-slate-700">عدد الأيام المراد صرف بدلها النقدي:</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = Number(Math.max(0, netAvailable - consumedLeaveDays).toFixed(2));
+                              setEncashmentDays(remaining);
+                            }}
+                            className="text-[11px] text-[#714B67] hover:underline font-bold cursor-pointer"
+                          >
+                            تصفية كامل المتبقي ({Math.max(0, netAvailable - consumedLeaveDays).toFixed(2)} يوم)
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DecimalInput
+                            min={0}
+                            max={Math.max(0, netAvailable - consumedLeaveDays)}
+                            value={encashmentDays}
+                            onChange={setEncashmentDays}
+                            className="w-full bg-white border border-amber-300 rounded-xl p-2 font-mono font-black text-amber-950 outline-none focus:border-amber-600"
+                          />
+                          <span className="text-xs font-bold text-slate-500 min-w-[30px]">يوم</span>
+                        </div>
+                        <p className="text-[10px] text-amber-800 font-medium">
+                          * عند الاعتماد أو الضغط على "تسييل وصرف البدل النقدي"، يتم خصم هذه الأيام مباشرة من رصيد الموظف وسجل التخصيصات.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Allowances & Deductions Group */}
+                  <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 space-y-3 text-xs">
+                    <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
+                      <CreditCard size={15} className="text-slate-600" />
+                      <span>البدلات الإضافية والاستقطاعات والخصومات</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">بدل تذاكر السفر (د.ك):</label>
+                        <DecimalInput
+                          min={0}
+                          value={ticketAllowance}
+                          onChange={setTicketAllowance}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">بدل سكن / بدلات أخرى (د.ك):</label>
+                        <DecimalInput
+                          min={0}
+                          value={housingAllowance}
+                          onChange={setHousingAllowance}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-rose-700 mb-1">خصم سلفة / قرض (د.ك):</label>
+                        <DecimalInput
+                          min={0}
+                          value={loanDeduction}
+                          onChange={setLoanDeduction}
+                          className="w-full bg-white border border-rose-200 rounded-xl p-2 font-mono font-bold text-rose-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-rose-700 mb-1">استقطاعات وجزاءات إدارية (د.ك):</label>
+                        <DecimalInput
+                          min={0}
+                          value={adminDeduction}
+                          onChange={setAdminDeduction}
+                          className="w-full bg-white border border-rose-200 rounded-xl p-2 font-mono font-bold text-rose-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Custom Items List (if any) */}
+                  {customItems.length > 0 && (
+                    <div className="bg-purple-50/50 border border-purple-200 rounded-2xl p-4 space-y-2 text-xs">
+                      <h4 className="font-bold text-[#714B67] flex items-center justify-between">
+                        <span>البنود المالية المخصصة المضافة:</span>
+                        <span className="font-mono text-[11px]">({customItems.length} بنود)</span>
+                      </h4>
+                      <div className="space-y-1.5">
+                        {customItems.map(item => (
+                          <div key={item.id} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-purple-100">
+                            <div>
+                              <span className="font-bold text-slate-800 block">{item.name}</span>
+                              {item.notes && <span className="text-[10px] text-slate-400 block">{item.notes}</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-mono font-black ${item.type === 'EARNING' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {item.type === 'EARNING' ? '+' : '-'}{item.amount.toFixed(3)} د.ك
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCustomItem(item.id)}
+                                className="text-rose-500 hover:text-rose-700 p-1 rounded cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
-                {/* Odoo Standard Tree View: <tree editable="bottom"> */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="p-3.5">تاريخ الحركة (Transaction Date)</th>
-                        <th className="p-3.5">البيان / نوع الإجازة (Description)</th>
-                        <th className="p-3.5 text-center">الأيام المستهلكة (Days)</th>
-                        <th className="p-3.5 text-center">المبلغ المنصرف (Amount Paid)</th>
-                        <th className="p-3.5 text-center">الحالة (State)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {employeeHistoryLines.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 font-bold">
-                            لا توجد حركات أو إجازات سابقة مسجلة لهذا الموظف
-                          </td>
-                        </tr>) : (
-                        employeeHistoryLines.map((line, idx) => (
-                          <tr key={`${line.id || 'hist'}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                            <td className="p-3.5 font-mono text-slate-700 font-bold">{line.transaction_date}</td>
-                            <td className="p-3.5 font-bold text-slate-800">{line.description}</td>
-                            <td className="p-3.5 text-center font-mono font-bold text-purple-900">{line.days_taken} يوم</td>
-                            <td className="p-3.5 text-center font-mono font-bold text-emerald-800">{line.amount_paid.toFixed(3)} د.ك</td>
-                            <td className="p-3.5 text-center">
-                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                line.state === 'معتمد' 
-                                  ? 'bg-emerald-100 text-emerald-800' 
-                                  : line.state === 'مؤرشف' 
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {line.state}
-                              </span>
-                            </td>
-                          </tr>))
+                {/* Column 2: Mathematical Summary & Universal Breakdown Table (5 cols) */}
+                <div className="lg:col-span-5 space-y-5">
+                  
+                  {/* Dynamic Items Live Breakdown Box */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                      <h3 className="font-bold text-xs sm:text-sm text-slate-800 flex items-center gap-2">
+                        <Coins size={16} className="text-[#008784]" />
+                        <span>شيت البنود المالية المعتمدة</span>
+                      </h3>
+                      <span className="text-[11px] font-mono font-bold text-[#714B67]">
+                        {settlementResult?.voucherNumber}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      {settlementResult?.items.map((item, idx) => (
+                        <div 
+                          key={item.id || idx} 
+                          className={`flex items-center justify-between p-2.5 rounded-xl border transition ${
+                            item.type === 'EARNING' 
+                              ? 'bg-emerald-50/40 border-emerald-100 hover:bg-emerald-50/80' 
+                              : 'bg-rose-50/40 border-rose-100 hover:bg-rose-50/80'
+                          }`}
+                        >
+                          <div className="space-y-0.5 max-w-[70%]">
+                            <span className="font-bold text-slate-800 block text-xs">{item.name}</span>
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              {Number((item.quantity || 0).toFixed(2))} {item.unit === 'days' ? 'أيام' : item.unit === 'hours' ? 'ساعات' : 'وحدة'} × {item.rate.toFixed(3)}
+                            </span>
+                          </div>
+                          <div className="text-left font-mono font-black">
+                            <span className={item.type === 'EARNING' ? 'text-emerald-800' : 'text-rose-700'}>
+                              {item.type === 'EARNING' ? '+' : '-'}{item.amount.toFixed(3)} د.ك
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Subtotals & Net Payout Box */}
+                    <div className="space-y-2 pt-3 border-t border-slate-200 text-xs">
+                      <div className="flex justify-between text-slate-600 font-bold">
+                        <span>إجمالي المستحقات (Earnings):</span>
+                        <span className="font-mono text-emerald-800 font-black">
+                          +{(settlementResult?.totalEarnings || 0).toFixed(3)} د.ك
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-slate-600 font-bold">
+                        <span>إجمالي الاستقطاعات (Deductions):</span>
+                        <span className="font-mono text-rose-700 font-black">
+                          -{(settlementResult?.totalDeductions || 0).toFixed(3)} د.ك
+                        </span>
+                      </div>
+
+                      {/* Net Payable Highlight Card */}
+                      <div className="bg-slate-900 text-white rounded-xl p-4 mt-3 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-slate-300 block">صافي المستحق النهائي للصرف</span>
+                            <span className="text-[10px] text-slate-400 font-mono">NET SETTLEMENT PAYOUT</span>
+                          </div>
+                          <div className="text-left">
+                            <span className="text-2xl font-black font-mono text-emerald-400">
+                              {(settlementResult?.netSettlementPayout || 0).toFixed(3)} د.ك
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Post-Settlement Balance Snapshot Card */}
+                  <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 space-y-2.5 text-xs">
+                    <h4 className="font-bold text-[#714B67] flex items-center justify-between border-b border-purple-200 pb-1.5">
+                      <span>حالة رصيد الإجازات بعد هذه التسوية:</span>
+                      <Layers size={15} />
+                    </h4>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-slate-600">
+                        <span>الرصيد المتاح قبل التسوية:</span>
+                        <span className="font-mono font-bold text-slate-900">{netAvailable.toFixed(2)} يوم</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>الأيام المستهلكة في السفر:</span>
+                        <span className="font-mono font-bold text-blue-800">-{consumedLeaveDays.toFixed(2)} يوم</span>
+                      </div>
+                      {includeEncashment && encashmentDays > 0 && (
+                        <div className="flex justify-between text-amber-900 font-bold">
+                          <span>الأيام المسيلة بالبدل النقدي:</span>
+                          <span className="font-mono">-{encashmentDays.toFixed(2)} يوم</span>
+                        </div>
                       )}
-                    </tbody>
-                  </table>
+                      <div className="flex justify-between text-slate-800 font-black border-t border-purple-200 pt-1.5">
+                        <span>الرصيد المتبقي بعد التصفية:</span>
+                        <span className="font-mono text-teal-800 bg-white px-2 py-0.5 rounded border border-teal-300">
+                          {(settlementResult?.remainingBalanceAfter || 0).toFixed(2)} يوم
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Details */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+                    <label className="block font-bold text-slate-700">طريقة الصرف والتحويل:</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['BANK_TRANSFER', 'CASH', 'CHEQUE'] as const).map(method => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setPaymentMethod(method)}
+                          className={`p-2 rounded-xl text-center font-bold transition cursor-pointer border ${
+                            paymentMethod === method
+                              ? 'bg-[#714B67] text-white border-[#714B67]'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {method === 'BANK_TRANSFER' ? 'تحويل بنكي' : method === 'CASH' ? 'نقداً (كاش)' : 'شيك مصرفي'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {paymentMethod === 'BANK_TRANSFER' && selectedEmp?.iban && (
+                      <div className="pt-2 text-[11px] text-slate-500 font-mono">
+                        <span>IBAN: {selectedEmp.iban} ({selectedEmp.bankName || 'البنك المعتمد'})</span>
+                      </div>
+                    )}
+                  </div>
+
                 </div>
-              </div>)}
-          </div>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 2: Saved Settlement Vouchers Archive */}
+          {activeTab === 'vouchers_archive' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">
+                  سجل سندات التسوية وتصفية الإجازات المحفوظة ({savedVouchers.length} سند)
+                </span>
+                <span className="text-xs text-slate-500">
+                  يتم حفظ جميع التسويات بشكل دائم في قاعدة البيانات
+                </span>
+              </div>
+
+              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-[#714B67] text-white font-bold">
+                    <tr>
+                      <th className="p-3.5">رقم السند</th>
+                      <th className="p-3.5">تاريخ التسوية</th>
+                      <th className="p-3.5">الموظف</th>
+                      <th className="p-3.5 text-center">الأيام المستهلكة</th>
+                      <th className="p-3.5 text-center">التسييل النقدي</th>
+                      <th className="p-3.5 text-left">صافي المستحق</th>
+                      <th className="p-3.5 text-center">الحالة</th>
+                      <th className="p-3.5 text-center">إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {savedVouchers.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-slate-400 font-bold">
+                          لا توجد سندات تسوية معتمدة مسجلة حالياً
+                        </td>
+                      </tr>
+                    ) : (
+                      savedVouchers.map((v, idx) => (
+                        <tr key={v.id || idx} className="hover:bg-slate-50 transition">
+                          <td className="p-3.5 font-mono font-black text-[#714B67]">{v.voucherNumber}</td>
+                          <td className="p-3.5 font-mono text-slate-600">{v.settlementDate}</td>
+                          <td className="p-3.5">
+                            <span className="font-bold text-slate-900 block">{v.employeeName}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{v.employeeCode} • {v.jobTitle}</span>
+                          </td>
+                          <td className="p-3.5 text-center font-mono font-bold text-blue-900">{v.consumedLeaveDays} يوم</td>
+                          <td className="p-3.5 text-center font-mono font-bold text-amber-800">
+                            {v.encashedLeaveDays > 0 ? `${v.encashedLeaveDays} يوم` : '-'}
+                          </td>
+                          <td className="p-3.5 text-left font-mono font-black text-emerald-700" dir="ltr">
+                            {v.netSettlementPayout.toFixed(3)} د.ك
+                          </td>
+                          <td className="p-3.5 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              v.status === 'settled_locked' || v.status === 'paid' 
+                                ? 'bg-purple-100 text-purple-900 border border-purple-200' 
+                                : v.status === 'validated' 
+                                ? 'bg-teal-100 text-teal-800' 
+                                : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {v.status === 'settled_locked' ? '🔒 مقفل ومعتمد' : v.status === 'paid' ? 'تم الصرف ومقفل' : v.status === 'validated' ? 'معتمد' : 'مسودة'}
+                            </span>
+                          </td>
+                          <td className="p-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setViewingVoucher(v);
+                                  setShowPrintModal(true);
+                                }}
+                                className="bg-[#714B67] hover:bg-[#5a3b52] text-white p-1.5 rounded-lg text-xs font-bold transition cursor-pointer"
+                                title="معاينة وطباعة السند"
+                              >
+                                <Printer size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteVoucher(v.id, v.voucherNumber)}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-1.5 rounded-lg text-xs font-bold transition cursor-pointer border border-rose-200"
+                                title="إلغاء قفل وتراجع (Manager Rollback)"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: Employee Leave History & Archive */}
+          {activeTab === 'employee_history' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">
+                  سجل إجازات وحركات الموظف ({selectedEmp?.fullNameAr})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowArchiveModal(true)}
+                  className="bg-[#714B67] hover:bg-[#5a3b52] text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs"
+                >
+                  <Plus size={14} />
+                  <span>إضافة حركة إجازة سابقة بالأرشيف</span>
+                </button>
+              </div>
+
+              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3.5">نوع الإجازة</th>
+                      <th className="p-3.5">الفترة (من - إلى)</th>
+                      <th className="p-3.5 text-center">الأيام</th>
+                      <th className="p-3.5">البيان والسبب</th>
+                      <th className="p-3.5 text-center">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {leaves.filter(l => l.employeeId === selectedEmp?.id).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400 font-bold">
+                          لا توجد إجازات مسجلة لهذا الموظف
+                        </td>
+                      </tr>
+                    ) : (
+                      leaves.filter(l => l.employeeId === selectedEmp?.id).map((l, idx) => (
+                        <tr key={l.id || idx} className="hover:bg-slate-50">
+                          <td className="p-3.5 font-bold text-slate-900">
+                            {l.leaveType === 'BEREAVEMENT' ? 'إجازة وفاة (م77)' : l.leaveType === 'ANNUAL' ? 'إجازة سنوية' : l.leaveType}
+                          </td>
+                          <td className="p-3.5 font-mono text-slate-600">{l.startDate} إلى {l.endDate}</td>
+                          <td className="p-3.5 text-center font-mono font-bold text-[#714B67]">{l.totalDays} يوم</td>
+                          <td className="p-3.5 text-slate-600">{l.reason || '-'}</td>
+                          <td className="p-3.5 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              {l.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
+
       </div>
 
-      {/* Modal: تسجيل إجازة أرشيفية */}
+      {/* Modal 1: Add Custom Financial Line Item */}
+      {showAddCustomModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-['Tajawal']" dir="rtl">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                <Plus size={16} className="text-[#714B67]" />
+                إضافة بند مالي مخصص للتسوية
+              </h3>
+              <button 
+                onClick={() => setShowAddCustomModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCustomItem} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">نوع البند:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewCustomType('EARNING')}
+                    className={`p-2 rounded-xl text-center font-bold transition cursor-pointer border ${
+                      newCustomType === 'EARNING' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    مستحق / إضافة (+)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewCustomType('DEDUCTION')}
+                    className={`p-2 rounded-xl text-center font-bold transition cursor-pointer border ${
+                      newCustomType === 'DEDUCTION' ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    استقطاع / خصم (-)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">اسم / بيان البند المالي:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: مكافأة تميز، بدل هاتف، استقطاع عهدة..."
+                  value={newCustomName}
+                  onChange={(e) => setNewCustomName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl p-2 font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">المبلغ (د.ك):</label>
+                <DecimalInput
+                  min={0.001}
+                  value={newCustomAmount}
+                  onChange={setNewCustomAmount}
+                  className="w-full border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">ملاحظات توضيحية:</label>
+                <input
+                  type="text"
+                  value={newCustomNotes}
+                  onChange={(e) => setNewCustomNotes(e.target.value)}
+                  placeholder="ملاحظات تظهر في السند الرسمي"
+                  className="w-full border border-slate-300 rounded-xl p-2"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomModal(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#714B67] hover:bg-[#5a3b52] text-white rounded-xl font-bold cursor-pointer shadow-xs"
+                >
+                  إضافة البند
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Archive Leave Creation */}
       {showArchiveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-['Tajawal']" dir="rtl">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <Archive size={18} className="text-purple-600" />
-                تسجيل حركة إجازة أرشيفية سابقة
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
+                <Archive size={16} className="text-purple-600" />
+                تسجيل إجازة أرشيفية سابقة
               </h3>
               <button 
                 onClick={() => setShowArchiveModal(false)}
@@ -737,7 +1576,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
               </button>
             </div>
 
-            <form onSubmit={handleCreateArchiveLeave} className="space-y-4 text-xs">
+            <form onSubmit={handleCreateArchiveLeave} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">السنة الأرشيفية:</label>
@@ -746,62 +1585,61 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     value={archiveYear}
                     onChange={(e) => setArchiveYear(e.target.value)}
                     required
-                    className="w-full border border-slate-300 rounded-lg p-2 font-mono font-bold"
+                    className="w-full border border-slate-300 rounded-xl p-2 font-mono font-bold"
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">عدد الأيام المستهلكة:</label>
-                  <input
-                    type="number"
-                    step="0.5"
+                  <DecimalInput
+                    min={0}
                     value={archiveDays}
-                    onChange={(e) => setArchiveDays(parseFloat(e.target.value) || 0)}
-                    required
-                    className="w-full border border-slate-300 rounded-lg p-2 font-mono font-bold"
+                    onChange={setArchiveDays}
+                    className="w-full border border-slate-300 rounded-xl p-2 font-mono font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">البيان / تفاصيل الإجازة الأرشيفية:</label>
+                <label className="block font-bold text-slate-700 mb-1">البيان والتفاصيل:</label>
                 <input
                   type="text"
                   value={archiveReason}
                   onChange={(e) => setArchiveReason(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-2"
+                  className="w-full border border-slate-300 rounded-xl p-2"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowArchiveModal(false)}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50 cursor-pointer"
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#71639e] hover:bg-[#5e5284] text-white rounded-lg font-bold cursor-pointer shadow-xs"
+                  className="px-5 py-2 bg-[#714B67] hover:bg-[#5a3b52] text-white rounded-xl font-bold cursor-pointer shadow-xs"
                 >
                   حفظ في الأرشيف
                 </button>
               </div>
             </form>
           </div>
-        </div>)}
+        </div>
+      )}
 
-      {/* Modal: حاسبة وطباعة التسوية الرسمية */}
+      {/* Modal 3: Printable Document & PDF Export */}
       {showPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 font-['Tajawal'] overflow-y-auto" dir="rtl">
-          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <div className="flex items-center gap-2">
-                <Printer size={20} className="text-[#71639e]" />
+                <Printer size={20} className="text-[#714B67]" />
                 <h3 className="font-bold text-base text-slate-900">
-                  سند تسوية وتصفية إجازة موظف (Kuwait Law Clearance Report)
+                  سند تصفية وتسوية إجازة موظف (Leave Clearance & Settlement Document)
                 </h3>
               </div>
               
@@ -809,7 +1647,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                 <button
                   onClick={handlePdfExport}
                   disabled={isExporting}
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                   <span>تحميل PDF</span>
@@ -817,7 +1655,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
                 <button
                   onClick={handlePrint}
-                  className="bg-[#71639e] hover:bg-[#5e5284] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-xs"
                 >
                   <Printer className="w-3.5 h-3.5 text-amber-300" />
                   <span>طباعة فورية</span>
@@ -825,7 +1663,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
                 <button 
                   onClick={() => setShowPrintModal(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded cursor-pointer mr-2"
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg cursor-pointer mr-2"
                 >
                   <X size={20} />
                 </button>
@@ -834,118 +1672,116 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
             {/* Printable Document Area */}
             <div className="flex-1 overflow-y-auto p-4 bg-slate-100 rounded-xl">
-              <div 
-                id="leave-clearance-print-area" 
-                className="p-8 sm:p-10 bg-white text-slate-900 text-right max-w-3xl mx-auto border border-slate-300 rounded-xl shadow-sm print:border-none print:shadow-none print:p-0"
-                style={{ direction: 'rtl', textAlign: 'right', fontFamily: "'Cairo', 'Tajawal', sans-serif" }}
+              <div id="leave-clearance-print-area">
+                <LeaveClearanceDocument
+                  employee={{
+                    name: viewingVoucher ? viewingVoucher.employeeName : selectedEmp?.fullNameAr || '',
+                    civilId: viewingVoucher ? viewingVoucher.civilId : selectedEmp?.civilId || '',
+                    employeeCode: viewingVoucher ? viewingVoucher.employeeCode : selectedEmp?.employeeCode || '',
+                    joinDate: viewingVoucher ? viewingVoucher.joinDate : selectedEmp?.joinDate || '',
+                    jobTitle: viewingVoucher ? viewingVoucher.jobTitle : selectedEmp?.jobTitle || '',
+                    department: viewingVoucher ? viewingVoucher.department : selectedEmp?.department || '',
+                    bankName: selectedEmp?.bankName,
+                    iban: selectedEmp?.iban,
+                  }}
+                  settlement={viewingVoucher ? {
+                    voucherNumber: viewingVoucher.voucherNumber,
+                    settlementDate: viewingVoucher.settlementDate,
+                    dailyWage: viewingVoucher.dailyWage,
+                    hourlyWage: viewingVoucher.hourlyWage,
+                    carriedOverBalance: viewingVoucher.carriedOverBalance,
+                    accruedBalance: viewingVoucher.accruedBalance,
+                    totalAvailableBefore: viewingVoucher.totalAvailableBefore,
+                    statutoryLeaveDays: viewingVoucher.statutoryLeaveDays,
+                    consumedLeaveDays: viewingVoucher.consumedLeaveDays,
+                    encashedLeaveDays: viewingVoucher.encashedLeaveDays,
+                    unpaidLeaveDays: viewingVoucher.unpaidLeaveDays,
+                    remainingBalanceAfter: viewingVoucher.remainingBalanceAfter,
+                    items: viewingVoucher.items,
+                    totalEarnings: viewingVoucher.totalEarnings,
+                    totalDeductions: viewingVoucher.totalDeductions,
+                    netSettlementPayout: viewingVoucher.netSettlementPayout,
+                    aysed_carried_over: viewingVoucher.carriedOverBalance,
+                    aysed_opening_balance: 0,
+                    aysed_accrued_2026: viewingVoucher.accruedBalance,
+                    aysed_total_available: viewingVoucher.totalAvailableBefore,
+                    aysed_paid_days: viewingVoucher.consumedLeaveDays,
+                    aysed_unpaid_days: viewingVoucher.unpaidLeaveDays,
+                    aysed_daily_wage: viewingVoucher.dailyWage,
+                    aysed_leave_cash: (viewingVoucher.consumedLeaveDays * viewingVoucher.dailyWage),
+                    aysed_ticket_allowance: 0,
+                    aysed_allowances: 0,
+                    aysed_deductions: viewingVoucher.totalDeductions,
+                    aysed_net_payable: viewingVoucher.netSettlementPayout,
+                  } : settlementResult!}
+                  activeCompany={activeCompany}
+                  voucherNumber={viewingVoucher?.voucherNumber || settlementResult?.voucherNumber}
+                  settlementDate={viewingVoucher?.settlementDate || settlementDate}
+                  items={viewingVoucher?.items || settlementResult?.items}
+                />
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Unlock Manager Rollback Modal */}
+      {showUnlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 font-['Tajawal']" dir="rtl">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="text-amber-600" size={22} />
+                <h3 className="font-bold text-base text-slate-900">إلغاء قفل سند التسوية (Manager Rollback)</h3>
+              </div>
+              <button 
+                onClick={() => setShowUnlockModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded cursor-pointer"
               >
-                {/* ترويسة التقرير */}
-                <div className="text-center border-b-2 border-[#71639e] pb-4 mb-6">
-                  <h2 className="text-2xl font-black text-slate-900">نـموذج تـسوية وتـصفية إجـازة مـوظف</h2>
-                  <p className="text-xs text-slate-600 font-bold mt-1">نـظام Aysed S HR 2026 - الكـويت (المادة 70)</p>
-                </div>
+                <X size={18} />
+              </button>
+            </div>
 
-                {/* جدول البيانات الأساسية */}
-                <table className="table table-sm table-bordered w-full text-xs border border-slate-300 mb-6">
-                  <tbody>
-                    <tr className="bg-slate-50">
-                      <td className="p-2.5 border border-slate-300 font-bold w-1/4">الـرقم المـدني:</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold w-1/4">{selectedEmp?.civilId || '-'}</td>
-                      <td className="p-2.5 border border-slate-300 font-bold w-1/4">تـاريخ المـباشرة:</td>
-                      <td className="p-2.5 border border-slate-300 font-mono w-1/4">{selectedEmp?.joinDate || (selectedEmp as any)?.joiningDate || '-'}</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 border border-slate-300 font-bold">اسم الموظف والكود:</td>
-                      <td className="p-2.5 border border-slate-300 font-bold text-slate-900" colSpan={3}>{selectedEmp?.fullNameAr} ({selectedEmp?.employeeCode})</td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div className="space-y-4 text-xs">
+              <p className="text-slate-600 leading-relaxed">
+                سند التسوية رقم <span className="font-mono font-bold text-[#714B67]">{unlockTarget?.voucherNumber}</span> مقفل ومحمي ضد التعديل أو الحذف العشوائي. لإلغاء القفل وتراجع الصلاحيات، يرجى كتابة سبب الإلغاء وصلاحية المدير المعتمد:
+              </p>
 
-                {/* ملخص الأرصدة */}
-                <h4 className="text-sm font-bold text-slate-900 mt-6 mb-3">١. مـلخص الـأرصدة وFIFO (Days Summary)</h4>
-                <table className="table table-bordered w-full text-xs border border-slate-300 text-center mb-6">
-                  <thead>
-                    <tr style={{ backgroundColor: '#f8f9fa' }} className="font-bold text-slate-900 border-b border-slate-300">
-                      <th className="p-2 border border-slate-300">المكتسب 2026</th>
-                      <th className="p-2 border border-slate-300 text-[#71639e]">صافي المتاح</th>
-                      <th className="p-2 border border-slate-300 text-rose-700">إجمالي المستهلك</th>
-                      <th className="p-2 border border-slate-300 text-blue-900">أيام مدفوعة</th>
-                      <th className="p-2 border border-slate-300 text-rose-700">بدون راتب</th>
-                      <th className="p-2 border border-slate-300">المتبقي</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-purple-800">{(accruedBalance || 0).toFixed(2)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-black text-[#71639e]">{(settlementData?.available_paid || 0).toFixed(2)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-rose-700">{(settlementData?.requested_days || 0).toFixed(2)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-blue-900">{(settlementData?.aysed_paid_days || 0).toFixed(2)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-rose-700">{(settlementData?.aysed_unpaid_days || 0).toFixed(2)} يوم</td>
-                      <td className="p-2.5 border border-slate-300 font-mono font-bold text-emerald-800">
-                        {Math.max(0, (settlementData?.available_paid || 0) - (settlementData?.aysed_paid_days || 0)).toFixed(2)} يوم
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">سبب إلغاء القفل وصلاحية المدير <span className="text-red-500">*</span>:</label>
+                <textarea
+                  value={unlockReasonInput}
+                  onChange={(e) => setUnlockReasonInput(e.target.value)}
+                  placeholder="أدخل سبب طلب فك القفل وصلاحية المدير..."
+                  rows={3}
+                  className="w-full border border-slate-300 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-[#714B67]/30 text-xs"
+                />
+              </div>
 
-                {/* التسوية المالية */}
-                <h4 className="text-sm font-bold text-slate-900 mt-6 mb-3">٢. الـتسوية المـالية (Financial Settlement)</h4>
-                <table className="table table-sm w-full text-xs border border-slate-300 mb-4">
-                  <tbody>
-                    <tr className="bg-slate-100 border-b border-slate-300">
-                      <td className="p-3 font-bold">
-                        إجـمالي المـبلغ المـستحق لـلإجازة ({(settlementData?.aysed_paid_days || 0).toFixed(2)} يوم × أجر اليوم {dailyWage.toFixed(3)} د.ك = {settlementAmount.toFixed(3)} د.ك)
-                      </td>
-                      <td className="p-3 text-left font-mono font-bold text-base text-blue-900" dir="ltr">{settlementAmount.toFixed(3)} د.ك</td>
-                    </tr>
-                    {ticketAllowanceInput > 0 && (
-                      <tr className="border-b border-slate-300">
-                        <td className="p-2.5 font-bold">بدل تذاكر السفر المعتمد</td>
-                        <td className="p-2.5 text-left font-mono font-bold" dir="ltr">{ticketAllowanceInput.toFixed(3)} د.ك</td>
-                      </tr>)}
-                    {deductionsInput > 0 && (
-                      <tr className="border-b border-slate-300 bg-rose-50/50">
-                        <td className="p-2.5 font-bold text-rose-800">استقطاعات وسلفيات مسجلة</td>
-                        <td className="p-2.5 text-left font-mono font-bold text-rose-700" dir="ltr">-{deductionsInput.toFixed(3)} د.ك</td>
-                      </tr>)}
-                    <tr className="bg-slate-900 text-white font-bold text-sm">
-                      <td className="p-3">صافي المستحق النهائي (NET PAYABLE)</td>
-                      <td className="p-3 text-left font-mono text-emerald-400 font-black text-base" dir="ltr">{netPayable.toFixed(3)} د.ك</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <p className="text-xs text-slate-600 mt-4">* تـنبيه: تـم تـرحيل الأيام بـدون راتب لـخصمها مـن مـدة الخـدمة الـقانونية وفق المادة (70).</p>
-
-                {/* الإقرار والتوقيعات */}
-                <div className="border border-slate-300 p-3 rounded-lg text-xs text-slate-700 bg-slate-50 mb-8 mt-4 leading-relaxed">
-                  <strong>إقرار وتعهد: </strong> أقر أنا الموقع أدناه باستلام كامل المبلغ والمستحقات الموضحة أعلاه، وبموجبه أبرئ ذمة المؤسسة من أي مستحقات عن هذه الفترة بعد التوقيع.
-                </div>
-
-                <div className="grid grid-cols-4 gap-4 text-center text-xs pt-4 border-t border-slate-300">
-                  <div>
-                    <p className="font-bold text-slate-800">المحاسبة</p>
-                    <p className="text-slate-400 mt-8 text-[10px]">التوقيع: ..................</p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">الموارد البشرية (HR)</p>
-                    <p className="text-slate-400 mt-8 text-[10px]">التوقيع: ..................</p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">المدير الاداري</p>
-                    <p className="text-slate-400 mt-8 text-[10px]">الختم والتوقيع: .........</p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-800">توقيع واستلام الموظف</p>
-                    <p className="text-slate-400 mt-8 text-[10px]">التوقيع: ..................</p>
-                  </div>
-                </div>
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowUnlockModal(false)}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-xl font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  تراجع
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmUnlockVoucher}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold cursor-pointer shadow-xs"
+                >
+                  تأكيد وفك القفل
+                </button>
               </div>
             </div>
           </div>
-        </div>)}
-    </div>);
+        </div>
+      )}
+
+    </div>
+  );
 };
 
 export default LeaveSettlementCalculator;

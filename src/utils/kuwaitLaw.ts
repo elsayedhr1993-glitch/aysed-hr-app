@@ -649,6 +649,62 @@ export interface UniversalLeaveLedger {
 }
 
 /**
+ * دالة حساب وتقسيم إجازة الوفاة والعزاء وفق المادة 77 من قانون العمل الكويتي رقم 6 لسنة 2010:
+ * "للعامل الحق في إجازة بأجر كامل لمدة ثلاثة أيام في حالة وفاة أحد أقاربه من الدرجة الأولى أو الثانية،
+ * ولا تخصم هذه الإجازة من رصيد إجازاته السنوية".
+ * 
+ * في حال رغبة الموظف في تمديد الإجازة (مثلاً 14 يوماً):
+ * - الأيام 1 إلى 3: إجازة عزاء رسمية مدفوعة بالكامل دون خصم من الرصيد السنوي (0 deduction).
+ * - الأيام المتبقية (11 يوماً): تخصم من رصيد الإجازة السنوية المتاح.
+ * - أي أيام إضافية تتجاوز الرصيد السنوي تحتسب كأيام بدون راتب.
+ */
+export interface BereavementLeaveSplitResult {
+  totalRequestedDays: number;
+  statutoryBereavementDays: number;
+  annualDeductedDays: number;
+  excessUnpaidDays: number;
+  paidDaysTotal: number;
+  isSplit: boolean;
+  explanation: string;
+}
+
+export function calculateBereavementLeaveSplit(
+  totalRequestedDays: number,
+  availableAnnualBalance: number = 0,
+  degree: 'FIRST' | 'SECOND' | 'OTHER' = 'FIRST'
+): BereavementLeaveSplitResult {
+  const total = Math.max(0, totalRequestedDays);
+  const available = Math.max(0, availableAnnualBalance);
+
+  // إذا كانت صلة القرابة من الدرجة الأولى أو الثانية، يستحق 3 أيام مدفوعة قانوناً
+  const maxStatutoryDays = (degree === 'FIRST' || degree === 'SECOND') ? 3 : 0;
+  const statutoryBereavementDays = Math.min(total, maxStatutoryDays);
+  const remainingDays = Math.max(0, total - statutoryBereavementDays);
+
+  const annualDeductedDays = Math.min(available, remainingDays);
+  const excessUnpaidDays = Math.max(0, remainingDays - annualDeductedDays);
+  const paidDaysTotal = statutoryBereavementDays + annualDeductedDays;
+  const isSplit = remainingDays > 0;
+
+  let explanation = '';
+  if (total <= maxStatutoryDays) {
+    explanation = `إجازة عزاء مستحقة بالكامل وفق المادة 77 (${statutoryBereavementDays} أيام بأجر كامل دون أي خصم من الرصيد السنوي).`;
+  } else {
+    explanation = `تم تطبيق المادة 77: أول ${statutoryBereavementDays} أيام إجازة عزاء رسمية مدفوعة (خصم 0 من الرصيد السنوي) + ${annualDeductedDays} يوم مخصومة من الرصيد السنوي المتاح${excessUnpaidDays > 0 ? ` + ${excessUnpaidDays} يوم إجازة بدون راتب (لتجاوز الرصيد)` : ''}.`;
+  }
+
+  return {
+    totalRequestedDays: total,
+    statutoryBereavementDays,
+    annualDeductedDays,
+    excessUnpaidDays,
+    paidDaysTotal,
+    isSplit,
+    explanation,
+  };
+}
+
+/**
  * Universal Multi-Year Leave Balance Formula (Single Source of Truth):
  * Total Available Balance = (carried_over_balance + current_year_accrued) - total_approved_leaves_taken
  */
@@ -659,8 +715,18 @@ export function computeUniversalLeaveLedger(emp: any, leaves: any[] = [], asOfDa
   const totalAllocated = Number((carriedOverBalance + currentYearAccrued).toFixed(2));
 
   const approvedTaken = (leaves || [])
-    .filter(l => !l.isHistorical && l.employeeId === emp?.id && (l.status === 'APPROVED' || l.status === 'VALIDATED') && l.leaveType === 'ANNUAL')
-    .reduce((sum, l) => sum + (l.totalDays || 0), 0);
+    .filter(l => !l.isHistorical && l.employeeId === emp?.id && (l.status === 'APPROVED' || l.status === 'VALIDATED'))
+    .reduce((sum, l) => {
+      if (l.leaveType === 'ANNUAL') {
+        return sum + (l.totalDays || 0);
+      }
+      // For BEREAVEMENT / COMPASSIONATE leaves:
+      // If extended and split with annual balance, only deduct the annual portion
+      if ((l.leaveType === 'BEREAVEMENT' || l.leaveType === 'COMPASSIONATE') && l.isSplitBereavement) {
+        return sum + (l.annualDeductedDays !== undefined ? l.annualDeductedDays : Math.max(0, (l.totalDays || 0) - 3));
+      }
+      return sum;
+    }, 0);
 
   const netAvailableBalance = Number(Math.max(0, totalAllocated - approvedTaken).toFixed(2));
   const breakdown = `مرحل: ${carriedOverBalance} + مكتسب: ${currentYearAccrued} - مستهلك: ${approvedTaken} = متاح: ${netAvailableBalance}`;

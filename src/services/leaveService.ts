@@ -119,7 +119,7 @@ export function computeFifoLeaveAllocations(
 ): FifoAllocationResult {
   // Filter allocations for this employee (ANNUAL leave type, approved or validated state)
   const empAllocations = allocations
-    .filter(a => a.employeeId === employee.id && a.leaveType === 'ANNUAL' && (a.state === 'validate' || a.state === 'confirm' || !a.state))
+    .filter(a => (a.employeeId === employee.id || a.employeeId === employee.employeeCode) && a.leaveType === 'ANNUAL' && (a.state === 'validate' || a.state === 'confirm' || !a.state))
     .map(a => ({
       ...a,
       consumedDays: 0,
@@ -137,16 +137,23 @@ export function computeFifoLeaveAllocations(
     return 0;
   });
 
-  // Filter approved annual leaves for this employee (chronological order)
-  const approvedAnnualLeaves = leaves
-    .filter(l => !l.isHistorical && l.employeeId === employee.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && l.leaveType === 'ANNUAL')
+  // Filter approved leaves that consume annual leave balance (chronological order)
+  const approvedDeductibleLeaves = leaves
+    .filter(l => !l.isHistorical && (l.employeeId === employee.id || l.employeeId === employee.employeeCode) && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && 
+      (l.leaveType === 'ANNUAL' || ((l.leaveType === 'BEREAVEMENT' || l.leaveType === 'COMPASSIONATE') && l.isSplitBereavement))
+    )
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
   const breakdown: FifoAllocationResult['breakdown'] = [];
 
   // Iterate over leaves and consume allocations FIFO
-  for (const leave of approvedAnnualLeaves) {
-    let daysToConsume = leave.paidDays !== undefined ? leave.paidDays : (leave.totalDays || 1);
+  for (const leave of approvedDeductibleLeaves) {
+    let daysToConsume = 0;
+    if (leave.leaveType === 'BEREAVEMENT' || leave.leaveType === 'COMPASSIONATE') {
+      daysToConsume = leave.annualDeductedDays !== undefined ? leave.annualDeductedDays : Math.max(0, (leave.totalDays || 0) - 3);
+    } else {
+      daysToConsume = leave.paidDays !== undefined ? leave.paidDays : (leave.totalDays || 1);
+    }
     const leaveTotalDays = leave.totalDays || 1;
     const leaveBreakdown: FifoAllocationResult['breakdown'][0] = {
       leaveId: leave.id,

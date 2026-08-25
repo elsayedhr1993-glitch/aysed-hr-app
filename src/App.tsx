@@ -25,7 +25,7 @@ import { initialCompanies, initialDepartments, initialJobTitles, initialEmployee
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { generateSmartNotifications } from './utils/notificationsEngine';
 import toast, { Toaster } from 'react-hot-toast';
-import { auth, db, cleanFirestoreData, isTenantPurged } from './lib/firebase';
+import { auth, db, cleanFirestoreData, isTenantPurged, recordPurgedTenant } from './lib/firebase';
 import { doc, setDoc, deleteDoc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData } from './utils/persistentStorage';
@@ -45,6 +45,21 @@ function MainActionManager() {
   const [userCompanyId, setUserCompanyId] = useState('');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [portalViewMode, setPortalViewMode] = useState<'superadmin' | 'apps'>('superadmin');
+  
+  useEffect(() => {
+    recordPurgedTenant([
+      'comp-super-admin',
+      'comp-almanar',
+      'comp-fanar',
+      'comp-fanar-branches',
+      'comp-elite',
+      'منصة إدارة النظام المركزية',
+      'عيادة المنار',
+      'شركة عيادات الفنار التخصصية',
+      'مجموعة الفنار للخدمات الطبية والمختبرات',
+      'شركة إيليت كلينك الطبية'
+    ]);
+  }, []);
   
   // Primary State Controller: Single state variable to navigate screens without conflict
   const [currentApp, setCurrentApp] = useState<string | null>(null);
@@ -90,7 +105,7 @@ function MainActionManager() {
         }
       }
       const valid = deduplicateCompanies(allComps);
-      return valid.length > 0 ? valid : [initialCompanies[0]];
+      return valid;
     } catch (e) {}
     return deduplicateCompanies(initialCompanies);
   });
@@ -101,19 +116,14 @@ function MainActionManager() {
         const raw = localStorage.getItem('registered_companies_v1');
         if (raw) {
           const list = JSON.parse(raw);
-          if (Array.isArray(list) && list.length > 0) {
+          if (Array.isArray(list)) {
             const valid = deduplicateCompanies(list);
-            if (valid.length > 0) {
-              setCompanies(valid);
-              return;
-            }
+            setCompanies(valid);
+            return;
           }
         }
       } catch (err) {}
-      setCompanies(prev => {
-        const remaining = deduplicateCompanies(prev);
-        return remaining.length > 0 ? remaining : [initialCompanies[0]];
-      });
+      setCompanies(prev => deduplicateCompanies(prev));
     };
     window.addEventListener('aysed_companies_changed', handleCompaniesChanged);
     return () => window.removeEventListener('aysed_companies_changed', handleCompaniesChanged);
@@ -447,7 +457,31 @@ function MainActionManager() {
 
     if (!targetComp) return;
 
+    const isSuperAdminTarget = targetComp.id === 'comp-super-admin' || 
+      (targetComp.nameAr && targetComp.nameAr.includes('إدارة النظام المركزية')) || 
+      (targetComp.nameEn && targetComp.nameEn.includes('SaaS Platform'));
+
+    if (isSuperAdminTarget) {
+      setActiveCompany(targetComp);
+      localStorage.setItem('activeCompanyId', 'comp-super-admin');
+      setPortalViewMode('superadmin');
+      setCurrentApp(null);
+      if (auth.currentUser) {
+        try {
+          await setDoc(doc(db, 'users', auth.currentUser.uid), cleanFirestoreData({
+            company_id: 'comp-super-admin',
+            companyId: 'comp-super-admin',
+            role: 'SUPER_ADMIN',
+            updated_at: new Date().toISOString()
+          }), { merge: true });
+        } catch (err) {}
+      }
+      toast.success('تم الانتقال إلى لوحة التحكم المركزية (Super Admin) بنجاح');
+      return;
+    }
+
     // Instantly reset view states upon switching clinic context
+    setPortalViewMode('apps');
     setEmployees([]);
     setContracts([]);
     setLeaves([]);
@@ -834,9 +868,49 @@ function MainActionManager() {
       setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, updated);
       return updated;
     });
+
+    // Synchronize or create regular opening leave allocation for this employee if carriedOver is specified
+    const carriedDays = Number(empWithComp.carriedOverLeave2025 ?? empWithComp.carriedOverBalance ?? 0);
+    if (!isNaN(carriedDays) && carriedDays >= 0) {
+      try {
+        const rawAllocs = localStorage.getItem(MANARA_STORAGE_KEYS.LEAVE_ALLOCATIONS);
+        let allocs: any[] = rawAllocs ? JSON.parse(rawAllocs) : [];
+        const existingRegIdx = allocs.findIndex((a: any) => a.employeeId === emp.id && a.allocationType === 'regular');
+        if (existingRegIdx >= 0) {
+          allocs[existingRegIdx] = {
+            ...allocs[existingRegIdx],
+            numberOfDays: carriedDays,
+            remainingDays: Math.max(0, carriedDays - (allocs[existingRegIdx].consumedDays || 0)),
+            name: `رصيد إجازات مرحل من 2025 (${carriedDays} يوم)`
+          };
+        } else if (carriedDays > 0) {
+          const newAlloc = {
+            id: `alloc-reg-${emp.id}-${Date.now()}`,
+            name: `رصيد إجازات مرحل من 2025 (${carriedDays} يوم)`,
+            employeeId: emp.id,
+            companyId: targetCompId,
+            leaveType: 'ANNUAL',
+            allocationType: 'regular',
+            numberOfDays: carriedDays,
+            consumedDays: 0,
+            remainingDays: carriedDays,
+            dateFrom: '2025-12-31',
+            dateTo: '',
+            state: 'validate',
+            notes: 'رصيد مرحل معتمد من نهاية عام 2025',
+            createdAt: new Date().toISOString()
+          };
+          allocs.unshift(newAlloc);
+        }
+        localStorage.setItem(MANARA_STORAGE_KEYS.LEAVE_ALLOCATIONS, JSON.stringify(allocs));
+      } catch (err) {
+        console.error('Error syncing employee carried over allocation:', err);
+      }
+    }
+
     try {
       await TenantDatabaseService.saveEmployee(empWithComp, targetCompId);
-      toast.success("تم حفظ بيانات الموظف بنجاح");
+      toast.success("تم حفظ بيانات الموظف بنجاح وتحديث الرصيد المرحل");
       addAuditLog({
         action: isExisting ? 'UPDATE' : 'CREATE',
         entity: 'EMPLOYEE',
@@ -882,6 +956,19 @@ function MainActionManager() {
   };
 
   const handleSaveLeave = async (lv: LeaveRequest) => {
+    // Prevent duplicate/overlapping leave requests for the same employee
+    const overlapping = leaves.some(l => 
+      l.employeeId === lv.employeeId &&
+      l.id !== lv.id &&
+      l.status !== 'REJECTED' &&
+      l.status !== 'DRAFT' &&
+      !(lv.endDate < l.startDate || lv.startDate > l.endDate)
+    );
+    if (overlapping) {
+      toast.error('خطأ: توجد إجازة أخرى مسجلة أو معتمدة لنفس الموظف تتداخل مع هذه التواريخ!');
+      return;
+    }
+
     setLeaves(prev => {
       const idx = prev.findIndex(l => l.id === lv.id);
       const updated = idx >= 0 ? prev.map(l => l.id === lv.id ? lv : l) : [lv, ...prev];
@@ -945,7 +1032,31 @@ function MainActionManager() {
       return updated;
     });
 
-    if (targetLeave && status === 'APPROVED' && targetLeave.leaveType !== 'HOURLY_PERMISSION') {
+    if (targetLeave && status === 'APPROVED' && !wasApproved && targetLeave.leaveType !== 'HOURLY_PERMISSION') {
+      const emp = employees.find(e => e.id === targetLeave.employeeId);
+      if (emp) {
+        const consumed = targetLeave.totalDays || 0;
+        const currentBal = Number((emp as any).remaining_leaves ?? (emp as any).paid_days_remaining ?? 30);
+        const updatedBal = Math.max(0, currentBal - consumed);
+
+        setEmployees(prev => prev.map(e => e.id === emp.id ? {
+          ...e,
+          remaining_leaves: updatedBal,
+          leave_balance: updatedBal,
+          paid_days_remaining: updatedBal
+        } : e));
+
+        try {
+          await setDoc(doc(db, "employees", emp.id), cleanFirestoreData({
+            remaining_leaves: updatedBal,
+            leave_balance: updatedBal,
+            paid_days_remaining: updatedBal
+          }), { merge: true });
+        } catch (err) {
+          console.error("Error deducting employee balance on leave approval:", err);
+        }
+      }
+
       try {
         const start = new Date(targetLeave.startDate);
         const end = new Date(targetLeave.endDate);
@@ -1383,8 +1494,6 @@ function MainActionManager() {
       return updated;
     });
     try {
-      const { deleteDoc, doc } = await import('firebase/firestore');
-      const { db } = await import('./lib/firebase');
       await deleteDoc(doc(db, "commencements", id));
     } catch (e) {
       console.error("Firestore delete commencement error:", e);

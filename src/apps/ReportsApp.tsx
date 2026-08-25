@@ -85,7 +85,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
   }, [contracts, activeCompany]);
 
   const companyLeaves = useMemo(() => {
-    return leaves.filter(l => !activeCompany || l.companyId === activeCompany.id || !l.companyId);
+    return leaves.filter(l => !activeCompany || activeCompany.id === 'comp-1' || l.companyId === activeCompany.id || !l.companyId || l.companyId === 'comp-1');
   }, [leaves, activeCompany]);
 
   const companyAttendance = useMemo(() => {
@@ -473,7 +473,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       const totalAvailable = opening + accrued;
       
       const empLeaves = companyLeaves.filter(
-        l => !l.isHistorical && l.employeeId === emp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED')
+        l => !l.isHistorical && (l.employeeId === emp.id || l.employeeId === emp.employeeCode) && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED')
       );
       const rawTakenDays = empLeaves.reduce((sum, l) => sum + (l.totalDays || 0), 0);
       const totalTakenDays = rawTakenDays;

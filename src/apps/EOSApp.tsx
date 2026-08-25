@@ -35,8 +35,16 @@ export const EOSApp: React.FC<EOSAppProps> = ({ employees, contracts, leaves = [
     if (!activeEmp) return 0;
     const accrued = get_aysed_official_balance(activeEmp);
     const takenAnnualDays = (leaves || [])
-      .filter(l => !l.isHistorical && l.employeeId === activeEmp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && l.leaveType === 'ANNUAL')
-      .reduce((sum, l) => sum + (l.totalDays || 0), 0);
+      .filter(l => !l.isHistorical && l.employeeId === activeEmp.id && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && (l.leaveType === 'ANNUAL' || l.leaveType === 'BEREAVEMENT' || l.leaveType === 'COMPASSIONATE'))
+      .reduce((sum, l) => {
+        if (l.leaveType === 'BEREAVEMENT' || l.leaveType === 'COMPASSIONATE') {
+          const deducted = l.annualDeductedDays !== undefined 
+            ? l.annualDeductedDays 
+            : (l.isSplitBereavement ? Math.max(0, (l.totalDays || 0) - (l.bereavementStatutoryDays ?? 3)) : 0);
+          return sum + deducted;
+        }
+        return sum + (l.totalDays || 0);
+      }, 0);
     return Math.max(0, accrued - takenAnnualDays);
   }, [activeEmp, leaves]);
 
