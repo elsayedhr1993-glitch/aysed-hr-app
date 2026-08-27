@@ -1,4 +1,170 @@
-import { Employee } from '../types';
+import { Employee, Contract, LeaveRequest, HrLeaveAllocation } from '../types';
+
+export interface LeaveRecord {
+  type: 'annual' | 'unpaid' | 'sick' | 'compensation_holiday' | 'manual_adjustment';
+  days: number;
+  status: 'approved' | 'pending' | 'rejected';
+  date?: string;
+  notes?: string;
+}
+
+export interface EmployeeLeaveSummary {
+  accruedAnnualDays: number;       // الرصيد التراكمي المكتسب (2.5 شهرياً)
+  holidayCompensationDays: number; // بدل العمل بالعطلات الرسمية
+  manualAdjustments: number;       // أي تسويات أو إضافات يدوية
+  usedLeaveDays: number;           // الإجازات المستهلكة المعتمدة
+  totalAvailableDays: number;      // الرصيد الإجمالي القابل للاستخدام والصرف
+  cashSettlementAmount: number;    // القيمة المالية المستحقة في حال الصرف
+  dailyWageRate?: number;          // أجر اليوم (الراتب الشامل / 26)
+  comprehensiveSalary?: number;    // الراتب الشامل
+}
+
+/**
+ * المحرك المركزي الموحد لحساب رصيد وتصفية الإجازات
+ * يضمن تطابق شاشة العرض مع شاشة الصرف مع مسير الرواتب 100%
+ */
+export function calculateUnifiedLeaveBalance(
+  accruedAnnual: number,
+  records: LeaveRecord[],
+  basicSalary: number = 0,
+  allowances: number = 0
+): EmployeeLeaveSummary {
+  
+  // 1. تجميع الأيام التعويضية للعطلات المعتمدة فقط
+  const holidayCompensationDays = records
+    .filter(r => (r.type === 'compensation_holiday' || (r.type as string) === 'compensatory') && r.status === 'approved')
+    .reduce((sum, r) => sum + Number(r.days || 0), 0);
+
+  // 2. تجميع التعديلات اليدوية المعتمدة
+  const manualAdjustments = records
+    .filter(r => r.type === 'manual_adjustment' && r.status === 'approved')
+    .reduce((sum, r) => sum + Number(r.days || 0), 0);
+
+  // 3. تجميع الإجازات المستهلكة المعتمدة
+  const usedLeaveDays = records
+    .filter(r => (r.type === 'annual' || (r.type as string) === 'ANNUAL') && r.status === 'approved')
+    .reduce((sum, r) => sum + Number(r.days || 0), 0);
+
+  // 4. الرصيد الفعلي الحقيقي الشامل (المصدر الموحد للعرض والصرف)
+  const totalAvailableDays = Number(
+    (Number(accruedAnnual || 0) + holidayCompensationDays + manualAdjustments - usedLeaveDays).toFixed(2)
+  );
+
+  // 5. الحسبة المالية وفق قانون العمل الكويتي (الراتب الشامل / 26)
+  const totalComprehensiveSalary = Number(basicSalary || 0) + Number(allowances || 0);
+  const dailyWageRate = totalComprehensiveSalary > 0 ? (totalComprehensiveSalary / 26) : 0;
+  const cashSettlementAmount = Number((totalAvailableDays * dailyWageRate).toFixed(3));
+
+  return {
+    accruedAnnualDays: Number(accruedAnnual || 0),
+    holidayCompensationDays,
+    manualAdjustments,
+    usedLeaveDays,
+    totalAvailableDays,
+    cashSettlementAmount,
+    dailyWageRate: Number(dailyWageRate.toFixed(3)),
+    comprehensiveSalary: totalComprehensiveSalary
+  };
+}
+
+/**
+ * دالة مساعدة لاستخراج سجلات الإجازات الموحدة من بيانات الموظف
+ */
+export function buildLeaveRecordsFromEmployee(
+  employee: Employee,
+  allocations: HrLeaveAllocation[] = [],
+  leaves: LeaveRequest[] = []
+): { accruedAnnual: number; records: LeaveRecord[]; basicSalary: number; allowances: number } {
+  const empId = employee.id;
+  const empCode = employee.employeeCode;
+
+  // 1. حساب الراتب الأساسي والبدلات
+  const basicSalary = Number((employee as any).basicSalary || (employee as any).basic_salary || (employee as any).salary || 0);
+  const allowances = Number(
+    Number((employee as any).housingAllowance || (employee as any).housing_allowance || 0) +
+    Number((employee as any).transportAllowance || (employee as any).transport_allowance || 0) +
+    Number((employee as any).otherAllowances || (employee as any).otherAllowance || (employee as any).other_allowances || 0)
+  );
+
+  // 2. الرصيد السنوي المكتسب أو المرحل
+  const carried = Number(employee.carriedOverLeave2025 ?? employee.carriedOverBalance ?? (employee as any).aysed_carried_over ?? 0);
+  // حساب المكتسب لعام 2026: 2.5 يوم شهرياً من تاريخ التعيين أو بداية 2026
+  const joinDate = new Date(employee.joinDate || '2026-01-01');
+  const now = new Date();
+  const monthsDiff = Math.max(0, (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth()) + 1);
+  const calculatedAccrued = Math.min(30, monthsDiff * 2.5);
+  const accruedAnnual = Number((carried + calculatedAccrued).toFixed(2));
+
+  // 3. بناء مصفوفة السجلات
+  const records: LeaveRecord[] = [];
+
+  // مخصصات بدل العطلات الرسمية
+  allocations
+    .filter(a => (a.employeeId === empId || a.employeeId === empCode) && (a.allocationType === 'compensatory_off' || (a.allocationType as string) === 'compensatory' || a.name?.includes('عطلة') || a.name?.includes('تعويضي')))
+    .forEach(a => {
+      records.push({
+        type: 'compensation_holiday',
+        days: Number(a.numberOfDays || 0),
+        status: (a.state === 'validate' || (a.state as string) === 'approved') ? 'approved' : 'pending',
+        date: a.dateFrom,
+        notes: a.name
+      });
+    });
+
+  // تسويات يدوية أخرى
+  allocations
+    .filter(a => (a.employeeId === empId || a.employeeId === empCode) && ((a.allocationType as string) === 'manual_adjustment' || a.name?.includes('تسوية') || a.name?.includes('تعديل')))
+    .forEach(a => {
+      records.push({
+        type: 'manual_adjustment',
+        days: Number(a.numberOfDays || 0),
+        status: (a.state === 'validate' || (a.state as string) === 'approved') ? 'approved' : 'pending',
+        date: a.dateFrom,
+        notes: a.name
+      });
+    });
+
+  // الإجازات المستهلكة
+  leaves
+    .filter(l => (l.employeeId === empId || l.employeeId === empCode) && (l.status === 'APPROVED' || (l as any).state === 'validate' || (l as any).state === 'approved' || (l as any).status === 'approved'))
+    .forEach(l => {
+      records.push({
+        type: l.leaveType === 'UNPAID' ? 'unpaid' : l.leaveType === 'SICK' ? 'sick' : 'annual',
+        days: Number(l.totalDays || (l as any).numberOfDays || (l as any).days || 0),
+        status: 'approved',
+        date: l.startDate,
+        notes: l.reason || (l as any).name || (l as any).notes
+      });
+    });
+
+  return {
+    accruedAnnual,
+    records,
+    basicSalary,
+    allowances
+  };
+}
+
+/**
+ * حساب الملخص الموحد الشامل للموظف
+ */
+export function getEmployeeUnifiedSummary(
+  employee: Employee,
+  allocations: HrLeaveAllocation[] = [],
+  leaves: LeaveRequest[] = [],
+  contract?: Contract
+): EmployeeLeaveSummary {
+  const data = buildLeaveRecordsFromEmployee(employee, allocations, leaves);
+  const basicSalary = contract ? Number(contract.basicSalary || 0) : data.basicSalary;
+  const allowances = contract ? (Number(contract.housingAllowance || 0) + Number(contract.transportAllowance || 0) + Number(contract.otherAllowance || 0)) : data.allowances;
+
+  return calculateUnifiedLeaveBalance(
+    data.accruedAnnual,
+    data.records,
+    basicSalary,
+    allowances
+  );
+}
 
 /**
  * calculateNetWorkingDays

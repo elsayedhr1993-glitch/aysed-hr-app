@@ -50,6 +50,17 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
       return;
     }
 
+    // Determine custom/explicitly specified daily hours
+    // Priority: customDailyHours > custom_daily_hours > dailyWorkHours > plannedDailyHours > 8
+    const rawHours = editingContract.customDailyHours ?? editingContract.custom_daily_hours ?? editingContract.dailyWorkHours ?? editingContract.plannedDailyHours;
+    const finalDailyHours = (rawHours !== undefined && rawHours !== null && !isNaN(Number(rawHours)) && Number(rawHours) > 0)
+      ? Number(rawHours)
+      : 8;
+
+    const finalWeeklyHours = editingContract.workingHoursPerWeek && Number(editingContract.workingHoursPerWeek) > 0
+      ? Number(editingContract.workingHoursPerWeek)
+      : Math.round(finalDailyHours * 6);
+
     const newContract: Contract = {
       id: editingContract.id || `cnt-${Date.now()}`,
       employeeId: editingContract.employeeId,
@@ -66,8 +77,11 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
       resourceCalendarId: editingContract.resourceCalendarId || 'cal-std-8h-6d',
       workingSchedule: editingContract.workingSchedule || 'الدوام الصباحي القياسي 8 ساعات (08:00 - 16:00)',
       workHoursType: editingContract.workHoursType || 'STANDARD',
-      workingHoursPerWeek: Number(editingContract.workingHoursPerWeek) || 48,
-      dailyWorkHours: Number(editingContract.dailyWorkHours) || 8,
+      workingHoursPerWeek: finalWeeklyHours,
+      dailyWorkHours: finalDailyHours,
+      customDailyHours: finalDailyHours,
+      custom_daily_hours: finalDailyHours,
+      plannedDailyHours: finalDailyHours,
     };
 
     onSaveContract(newContract);
@@ -145,6 +159,7 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
               <th className="p-3">الراتب الأساسي (KWD)</th>
               <th className="p-3">إجمالي البدلات</th>
               <th className="p-3">الراتب الإجمالي</th>
+              <th className="p-3">ساعات العمل</th>
               <th className="p-3">تاريخ البداية</th>
               <th className="p-3">فترة الإخطار</th>
               <th className="p-3 text-center">إجراءات</th>
@@ -206,6 +221,11 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                   <td className="p-3 font-mono font-bold text-slate-800 dir-ltr">{formatKWD(cnt.basicSalary)}</td>
                   <td className="p-3 font-mono text-slate-600 dir-ltr">{formatKWD(totalAllowances)}</td>
                   <td className="p-3 font-mono font-extrabold text-emerald-700 dir-ltr">{formatKWD(grossSalary)}</td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800">
+                      {cnt.customDailyHours || cnt.custom_daily_hours || cnt.dailyWorkHours || cnt.plannedDailyHours || 8} س/يوم
+                    </span>
+                  </td>
                   <td className="p-3 font-mono">{cnt.startDate}</td>
                   <td className="p-3">{cnt.noticePeriodDays} يوماً</td>
                   <td className="p-3 text-center space-x-1 space-x-reverse">
@@ -364,10 +384,13 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
               {/* تفاصيل الدوام وجدول العمل */}
               <div className="col-span-1 md:col-span-2 bg-purple-50/70 p-3.5 rounded-xl border border-purple-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-[#714B67]">تفاصيل الدوام وجدول ساعات العمل (Working Schedule)</span>
+                  <span className="font-bold text-xs text-[#714B67]">تفاصيل الدوام وجدول ساعات العمل (Working Schedule & Hours)</span>
+                  <span className="text-[10px] text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full font-bold">
+                    ساعات العقد المخصصة لها الأولوية القصوى
+                  </span>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1 text-[11px]">جدول العمل المعتمد بالعقد</label>
+                  <label className="block font-bold text-slate-700 mb-1 text-[11px]">جدول / قالب الدوام المعتمد بالعقد</label>
                   <select
                     value={editingContract.resourceCalendarId || 'cal-std-8h-6d'}
                     onChange={(e) => {
@@ -382,12 +405,14 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                         val === 'cal-split-shifts' ? 'SHIFT' :
                         val === 'cal-part-time-4h' ? 'PART_TIME' :
                         val === 'cal-flexible-8h' ? 'FLEXIBLE' : 'STANDARD';
-                      setEditingContract({
-                        ...editingContract,
+                      
+                      // Keep customDailyHours if already set by user; do NOT overwrite custom hours
+                      setEditingContract(prev => prev ? ({
+                        ...prev,
                         resourceCalendarId: val,
                         workingSchedule: schedName,
                         workHoursType: wType
-                      });
+                      }) : null);
                     }}
                     className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none"
                   >
@@ -400,19 +425,58 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                   </select>
                 </div>
 
-                <div className="mt-3">
-                  <label className="block font-bold text-slate-700 mb-1 text-[11px]">ساعات العمل اليومية المعتمدة (Planned Daily Hours)</label>
-                  <select
-                    value={editingContract.plannedDailyHours || 8}
-                    onChange={(e) => setEditingContract({ ...editingContract, plannedDailyHours: Number(e.target.value) })}
-                    className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none"
-                  >
-                    <option value={8}>8 ساعات (القياسي)</option>
-                    <option value={10}>10 ساعات</option>
-                    <option value={12}>12 ساعة</option>
-                    <option value={4}>4 ساعات (دوام جزئي)</option>
-                    <option value={6}>6 ساعات</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 text-[11px]">
+                      ساعات العمل اليومية المعتمدة بالعقد (Daily Work Hours) *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="24"
+                        step="0.5"
+                        value={editingContract.customDailyHours ?? editingContract.dailyWorkHours ?? editingContract.plannedDailyHours ?? 8}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setEditingContract(prev => prev ? ({
+                            ...prev,
+                            dailyWorkHours: val,
+                            customDailyHours: val,
+                            custom_daily_hours: val,
+                            plannedDailyHours: val,
+                            workingHoursPerWeek: Math.round(val * 6)
+                          }) : null);
+                        }}
+                        placeholder="مثلاً 10 ساعات"
+                        className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none font-mono focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                      />
+                      <span className="text-xs font-bold text-slate-600 shrink-0">ساعة/يوم</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1 text-[11px]">
+                      ساعات العمل الأسبوعية (Weekly Hours)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="168"
+                        value={editingContract.workingHoursPerWeek || Math.round(((editingContract.customDailyHours ?? editingContract.dailyWorkHours ?? 8) as number) * 6)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setEditingContract(prev => prev ? ({
+                            ...prev,
+                            workingHoursPerWeek: val
+                          }) : null);
+                        }}
+                        className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none font-mono"
+                      />
+                      <span className="text-xs font-bold text-slate-600 shrink-0">ساعة/أسبوع</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

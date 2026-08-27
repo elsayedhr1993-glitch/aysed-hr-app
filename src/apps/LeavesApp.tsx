@@ -24,6 +24,9 @@ import {
 } from '../services/leaveService';
 import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData } from '../utils/persistentStorage';
 import { LeaveSettlementCalculator } from '../components/LeaveSettlementCalculator';
+import { LeaveBalanceCard } from '../components/LeaveBalanceCard';
+import { LeaveSettlementModal } from '../components/LeaveSettlementModal';
+import { liquidateLeaveBalanceInAllocations, saveSettlementVoucher } from '../services/leaveSettlementService';
 import { useLeaveWorkflow } from '../hooks/useLeaveWorkflow';
 import { OfficialLeaveModal } from '../components/OfficialLeaveModal';
 import { 
@@ -157,6 +160,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
   const [localSearch, setLocalSearch] = useState<string>('');
   const [historyEmpIdFilter, setHistoryEmpIdFilter] = useState<string>('ALL');
   const [settlementEmpId, setSettlementEmpId] = useState<string | undefined>();
+  const [settlementModalEmp, setSettlementModalEmp] = useState<Employee | null>(null);
   const [yearFilter, setYearFilter] = useState<string>('ALL');
   const [employeeFilter, setEmployeeFilter] = useState<string>(initialEmployeeId);
   const [stateFilter, setStateFilter] = useState<string>('ALL');
@@ -700,19 +704,31 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-slate-200 pb-3">
+      {/* Navigation Sub-Tabs - Odoo Enterprise Slim Bar */}
+      <div className="flex items-center gap-1.5 mb-4 border-b border-slate-200 pb-2.5 overflow-x-auto odoo-scrollbar">
         <button
-          onClick={() => setActiveSubTab('REQUESTS')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'REQUESTS'
-              ? 'bg-[#714B67] text-white shadow'
+          onClick={() => setActiveSubTab('BALANCES')}
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            activeSubTab === 'BALANCES'
+              ? 'bg-[#714B67] text-white shadow-2xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <FileText className="w-4 h-4" />
-          <span>طلبات الإجازات (hr.leave)</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+          <Calculator className="w-3.5 h-3.5" />
+          <span>أرصدة الإجازات</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('REQUESTS')}
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            activeSubTab === 'REQUESTS'
+              ? 'bg-[#714B67] text-white shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>طلبات الموظفين</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
             activeSubTab === 'REQUESTS' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
           }`}>
             {companyLeaves.filter(l => !l.isHistorical).length}
@@ -720,16 +736,28 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
         </button>
 
         <button
-          onClick={() => setActiveSubTab('ALLOCATIONS')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'ALLOCATIONS'
-              ? 'bg-[#714B67] text-white shadow'
+          onClick={() => setActiveSubTab('HOLIDAYS')}
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            activeSubTab === 'HOLIDAYS'
+              ? 'bg-[#714B67] text-white shadow-2xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Layers className="w-4 h-4 text-purple-400" />
-          <span>تخصيصات الأرصدة والاستحقاق (hr.leave.allocation)</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+          <Calendar className="w-3.5 h-3.5 text-amber-400" />
+          <span>بدل العطلات الرسمية</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('ALLOCATIONS')}
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            activeSubTab === 'ALLOCATIONS'
+              ? 'bg-[#714B67] text-white shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5 text-purple-400" />
+          <span>التهيئة وتخصيصات الأرصدة</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
             activeSubTab === 'ALLOCATIONS' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
           }`}>
             {allocations.length}
@@ -737,51 +765,27 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
         </button>
 
         <button
-          onClick={() => setActiveSubTab('BALANCES')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'BALANCES'
-              ? 'bg-[#714B67] text-white shadow'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Calculator className="w-4 h-4" />
-          <span>كشف أرصدة الموظفين بنظام FIFO</span>
-        </button>
-
-        <button
           onClick={() => setActiveSubTab('SETTLEMENT')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeSubTab === 'SETTLEMENT'
-              ? 'bg-[#714B67] text-white shadow'
+              ? 'bg-[#714B67] text-white shadow-2xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <DollarSign className="w-4 h-4 text-emerald-400" />
-          <span>حاسبة التسوية والتصفية الرسمية</span>
+          <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+          <span>التسوية والتصفية</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('HISTORY_LOG')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeSubTab === 'HISTORY_LOG'
-              ? 'bg-[#714B67] text-white shadow'
+              ? 'bg-[#714B67] text-white shadow-2xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <History className="w-4 h-4 text-purple-300" />
+          <History className="w-3.5 h-3.5 text-purple-300" />
           <span>سجل الحركات والأرشيف</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('HOLIDAYS')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'HOLIDAYS'
-              ? 'bg-[#714B67] text-white shadow'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Calendar className="w-4 h-4 text-amber-400" />
-          <span>العطلات الرسمية 2026</span>
         </button>
       </div>
 
@@ -987,31 +991,31 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                     leaveType: 'ANNUAL',
                     numberOfDays: 30,
                     dateFrom: new Date().toISOString().split('T')[0],
-                    name: 'تخصيص رصيد إجازة سنوية جديد (Regular Allocation)',
+                    name: 'تخصيص رصيد إجازة سنوية جديد',
                   });
                 }}
-                className="bg-[#714B67] hover:bg-[#5a3b52] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                className="bg-[#714B67] hover:bg-[#5a3a51] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 text-amber-300" />
-                <span>إضافة تخصيص رصيد جديد (New Allocation)</span>
+                <span>إضافة تخصيص رصيد جديد</span>
               </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
-              <table className="w-full text-right text-xs table-auto min-w-[1100px]">
-                <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
+              <table className="w-full text-right text-xs table-fixed min-w-[1350px]">
+                <thead className="bg-slate-100 text-slate-700 font-semibold text-xs sticky top-0 z-10 border-b border-slate-200 shadow-2xs">
                   <tr>
-                    <th className="p-3 w-44 whitespace-nowrap">الموظف</th>
-                    <th className="p-3 min-w-[240px] whitespace-nowrap">مسمى التخصيص (Allocation Description)</th>
-                    <th className="p-3 w-32 text-center whitespace-nowrap">النوع (Type)</th>
-                    <th className="p-3 w-32 text-center whitespace-nowrap">تاريخ السريان</th>
-                    <th className="p-3 w-28 text-center whitespace-nowrap">الأيام المخصصة</th>
-                    <th className="p-3 w-28 text-center whitespace-nowrap">المستهلك (FIFO)</th>
-                    <th className="p-3 w-32 text-center whitespace-nowrap">المتبقي</th>
-                    <th className="p-3 w-28 text-center whitespace-nowrap">الحالة</th>
-                    <th className="p-3 w-36 text-center whitespace-nowrap">الإجراءات</th>
+                    <th className="px-4 py-3 min-w-[220px] w-60 overflow-hidden whitespace-nowrap truncate">الموظف وبيانات الهوية</th>
+                    <th className="px-4 py-3 min-w-[220px] w-64 overflow-hidden whitespace-nowrap truncate">مسمى التخصيص</th>
+                    <th className="px-4 py-3 min-w-[140px] w-36 text-center overflow-hidden whitespace-nowrap truncate">النوع</th>
+                    <th className="px-4 py-3 min-w-[140px] w-36 text-center overflow-hidden whitespace-nowrap truncate">تاريخ السريان</th>
+                    <th className="px-4 py-3 min-w-[110px] w-28 text-center overflow-hidden whitespace-nowrap truncate">الأيام المخصصة</th>
+                    <th className="px-4 py-3 min-w-[110px] w-28 text-center overflow-hidden whitespace-nowrap truncate">المستهلك (FIFO)</th>
+                    <th className="px-4 py-3 min-w-[110px] w-28 text-center overflow-hidden whitespace-nowrap truncate">المتبقي</th>
+                    <th className="px-4 py-3 min-w-[100px] w-28 text-center overflow-hidden whitespace-nowrap truncate">الحالة</th>
+                    <th className="px-4 py-3 min-w-[170px] w-44 text-center overflow-hidden whitespace-nowrap truncate">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1036,15 +1040,15 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
 
                       return (
                         <tr key={`${alloc.id}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
-                          <td className="p-3">
-                            <div className="font-bold text-slate-900">{emp.fullNameAr}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{emp.employeeCode}</div>
+                          <td className="px-4 py-3 min-w-[220px] w-60 overflow-hidden whitespace-nowrap truncate">
+                            <div className="font-bold text-slate-900 truncate">{emp.fullNameAr}</div>
+                            <div className="text-[10px] text-slate-400 font-mono truncate">الرقم: {emp.employeeCode} {emp.civilId ? `| مدني: ${emp.civilId}` : ''}</div>
                           </td>
-                          <td className="p-3 font-bold text-slate-800 max-w-sm whitespace-normal break-words leading-relaxed">
+                          <td className="px-4 py-3 min-w-[220px] w-64 font-bold text-slate-800 overflow-hidden whitespace-nowrap truncate" title={alloc.name}>
                             {alloc.name}
                           </td>
-                          <td className="p-3 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <td className="px-4 py-3 min-w-[140px] w-36 text-center overflow-hidden whitespace-nowrap truncate">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-block truncate max-w-full ${
                               alloc.allocationType === 'compensatory_off' || (alloc as any).allocationType === 'compensatory' || alloc.name?.includes('تعويضي') || alloc.name?.includes('بديل')
                                 ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
                                 : alloc.allocationType === 'regular' 
@@ -1058,34 +1062,34 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                                   : 'استحقاق شهري (2.5)'}
                             </span>
                           </td>
-                          <td className="p-3 text-center font-mono text-slate-600">{alloc.dateFrom || '—'}</td>
-                          <td className="p-3 text-center font-mono font-bold text-slate-900 text-sm whitespace-nowrap">
+                          <td className="px-4 py-3 min-w-[140px] w-36 text-center font-mono text-slate-600 overflow-hidden whitespace-nowrap truncate">{alloc.dateFrom || '—'}</td>
+                          <td className="px-4 py-3 min-w-[110px] w-28 text-center font-mono font-bold text-slate-900 text-xs overflow-hidden whitespace-nowrap truncate">
                             {formatDaysDisplay(alloc.numberOfDays)}
                           </td>
-                          <td className="p-3 text-center font-mono whitespace-nowrap">
+                          <td className="px-4 py-3 min-w-[110px] w-28 text-center font-mono overflow-hidden whitespace-nowrap truncate">
                             <span className={consumed > 0 ? 'text-rose-700 font-bold' : 'text-slate-400'}>
                               {formatDaysDisplay(consumed)}
                             </span>
                           </td>
-                          <td className="p-3 text-center font-mono whitespace-nowrap tabular-nums">
-                            <span className="font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 inline-block">
+                          <td className="px-4 py-3 min-w-[110px] w-28 text-center font-mono overflow-hidden whitespace-nowrap tabular-nums">
+                            <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block truncate max-w-full">
                               {formatDaysDisplay(remaining)}
                             </span>
                           </td>
-                          <td className="p-3 text-center whitespace-nowrap">
-                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200">
-                              معتمد (Validated)
+                          <td className="px-4 py-3 min-w-[100px] w-28 text-center overflow-hidden whitespace-nowrap truncate">
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-200 inline-block truncate">
+                              معتمد
                             </span>
                           </td>
-                          <td className="p-3 text-center whitespace-nowrap">
+                          <td className="px-4 py-3 min-w-[170px] w-44 text-center overflow-hidden whitespace-nowrap truncate">
                             <div className="flex items-center justify-center gap-1.5">
                               {emp && (
                                 <button
                                   onClick={() => setSelectedFifoEmployee(emp as Employee)}
-                                  className="p-1.5 text-purple-700 hover:bg-purple-50 rounded transition cursor-pointer font-bold text-[11px] flex items-center gap-0.5 border border-purple-200"
+                                  className="px-2 py-1 text-purple-700 hover:bg-purple-50 rounded transition cursor-pointer font-bold text-[10px] flex items-center gap-1 border border-purple-200"
                                   title="عرض كشف استهلاك FIFO"
                                 >
-                                  <Layers className="w-3.5 h-3.5" />
+                                  <Layers className="w-3 h-3" />
                                   <span>FIFO</span>
                                 </button>
                               )}
@@ -1096,18 +1100,18 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer border border-blue-200"
                                     title="تعديل التخصيص"
                                   >
-                                    <Edit3 className="w-3.5 h-3.5" />
+                                    <Edit3 className="w-3 h-3" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteAllocation(alloc.id)}
                                     className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer border border-rose-200"
                                     title="حذف التخصيص"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <Trash2 className="w-3 h-3" />
                                   </button>
                                 </>
                               ) : (
-                                <span className="text-[10px] text-slate-500 font-bold px-2.5 py-1 bg-slate-100 rounded border border-slate-200 flex items-center gap-1" title="السجل معتمد ومقفل للحفاظ على سلامة دفتر الأستاذ">
+                                <span className="text-[10px] text-slate-500 font-bold px-2 py-1 bg-slate-100 rounded border border-slate-200 inline-flex items-center gap-1" title="السجل معتمد ومقفل للحفاظ على سلامة دفتر الأستاذ">
                                   <Lock className="w-3 h-3 text-slate-600" /> مقفل
                                 </span>
                               )}
@@ -1241,6 +1245,14 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                               >
                                 <Layers className="w-3 h-3 text-amber-300" />
                                 <span>بطاقة FIFO</span>
+                              </button>
+                              <button
+                                onClick={() => setSettlementModalEmp(emp)}
+                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-1 rounded text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                title="تسوية وصرف رصيد إجازات نقدياً (SSOT)"
+                              >
+                                <DollarSign className="w-3 h-3 text-emerald-600" />
+                                <span>صرف وتسوية</span>
                               </button>
                               <button
                                 onClick={() => {
@@ -1883,6 +1895,30 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
             </div>
           </div>);
       })()}
+
+      {/* Unified Leave Settlement Modal (SSOT) */}
+      {settlementModalEmp && (
+        <LeaveSettlementModal
+          employee={settlementModalEmp}
+          allocations={allocations}
+          leaves={leaves}
+          contract={contracts.find(c => c.employeeId === settlementModalEmp.id && (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE' || (c.status as string) === 'active'))}
+          onClose={() => setSettlementModalEmp(null)}
+          onConfirmSettlement={async (encashedDays, cashAmount, notes) => {
+            // Liquidate leave balance and persist
+            liquidateLeaveBalanceInAllocations(
+              settlementModalEmp.id,
+              encashedDays,
+              allocations,
+              setAllocations,
+              settlementModalEmp,
+              onSaveEmployee
+            );
+            toast.success(`تم صرف وتسوية ${encashedDays} يوم بقيمة ${cashAmount.toFixed(3)} د.ك بنجاح`);
+            setSettlementModalEmp(null);
+          }}
+        />
+      )}
 
     </div>);
 };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useHR } from '../context/HRContext';
 import { Scale, Calculator, DollarSign, User, ShieldCheck } from 'lucide-react';
 import { formatKWD } from '../utils/kuwaitLaw';
+import { calculateUnifiedLeaveBalance, LeaveRecord } from '../utils/leaveEngine';
 
 export const SettlementView: React.FC = () => {
   const { employees, loading } = useHR();
@@ -10,9 +11,17 @@ export const SettlementView: React.FC = () => {
 
   const currentEmp = employees.find(e => e.id === (selectedId || employees[0]?.id));
 
-  // حساب تعويض رصيد الإجازات المتبقي وفق القانون الكويتي
-  const dailyWage = currentEmp ? (currentEmp.basic_salary / 26) : 0;
-  const leaveEncashmentValue = currentEmp ? ((currentEmp.remaining_leaves || 0) * dailyWage) : 0;
+  // حساب تعويض رصيد الإجازات المتبقي وفق المحرك الموحد SSOT وقانون العمل الكويتي
+  const basicSalary = Number(currentEmp?.basic_salary || 0);
+  const allowances = Number(currentEmp?.allowances || 0);
+  const leaveSummary = calculateUnifiedLeaveBalance(
+    Number(currentEmp?.carriedOverBalance ?? currentEmp?.remaining_leaves ?? 30),
+    [],
+    basicSalary,
+    allowances
+  );
+  const dailyWage = leaveSummary.dailyWageRate || (basicSalary / 26);
+  const leaveEncashmentValue = leaveSummary.cashSettlementAmount;
   
   // حساب مكافأة نهاية الخدمة التقديرية
   const eosEstimated = currentEmp ? ((currentEmp.basic_salary / 26) * 15 * serviceYears) : 0;

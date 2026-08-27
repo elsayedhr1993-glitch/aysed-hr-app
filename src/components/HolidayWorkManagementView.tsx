@@ -6,7 +6,9 @@ import {
   saveHolidayWorkRecord, 
   deleteHolidayWorkRecord,
   getHolidayWorkRecords, 
-  WorkOnHolidayRecord 
+  normalizeCompensationType,
+  WorkOnHolidayRecord,
+  CompensationOption
 } from '../services/holidayWorkService';
 import { CheckCircle2, Plus, Loader2, Award, CalendarCheck, Sparkles, Trash2, Edit3, X, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -31,7 +33,7 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [holidayName, setHolidayName] = useState('عطلة رسمية');
   const [hoursWorked, setHoursWorked] = useState<number>(8);
-  const [compensationType, setCompensationType] = useState<'pay' | 'day'>('day');
+  const [compensationType, setCompensationType] = useState<CompensationOption>('COMP_OFF');
   const [autoApproveAndTransfer, setAutoApproveAndTransfer] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -60,11 +62,16 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
 
   const handleOpenNewModal = () => {
     setEditingRecordId(null);
-    if (employees.length > 0 && !employeeId) setEmployeeId(employees[0].id);
+    const defaultEmp = employees[0];
+    if (defaultEmp) {
+      setEmployeeId(defaultEmp.id);
+      setCompensationType(defaultEmp.defaultHolidayCompensationPreference || 'COMP_OFF');
+    } else {
+      setCompensationType('COMP_OFF');
+    }
     setDate(new Date().toISOString().split('T')[0]);
     setHolidayName('عطلة رسمية');
     setHoursWorked(8);
-    setCompensationType('day');
     setAutoApproveAndTransfer(true);
     setIsModalOpen(true);
   };
@@ -75,7 +82,7 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
     setDate(rec.date || new Date().toISOString().split('T')[0]);
     setHolidayName(rec.holidayName || 'عطلة رسمية');
     setHoursWorked(rec.hoursWorked || 8);
-    setCompensationType(rec.compensationType || 'day');
+    setCompensationType(rec.compensationType || 'COMP_OFF');
     setAutoApproveAndTransfer(rec.state === 'approved');
     setIsModalOpen(true);
   };
@@ -233,18 +240,33 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
                   <td className="p-3.5 text-slate-600 font-mono text-xs">{rec.date}</td>
                   <td className="p-3.5 text-center font-bold text-slate-800 font-mono">{rec.hoursWorked} س</td>
                   <td className="p-3.5 text-center">
-                    {rec.compensationType === 'pay' ? (
-                      <span className="bg-teal-50 border border-teal-200 text-teal-800 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1">
-                        <span>بدل نقدي (1.5x):</span>
-                        <strong className="font-mono">{calc.cashPayableAmount} د.ك</strong>
-                      </span>
-                    ) : (
-                      <span className="bg-purple-50 border border-purple-200 text-purple-800 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1">
-                        <Award className="w-3.5 h-3.5 text-purple-600" />
-                        <span>يوم بديل:</span>
-                        <strong className="font-mono">{calc.compensatoryDaysAdded} يوم</strong>
-                      </span>
-                    )}
+                    {(() => {
+                      const norm = normalizeCompensationType(rec.compensationType);
+                      if (norm === 'CASH') {
+                        return (
+                          <span className="bg-teal-50 border border-teal-200 text-teal-800 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1">
+                            <span>💵 [1] صرف نقدي (1.5x):</span>
+                            <strong className="font-mono">{calc.cashPayableAmount} د.ك</strong>
+                          </span>
+                        );
+                      } else if (norm === 'ANNUAL_ACCRUAL') {
+                        return (
+                          <span className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1">
+                            <Award className="w-3.5 h-3.5 text-blue-600" />
+                            <span>📈 [2] رصيد سنوي:</span>
+                            <strong className="font-mono">{calc.compensatoryDaysAdded} يوم</strong>
+                          </span>
+                        );
+                      } else {
+                        return (
+                          <span className="bg-purple-50 border border-purple-200 text-purple-800 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1">
+                            <Award className="w-3.5 h-3.5 text-purple-600" />
+                            <span>🛡️ [3] راحة بديلة مستقلة:</span>
+                            <strong className="font-mono">{calc.compensatoryDaysAdded} يوم</strong>
+                          </span>
+                        );
+                      }
+                    })()}
                   </td>
                   <td className="p-3.5 text-center">
                     {rec.state === 'approved' ? (
@@ -440,11 +462,12 @@ export const HolidayWorkManagementView: React.FC<Props> = ({ employees, activeCo
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">نوع التعويض المستحق</label>
                   <select
                     value={compensationType}
-                    onChange={(e) => setCompensationType(e.target.value as any)}
+                    onChange={(e) => setCompensationType(e.target.value as CompensationOption)}
                     className="w-full border border-slate-300 rounded-xl p-2.5 text-sm bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-bold text-purple-900"
                   >
-                    <option value="day">🎁 يوم إجازة بديل (يُضاف لرصيد الإجازات)</option>
-                    <option value="pay">💵 بدل نقدي إضافي 1.5x (يُرحل لمسير الرواتب)</option>
+                    <option value="CASH">💵 [1] صرف نقدي مباشر (Cash Payout)</option>
+                    <option value="ANNUAL_ACCRUAL">📈 [2] إضافة للرصيد السنوي (Annual Leave Accrual)</option>
+                    <option value="COMP_OFF">🛡️ [3] يوم راحة بديل في وقت آخر (Comp-Off Only)</option>
                   </select>
                 </div>
               </div>

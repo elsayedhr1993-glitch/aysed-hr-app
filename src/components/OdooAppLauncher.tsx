@@ -323,7 +323,7 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
         </div>
 
         {/* Odoo Enterprise 4-Column App Switcher */}
-        <div className="o_app_switcher w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full px-2 py-4">
           {apps.filter(app => {
             if (!isSuperAdmin) {
               if (['SAAS_ADMIN', 'COMPANIES'].includes(app.id)) {
@@ -340,16 +340,19 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
               <button
                 key={app.id}
                 onClick={() => onSelectApp(app.id)}
-                className="o_app_icon_card flex flex-col items-center justify-between text-center relative overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 shadow-xs p-4 bg-white rounded-xl border border-slate-200 hover:border-[#71639e] transition-all min-h-[180px]"
+                className="flex flex-col items-center justify-between text-center relative overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 p-5 bg-white rounded-xl border border-gray-100 min-h-[190px]"
               >
-                <div className="w-full flex justify-end items-center mb-1">
-                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full group-hover:bg-[#71639e] group-hover:text-white transition-colors duration-200">
+                <div className="w-full flex justify-between items-center mb-1">
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200">
+                    {app.titleEn}
+                  </span>
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200 group-hover:bg-[#71639e] group-hover:text-white transition-colors duration-200">
                     {app.badge}
                   </span>
                 </div>
 
-                {/* Flat Vibrant Icon Container */}
-                <div className={`w-12 h-12 ${app.iconBg} rounded-xl flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-200 my-2`}>
+                {/* Flat Vibrant Icon Container with soft background */}
+                <div className={`w-12 h-12 ${app.bgColor} rounded-xl flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform duration-200 my-2`}>
                   <IconComponent className="w-6 h-6" />
                 </div>
 
@@ -362,7 +365,7 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
                   </p>
                 </div>
 
-                <div className="mt-auto pt-3 border-t border-slate-100 w-full flex items-center justify-center text-[11px] text-slate-500 group-hover:text-[#71639e] font-bold transition-colors">
+                <div className="mt-auto pt-3 border-t border-slate-100 w-full flex items-center justify-center text-[11px] text-slate-600 group-hover:text-[#71639e] font-bold transition-colors">
                   <span>فتح التطبيق</span>
                   <ArrowUpRight className="w-3.5 h-3.5 mr-1" />
                 </div>

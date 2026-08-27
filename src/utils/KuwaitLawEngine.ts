@@ -1,4 +1,5 @@
 import { Employee, Contract, LeaveRequest, AttendanceRecord } from '../types';
+import { calculateUnifiedLeaveBalance, buildLeaveRecordsFromEmployee } from './leaveEngine';
 
 export interface PrivateSectorEmployeeStatement {
   employeeId: string;
@@ -65,9 +66,16 @@ export class KuwaitLawEngine {
     // صافي الراتب المحول لنظام حماية الأجور (WPS) - بدون أي تأمينات
     const netSalaryWPS = +(gross - absenceDeduction + overtimePay).toFixed(3);
 
-    // رصيد الإجازات
-    const leaveBalance = Number((employee as any).leaveBalance ?? (employee as any).remaining_leaves ?? 30);
-    const leaveEncashmentValue = +(leaveBalance * dailyWage).toFixed(3);
+    // رصيد الإجازات الموحد (SSOT)
+    const empData = buildLeaveRecordsFromEmployee(employee, [], leaves);
+    const leaveSummary = calculateUnifiedLeaveBalance(
+      empData.accruedAnnual,
+      empData.records,
+      basic,
+      housing + transport + other
+    );
+    const leaveBalance = leaveSummary.totalAvailableDays;
+    const leaveEncashmentValue = leaveSummary.cashSettlementAmount;
 
     // حساب مكافأة نهاية الخدمة (المادة 51)
     const joinDate = new Date(contract?.startDate || employee.joinDate || '2025-01-01');

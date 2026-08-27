@@ -98,6 +98,7 @@ export interface Employee {
   aysed_carried_over?: number;
   unpaid_days_count?: number;   // إجمالي الأيام بدون راتب (Odoo Computed: unpaid_days_count)
   paid_days_remaining?: number; // رصيد الإجازات المتبقي (Odoo Computed: paid_days_remaining)
+  defaultHolidayCompensationPreference?: 'CASH' | 'ANNUAL_ACCRUAL' | 'COMP_OFF'; // آلية التعويض المفضلة للعمل في العطلات الرسمية
   lastAccrualDate?: string;     // تاريخ آخر ترحيل آلي لرصيد الإجازات (YYYY-MM أو YYYY-MM-DD)
   accrualHistory?: Array<{
     date: string;
@@ -168,6 +169,8 @@ export interface Contract {
   shiftId?: string; // الشفت المرتبط
   workingHoursPerWeek?: number; // ساعات العمل أسبوعياً (مثلاً 48 ساعة)
   dailyWorkHours?: number; // ساعات العمل اليومية (مثلاً 8 ساعات)
+  customDailyHours?: number; // ساعات العمل اليومية المخصصة (أولوية قصوى)
+  custom_daily_hours?: number; // ساعات العمل المخصصة Odoo/DB alias
   plannedDailyHours?: number; // ساعات العمل اليومية المعتمدة (8 / 10 / 12 ساعة)
 }
 

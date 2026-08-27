@@ -442,6 +442,9 @@ export const TenantDatabaseService = {
    */
   async saveContract(contract: Contract, targetCompanyId?: string): Promise<boolean> {
     const compId = targetCompanyId || contract.companyId || 'comp-super-admin';
+    const effectiveDailyHours = contract.customDailyHours ?? contract.custom_daily_hours ?? contract.dailyWorkHours ?? contract.plannedDailyHours ?? 8;
+    const effectiveWeeklyHours = contract.workingHoursPerWeek || (Number(effectiveDailyHours) * 6);
+
     if (isSupabaseConfigured) {
       try {
         await supabase.from('contracts').upsert([{
@@ -456,6 +459,12 @@ export const TenantDatabaseService = {
           end_date: contract.endDate,
           contract_type: contract.contractType,
           status: contract.status,
+          working_hours: effectiveDailyHours,
+          custom_daily_hours: effectiveDailyHours,
+          daily_work_hours: effectiveDailyHours,
+          resource_calendar_id: contract.resourceCalendarId,
+          working_schedule: contract.workingSchedule,
+          work_hours_type: contract.workHoursType,
           updated_at: new Date().toISOString()
         }], { onConflict: 'id' });
       } catch (sbErr) {
@@ -464,7 +473,16 @@ export const TenantDatabaseService = {
     }
 
     try {
-      const cleanDoc = cleanFirestoreData({ ...contract, companyId: compId, updatedAt: new Date().toISOString() });
+      const cleanDoc = cleanFirestoreData({
+        ...contract,
+        dailyWorkHours: effectiveDailyHours,
+        customDailyHours: effectiveDailyHours,
+        custom_daily_hours: effectiveDailyHours,
+        plannedDailyHours: contract.plannedDailyHours ?? effectiveDailyHours,
+        workingHoursPerWeek: effectiveWeeklyHours,
+        companyId: compId,
+        updatedAt: new Date().toISOString()
+      });
       await setDoc(doc(db, 'contracts', contract.id), cleanDoc, { merge: true });
       return true;
     } catch (fsErr) {

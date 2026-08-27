@@ -163,8 +163,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   const [highlightedFields, setHighlightedFields] = useState<Record<string, boolean>>({});
 
   // Profile Picture state
-  const [showPresetAvatars, setShowPresetAvatars] = useState<boolean>(false);
-  const [showAvatarUrlInput, setShowAvatarUrlInput] = useState<boolean>(false);
+  const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState<boolean>(false);
+  const [showPresetAvatarsModal, setShowPresetAvatarsModal] = useState<boolean>(false);
+  const [showAvatarUrlModal, setShowAvatarUrlModal] = useState<boolean>(false);
+  const [tempUrlInput, setTempUrlInput] = useState<string>('');
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -401,6 +403,8 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
     const empToSave: Employee = {
       id: editingEmp.id || `emp-${Date.now()}`,
       companyId: editingEmp.companyId || activeCompId,
+      branchId: activeCompany?.id || activeCompId || 'hq',
+      branchName: activeCompany?.name || 'المركز الرئيسي',
       employeeCode: editingEmp.employeeCode || `EMP-00${employees.length + 1}`,
       fullNameAr: editingEmp.fullNameAr.trim(),
       fullNameEn: editingEmp.fullNameEn?.trim() || '',
@@ -585,56 +589,63 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 mb-4 shadow-sm p-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 px-3 py-1.5 focus-within:border-[#714B67] transition">
-            <Search className="w-4 h-4 text-slate-400 mr-2" />
+      {/* Search & Filter Bar - Odoo Enterprise Slim & Compact */}
+      <div className="bg-white rounded-xl border border-slate-200 mb-3 shadow-2xs px-3 py-2 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 px-2.5 py-1 focus-within:border-[#714B67] transition">
+            <Search className="w-3.5 h-3.5 text-slate-400 ml-1.5 shrink-0" />
             <input
               type="text"
-              placeholder="البحث السريع (الاسم، الكود، الرقم المدني، المسمى)..."
+              placeholder="بحث سريع (الاسم، الكود، الرقم المدني)..."
               value={localSearchTerm}
               onChange={(e) => setLocalSearchTerm(e.target.value)}
-              className="bg-transparent outline-none text-xs w-64 text-slate-700 placeholder:text-slate-400 font-medium"
+              className="bg-transparent outline-none text-xs w-60 text-slate-700 placeholder:text-slate-400 font-medium"
             />
             {localSearchTerm && (
               <button onClick={() => setLocalSearchTerm('')} className="text-slate-400 hover:text-slate-600 p-0.5">
-                <X className="w-3.5 h-3.5" />
-              </button>)}
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
           <div className="relative">
             <button 
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
             >
               <Filter className="w-3.5 h-3.5 text-[#714B67]" />
-              <span>الفلترة: {odooFilter === 'ALL' ? 'الكل' : odooFilter === 'ACTIVE' ? 'النشطين' : odooFilter === 'ON_LEAVE' ? 'في إجازة' : 'المؤرشفين'}</span>
+              <span>فلتر: {odooFilter === 'ALL' ? 'الكل' : odooFilter === 'ACTIVE' ? 'النشطين' : odooFilter === 'ON_LEAVE' ? 'في إجازة' : 'المؤرشفين'}</span>
             </button>
             {isFilterMenuOpen && (
               <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 shadow-xl rounded-xl py-1 z-20">
-                <button onClick={() => { setOdooFilter('ALL'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">الجميع</button>
-                <button onClick={() => { setOdooFilter('ACTIVE'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold text-emerald-700">الموظفين النشطين</button>
-                <button onClick={() => { setOdooFilter('ON_LEAVE'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold text-amber-700">في إجازة اليوم</button>
-                <button onClick={() => { setOdooFilter('ARCHIVED'); setIsFilterMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold text-rose-700">المؤرشفين</button>
-              </div>)}
+                <button onClick={() => { setOdooFilter('ALL'); setIsFilterMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold">الجميع</button>
+                <button onClick={() => { setOdooFilter('ACTIVE'); setIsFilterMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold text-emerald-700">الموظفين النشطين</button>
+                <button onClick={() => { setOdooFilter('ON_LEAVE'); setIsFilterMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold text-amber-700">في إجازة اليوم</button>
+                <button onClick={() => { setOdooFilter('ARCHIVED'); setIsFilterMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold text-rose-700">المؤرشفين</button>
+              </div>
+            )}
           </div>
 
           <div className="relative">
             <button 
               onClick={() => setIsGroupByMenuOpen(!isGroupByMenuOpen)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
             >
               <List className="w-3.5 h-3.5 text-[#714B67]" />
-              <span>تجميع حسب: {odooGroupBy === 'NONE' ? 'بدون' : odooGroupBy === 'DEPARTMENT' ? 'الإدارة' : 'المدير'}</span>
+              <span>تجميع</span>
             </button>
             {isGroupByMenuOpen && (
               <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 shadow-xl rounded-xl py-1 z-20">
-                <button onClick={() => { setOdooGroupBy('NONE'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">بدون تجميع</button>
-                <button onClick={() => { setOdooGroupBy('DEPARTMENT'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">حسب القسم/الإدارة</button>
-                <button onClick={() => { setOdooGroupBy('MANAGER'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-4 py-2 text-xs hover:bg-slate-50 font-bold">حسب المدير المباشر</button>
-              </div>)}
+                <button onClick={() => { setOdooGroupBy('NONE'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold">بدون تجميع</button>
+                <button onClick={() => { setOdooGroupBy('DEPARTMENT'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold">حسب القسم/الإدارة</button>
+                <button onClick={() => { setOdooGroupBy('MANAGER'); setIsGroupByMenuOpen(false); }} className="w-full text-right px-3 py-1.5 text-xs hover:bg-slate-50 font-bold">حسب المدير المباشر</button>
+              </div>
+            )}
           </div>
+        </div>
+
+        <div className="text-[11px] text-slate-500 font-mono">
+          إجمالي النتائج: <strong className="text-slate-800">{filteredEmps.length}</strong> موظف
         </div>
       </div>
 
@@ -746,46 +757,46 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             <table className="w-full text-right text-xs table-auto">
               <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
                 <tr>
-                  <th className="p-3 w-28 whitespace-nowrap">كود النظام</th>
-                  <th className="p-3 w-36 whitespace-nowrap">معرف البصمة (Badge ID)</th>
-                  <th className="p-3 min-w-[200px] whitespace-nowrap">اسم الموظف</th>
-                  <th className="p-3 w-36 whitespace-nowrap">الرقم المدني</th>
-                  <th className="p-3 min-w-[180px] whitespace-nowrap">المسمى الوظيفي والقسم</th>
-                  <th className="p-3 w-28 whitespace-nowrap">الجنسية</th>
-                  <th className="p-3 w-32 whitespace-nowrap">تاريخ الالتحاق</th>
-                  <th className="p-3 w-24 text-center whitespace-nowrap">الإجراءات</th>
+                  <th className="py-2 px-3 w-28 whitespace-nowrap">كود النظام</th>
+                  <th className="py-2 px-3 w-36 whitespace-nowrap">معرف البصمة (Badge ID)</th>
+                  <th className="py-2 px-3 min-w-[200px] whitespace-nowrap">اسم الموظف</th>
+                  <th className="py-2 px-3 w-36 whitespace-nowrap">الرقم المدني</th>
+                  <th className="py-2 px-3 min-w-[180px] whitespace-nowrap">المسمى الوظيفي والقسم</th>
+                  <th className="py-2 px-3 w-28 whitespace-nowrap">الجنسية</th>
+                  <th className="py-2 px-3 w-32 whitespace-nowrap">تاريخ الالتحاق</th>
+                  <th className="py-2 px-3 w-24 text-center whitespace-nowrap">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredEmps.map((emp, index) => (
                   <tr key={emp.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70'} hover:bg-slate-100/80 transition`}>
-                    <td className="p-3 font-mono font-bold text-slate-600">{emp.employeeCode}</td>
-                    <td className="p-3 font-mono">
+                    <td className="py-2 px-3 font-mono font-bold text-slate-600">{emp.employeeCode}</td>
+                    <td className="py-2 px-3 font-mono">
                       <span className="bg-purple-100 text-purple-900 border border-purple-200 px-2 py-0.5 rounded font-bold text-[11px]">
                         {emp.biometricId || emp.badgeId || '—'}
                       </span>
                     </td>
-                    <td className="p-3 font-bold text-slate-900 cursor-pointer" onClick={() => handleOpenEditEmployee(emp)}>
+                    <td className="py-2 px-3 font-bold text-slate-900 cursor-pointer" onClick={() => handleOpenEditEmployee(emp)}>
                       <div className="flex items-center gap-2 hover:text-[#714B67] transition">
                         {emp.avatarUrl ? (
-                          <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-7 h-7 rounded-full object-cover border border-slate-200" />) : (
-                          <div className="w-7 h-7 rounded-full bg-[#714B67]/10 flex items-center justify-center text-[#714B67] font-bold">
+                          <img src={emp.avatarUrl} alt={emp.fullNameAr} className="w-6 h-6 rounded-full object-cover border border-slate-200" />) : (
+                          <div className="w-6 h-6 rounded-full bg-[#714B67]/10 flex items-center justify-center text-[#714B67] font-bold text-[10px]">
                             {emp.fullNameAr.charAt(0)}
                           </div>)}
                         <span>{emp.fullNameAr}</span>
                       </div>
                     </td>
-                    <td className="p-3 font-mono dir-ltr text-right">{emp.civilId}</td>
-                    <td className="p-3">
+                    <td className="py-2 px-3 font-mono dir-ltr text-right">{emp.civilId}</td>
+                    <td className="py-2 px-3">
                       <div className="font-semibold text-slate-800">{emp.jobTitle}</div>
-                      <div className="text-[11px] text-slate-500">{emp.department}</div>
+                      <div className="text-[10px] text-slate-500">{emp.department}</div>
                     </td>
-                    <td className="p-3">{emp.nationality}</td>
-                    <td className="p-3 font-mono">{emp.joinDate}</td>
-                    <td className="p-3 text-center">
+                    <td className="py-2 px-3">{emp.nationality}</td>
+                    <td className="py-2 px-3 font-mono">{emp.joinDate}</td>
+                    <td className="py-2 px-3 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button onClick={() => handleOpenEditEmployee(emp)} className="p-1 hover:bg-slate-200 rounded text-slate-700 cursor-pointer transition" title="تعديل">
-                          <Edit2 className="w-4 h-4 text-[#714B67]" />
+                          <Edit2 className="w-3.5 h-3.5 text-[#714B67]" />
                         </button>
                         <button onClick={() => {
                           if (onSoftDeleteEmployee) {
@@ -793,7 +804,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                             toast.success('تم أرشفة الموظف بنجاح');
                           }
                         }} className="p-1 hover:bg-rose-50 rounded text-rose-600 cursor-pointer transition" title="حذف">
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -1083,11 +1094,11 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {/* Employee Profile Picture Header Banner */}
-              <div className="bg-gradient-to-r from-slate-900 via-[#3d2737] to-[#714B67] text-white p-4 rounded-2xl shadow-sm border border-slate-700">
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  {/* Avatar Frame with Camera trigger */}
-                  <div className="relative group shrink-0">
+              {/* Employee Profile Picture Header Banner - Odoo Enterprise Standard */}
+              <div className="bg-gradient-to-r from-slate-900 via-[#3d2737] to-[#714B67] text-white p-5 rounded-2xl shadow-sm border border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-5 relative">
+                <div className="flex items-center gap-4 w-full">
+                  {/* Avatar Frame with Odoo Camera Dropdown Menu */}
+                  <div className="relative shrink-0">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-white/30 shadow-md bg-white/10 flex items-center justify-center relative">
                       {editingEmp.avatarUrl ? (
                         <img 
@@ -1097,150 +1108,218 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center text-white/80">
-                          <User className="w-10 h-10 mb-0.5 text-purple-200" />
+                          <User className="w-9 h-9 mb-0.5 text-purple-200" />
                           <span className="text-[10px] text-purple-200">بدون صورة</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Quick Camera Overlay Upload button */}
-                    <label 
-                      className="absolute -bottom-1 -right-1 bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-xl shadow-lg cursor-pointer transition flex items-center justify-center border-2 border-slate-900 group-hover:scale-110"
-                      title="رفع صورة جديدة"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleAvatarUpload} 
-                        className="hidden" 
-                      />
-                    </label>
+                    {/* Camera Badge triggering Odoo Enterprise Dropdown Menu */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsAvatarDropdownOpen(!isAvatarDropdownOpen)}
+                        className="absolute -bottom-2 -right-2 bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-xl shadow-lg cursor-pointer transition flex items-center justify-center border-2 border-slate-900 hover:scale-105 z-10"
+                        title="تعديل صورة الموظف"
+                      >
+                        <Camera className="w-4 h-4" />
+                      </button>
+
+                      {/* Odoo Enterprise Dropdown Menu */}
+                      {isAvatarDropdownOpen && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-20" 
+                            onClick={() => setIsAvatarDropdownOpen(false)} 
+                          />
+                          <div className="absolute right-0 bottom-10 w-52 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 duration-150">
+                            {/* Option 1: Upload File */}
+                            <label className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-900 cursor-pointer transition">
+                              <Upload className="w-4 h-4 text-emerald-600" />
+                              <span>رفع صورة جديدة</span>
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={(e) => {
+                                  setIsAvatarDropdownOpen(false);
+                                  handleAvatarUpload(e);
+                                }} 
+                                className="hidden" 
+                              />
+                            </label>
+
+                            {/* Option 2: Choose Preset Avatar */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAvatarDropdownOpen(false);
+                                setShowPresetAvatarsModal(true);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-900 transition text-right cursor-pointer"
+                            >
+                              <Sparkles className="w-4 h-4 text-amber-500" />
+                              <span>اختيار صورة رمزية</span>
+                            </button>
+
+                            {/* Option 3: Image URL */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAvatarDropdownOpen(false);
+                                setTempUrlInput(editingEmp.avatarUrl || '');
+                                setShowAvatarUrlModal(true);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-purple-50 hover:text-purple-900 transition text-right cursor-pointer"
+                            >
+                              <LinkIcon className="w-4 h-4 text-sky-600" />
+                              <span>رابط صورة (URL)</span>
+                            </button>
+
+                            {/* Option 4: Delete Photo (if exists) */}
+                            {editingEmp.avatarUrl && (
+                              <>
+                                <div className="border-t border-slate-100 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsAvatarDropdownOpen(false);
+                                    setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: '' }) : null);
+                                    toast.success('تم إزالة صورة البروفايل');
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition text-right cursor-pointer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  <span>حذف الصورة</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Employee Info & Photo Action Buttons */}
-                  <div className="flex-1 text-center sm:text-right space-y-1.5">
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                      <h4 className="font-bold text-base text-white">
+                  {/* Clean Employee Info Card Header */}
+                  <div className="flex-1 text-center sm:text-right space-y-1">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                      <h4 className="font-bold text-lg text-white">
                         {editingEmp.fullNameAr || 'موظف جديد'}
                       </h4>
                       {editingEmp.employeeCode && (
-                        <span className="bg-white/15 px-2 py-0.5 rounded-md font-mono text-xs text-purple-200 border border-white/10">
+                        <span className="bg-white/15 px-2.5 py-0.5 rounded-lg font-mono text-xs text-purple-200 border border-white/10">
                           {editingEmp.employeeCode}
                         </span>
                       )}
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                         editingEmp.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30' : 'bg-slate-700 text-slate-300'
                       }`}>
                         {editingEmp.status === 'ACTIVE' ? 'نشط' : 'غير نشط'}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-300">
+                    <p className="text-xs text-slate-300 font-medium">
                       {editingEmp.jobTitle || 'المسمى الوظيفي غير محدد'} • {editingEmp.department || 'القسم غير محدد'}
                     </p>
-
-                    {/* Buttons Row */}
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-                      {/* Upload File Button */}
-                      <label className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition flex items-center gap-1.5 shadow-xs">
-                        <Upload className="w-3.5 h-3.5 text-emerald-300" />
-                        <span>رفع صورة بروفايل</span>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleAvatarUpload} 
-                          className="hidden" 
-                        />
-                      </label>
-
-                      {/* Preset Avatars Toggle Button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowPresetAvatars(!showPresetAvatars)}
-                        className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                        <span>صور رمزية جاهزة</span>
-                      </button>
-
-                      {/* Toggle URL Input */}
-                      <button
-                        type="button"
-                        onClick={() => setShowAvatarUrlInput(!showAvatarUrlInput)}
-                        className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <LinkIcon className="w-3.5 h-3.5 text-sky-300" />
-                        <span>رابط صورة (URL)</span>
-                      </button>
-
-                      {/* Remove Photo */}
-                      {editingEmp.avatarUrl && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: '' }) : null);
-                            toast.success('تم إزالة صورة البروفايل');
-                          }}
-                          className="bg-rose-500/20 hover:bg-rose-500/40 border border-rose-400/30 text-rose-200 text-xs font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer"
-                          title="حذف الصورة الحالية"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>حذف الصورة</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Expandable URL Input Field */}
-                    {showAvatarUrlInput && (
-                      <div className="flex items-center gap-2 pt-2 max-w-md animate-in fade-in duration-200">
-                        <input
-                          type="url"
-                          value={editingEmp.avatarUrl || ''}
-                          onChange={(e) => setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: e.target.value }) : null)}
-                          placeholder="https://example.com/photo.jpg"
-                          className="flex-1 bg-black/40 border border-white/30 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 outline-none dir-ltr text-left"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAvatarUrlInput(false);
-                            toast.success('تم تحديث رابط الصورة');
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold"
-                        >
-                          تطبيق
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Expandable Preset Avatars Gallery */}
-                    {showPresetAvatars && (
-                      <div className="bg-black/40 p-3 rounded-xl border border-white/20 mt-2 animate-in fade-in duration-200">
-                        <p className="text-[11px] font-bold text-slate-300 mb-2">اختر من الصور الرمزية الجاهزة للموظفين:</p>
-                        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                          {PRESET_AVATARS.map((url, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: url }) : null);
-                                setShowPresetAvatars(false);
-                                toast.success('تم اختيار الصورة الرمزية');
-                              }}
-                              className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition hover:scale-105 cursor-pointer ${
-                                editingEmp.avatarUrl === url ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-white/20 hover:border-white'
-                              }`}
-                            >
-                              <img src={url} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <p className="text-[11px] text-purple-200/80 font-mono">
+                      {editingEmp.civilId ? `الرقم المدني: ${editingEmp.civilId}` : 'رقم الهوية غير متوفر'}
+                    </p>
                   </div>
                 </div>
               </div>
+
+              {/* Preset Avatars Modal */}
+              {showPresetAvatarsModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                      <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span>اختر صورة رمزية للموظف</span>
+                      </h3>
+                      <button 
+                        onClick={() => setShowPresetAvatarsModal(false)}
+                        className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-3 py-2">
+                      {PRESET_AVATARS.map((url, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: url }) : null);
+                            setShowPresetAvatarsModal(false);
+                            toast.success('تم اختيار الصورة الرمزية بنجاح');
+                          }}
+                          className={`w-20 h-20 rounded-2xl overflow-hidden border-2 transition hover:scale-105 cursor-pointer mx-auto shadow-xs ${
+                            editingEmp.avatarUrl === url ? 'border-purple-600 ring-2 ring-purple-500/30' : 'border-slate-200 hover:border-purple-400'
+                          }`}
+                        >
+                          <img src={url} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Avatar URL Modal */}
+              {showAvatarUrlModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                      <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <LinkIcon className="w-4 h-4 text-sky-600" />
+                        <span>إدخال رابط صورة (URL)</span>
+                      </h3>
+                      <button 
+                        onClick={() => setShowAvatarUrlModal(false)}
+                        className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">رابط الصورة المباشر</label>
+                        <input
+                          type="url"
+                          value={tempUrlInput}
+                          onChange={(e) => setTempUrlInput(e.target.value)}
+                          placeholder="https://example.com/avatar.jpg"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none dir-ltr text-left focus:ring-2 focus:ring-purple-500 font-mono"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAvatarUrlModal(false)}
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                        >
+                          إلغاء
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tempUrlInput.trim()) {
+                              setEditingEmp(prev => prev ? ({ ...prev, avatarUrl: tempUrlInput.trim() }) : null);
+                              setShowAvatarUrlModal(false);
+                              toast.success('تم تحديث رابط الصورة بنجاح');
+                            } else {
+                              toast.error('يرجى إدخال رابط صحيح');
+                            }
+                          }}
+                          className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold rounded-xl shadow-sm"
+                        >
+                          حفظ وتطبيق
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {activeTab === 'WORK' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1322,27 +1401,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">الفرع التابع له (Branch)</label>
-                    <select
-                      value={editingEmp.branchId || ''}
-                      onChange={(e) => {
-                        const bId = e.target.value;
-                        const found = companyBranches.find((b: any) => b.id === bId);
-                        setEditingEmp({ 
-                          ...editingEmp, 
-                          branchId: bId,
-                          branchName: found ? found.branchName : undefined
-                        });
-                      }}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
-                    >
-                      <option value="">اختر الفرع...</option>
-                      {companyBranches.map((b: any) => (
-                        <option key={b.id} value={b.id}>{b.branchName}</option>
-                      ))}
-                    </select>
-                  </div>
+
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ الالتحاق بالعمل</label>
@@ -1508,6 +1567,20 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">يمنع محرك الإجازات الآلي الترحيل المكرر في نفس الشهر</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">آلية التعويض المفضلة للعمل في العطلات الرسمية</label>
+                    <select
+                      value={editingEmp.defaultHolidayCompensationPreference || 'COMP_OFF'}
+                      onChange={(e) => setEditingEmp({ ...editingEmp, defaultHolidayCompensationPreference: e.target.value as any })}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none font-bold text-purple-900"
+                    >
+                      <option value="CASH">💵 [1] صرف نقدي مباشر (Cash Payout)</option>
+                      <option value="ANNUAL_ACCRUAL">📈 [2] إضافة للرصيد السنوي (Annual Leave Accrual)</option>
+                      <option value="COMP_OFF">🛡️ [3] يوم راحة بديل في وقت آخر (Comp-Off Only)</option>
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1">الخيار الافتراضي عند تسجيل عمل الموظف في أيام العطل والجمع</p>
                   </div>
                 </div>)}
 

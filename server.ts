@@ -13,7 +13,7 @@ import { sendWelcomeEmail, sendAdminNewSubscriptionNotification } from "./src/se
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 let adminApp: App | null = null;
 let authAdmin: ReturnType<typeof getAuth> | null = null;

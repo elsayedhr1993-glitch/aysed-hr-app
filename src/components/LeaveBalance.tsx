@@ -4,6 +4,7 @@ import { useLang } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { calcAnnualAccrual, getAnnualRemaining, getSickRemaining, getCasualRemaining } from '@/lib/kuwaitiLaw';
+import { calculateUnifiedLeaveBalance, LeaveRecord } from '@/utils/leaveEngine';
 import { Search, Save, Check, Scale, AlertTriangle, Info, CalendarDays, TrendingUp } from 'lucide-react';
 import { Avatar, EmptyState, LoadingState, SectionCard, Badge } from '@/components/ui';
 
@@ -208,7 +209,12 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
                   const carry = r.balance?.carry_forward ?? 0;
                   const used = r.balance?.annual_used ?? 0;
                   const empAccrued = accruedByEmployee.get(r.id) ?? 0;
-                  const remaining = getAnnualRemaining(r.balance, empAccrued);
+                  const records: LeaveRecord[] = [
+                    { type: 'annual', days: used, status: 'approved' },
+                    { type: 'unpaid', days: r.balance?.unpaid_used ?? 0, status: 'approved' }
+                  ];
+                  const unifiedSummary = calculateUnifiedLeaveBalance(carry + empAccrued, records, Number(r.salary || 0));
+                  const remaining = unifiedSummary.totalAvailableDays;
                   const sickRem = getSickRemaining(r.balance);
                   const casualRem = getCasualRemaining(r.balance);
                   const isEditing = editingCarry[r.id] !== undefined;

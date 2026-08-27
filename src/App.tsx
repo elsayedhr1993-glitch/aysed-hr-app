@@ -6,7 +6,6 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { OdooAppLauncher } from './components/OdooAppLauncher';
 import { OdooSidebar } from './components/OdooSidebar';
 import { BackgroundRenderer } from './components/BackgroundRenderer';
-import { SmartNotificationsBanner } from './components/SmartNotificationsBanner';
 import { AysedAICopilot } from './components/AysedAICopilot';
 import { OdooFieldInspector } from './components/OdooFieldInspector';
 import { AppRouter } from './routes';
@@ -61,10 +60,30 @@ function MainActionManager() {
     ]);
   }, []);
   
-  // Primary State Controller: Single state variable to navigate screens without conflict
-  const [currentApp, setCurrentApp] = useState<string | null>(null);
+  // Primary State Controller: Default to null (OdooAppLauncher / apps dashboard) and clear stale localStorage routing state
+  const [currentApp, setCurrentApp] = useState<string | null>(() => {
+    try {
+      localStorage.removeItem('aysed_current_app');
+      localStorage.removeItem('current_app');
+      localStorage.removeItem('current_view');
+      localStorage.removeItem('active_view');
+    } catch (e) {}
+    return null;
+  });
   const activeApp = currentApp || 'LAUNCHER';
-  const setActiveApp = (app: string | null) => setCurrentApp(app === 'LAUNCHER' || app === 'APP_LAUNCHER' ? null : app);
+  const setActiveApp = (app: string | null) => {
+    if (app === 'LAUNCHER' || app === 'APP_LAUNCHER' || app === 'apps' || app === 'dashboard') {
+      setCurrentApp(null);
+      try {
+        localStorage.removeItem('aysed_current_app');
+      } catch (e) {}
+    } else {
+      setCurrentApp(app);
+      try {
+        localStorage.setItem('aysed_current_app', app);
+      } catch (e) {}
+    }
+  };
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [autoOpenLeaveForEmpId, setAutoOpenLeaveForEmpId] = useState<string | null>(null);
@@ -865,6 +884,27 @@ function MainActionManager() {
   };
 
   const handleSaveEmployee = async (emp: Employee) => {
+    // Strict Unique Data Validation: Civil ID, Employee Code (Badge ID), IBAN
+    const duplicateCivilId = employees.find(e => e.civilId && e.civilId.trim() === emp.civilId?.trim() && e.id !== emp.id);
+    if (duplicateCivilId) {
+      toast.error(`خطأ: الرقم المدني (${emp.civilId}) مسجل مسبقاً للموظف (${duplicateCivilId.fullNameAr})! لا يمكن تكرار الرقم المدني.`);
+      return;
+    }
+
+    const duplicateCode = employees.find(e => e.employeeCode && e.employeeCode.trim() === emp.employeeCode?.trim() && e.id !== emp.id);
+    if (duplicateCode) {
+      toast.error(`خطأ: رقم الملف/البصمة (Badge ID: ${emp.employeeCode}) مستخدم مسبقاً للموظف (${duplicateCode.fullNameAr})!`);
+      return;
+    }
+
+    if (emp.iban && emp.iban.trim().length > 5) {
+      const duplicateIban = employees.find(e => e.iban && e.iban.trim().toLowerCase() === emp.iban?.trim().toLowerCase() && e.id !== emp.id);
+      if (duplicateIban) {
+        toast.error(`خطأ: رقم الحساب البنكي (IBAN) مسجل مسبقاً للموظف (${duplicateIban.fullNameAr})!`);
+        return;
+      }
+    }
+
     const isExisting = employees.some(e => e.id === emp.id);
     const targetCompId = emp.companyId || activeCompany?.id || 'comp-1';
     const empWithComp = { ...emp, companyId: targetCompId };
@@ -934,6 +974,21 @@ function MainActionManager() {
   const handleSaveContract = async (cnt: Contract) => {
     const targetCompId = cnt.companyId || activeCompany?.id || 'comp-1';
     const completeContract = { ...cnt, companyId: targetCompId };
+
+    // Strict Validation: Prevent saving more than 1 active/running contract for the same employee
+    const isRunning = completeContract.status === 'RUNNING' || (completeContract.status as string) === 'ACTIVE';
+    if (isRunning) {
+      const activeDuplicate = contracts.find(c => 
+        c.employeeId === completeContract.employeeId &&
+        c.id !== completeContract.id &&
+        (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE')
+      );
+      if (activeDuplicate) {
+        toast.error("خطأ: لا يمكن حفظ أكثر من عقد بحالة نشطة (Active/Running) لنفس الموظف! يوجد عقد نشط مسجل مسبقاً.");
+        return;
+      }
+    }
+
     setContracts(prev => {
       const idx = prev.findIndex(c => c.id === cnt.id);
       const updated = idx >= 0 ? prev.map(c => c.id === cnt.id ? completeContract : c) : [completeContract, ...prev];
@@ -1195,6 +1250,21 @@ function MainActionManager() {
   const handleSaveAttendance = async (rec: AttendanceRecord) => {
     const targetCompId = rec.companyId || activeCompany?.id || 'comp-1';
     const completeRec = { ...rec, companyId: targetCompId };
+
+    // Strict Validation: Check duplicate attendance movement for same employee, date, and exact checkIn minute
+    if (completeRec.employeeId && completeRec.date && completeRec.checkIn && completeRec.checkIn !== '—') {
+      const duplicateAtt = attendance.find(a => 
+        a.employeeId === completeRec.employeeId &&
+        a.date === completeRec.date &&
+        a.checkIn === completeRec.checkIn &&
+        a.id !== completeRec.id
+      );
+      if (duplicateAtt) {
+        toast.error(`تنبيه: توجد حركة حضور مسجلة مسبقاً لنفس الموظف في نفس التاريخ والوقت (${completeRec.date} - ${completeRec.checkIn})! تم منع التكرار.`);
+        return;
+      }
+    }
+
     setAttendance(prev => {
       const idx = prev.findIndex(a => a.id === rec.id);
       const updated = idx >= 0 ? prev.map(a => a.id === rec.id ? completeRec : a) : [completeRec, ...prev];
@@ -1876,7 +1946,7 @@ function MainActionManager() {
   if (isSubscriptionLocked) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-center dir-rtl" dir="rtl">
-        <Toaster position="top-right" />
+        <Toaster position="top-right" toastOptions={{ duration: 1200 }} />
         <div className="bg-white p-8 rounded-2xl max-w-md w-full shadow-2xl border border-rose-200 space-y-4">
           <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
             <ShieldAlert className="w-8 h-8" />
@@ -1961,7 +2031,7 @@ function MainActionManager() {
   if (currentUserRole === 'SUPER_ADMIN' && portalViewMode === 'superadmin') {
     return (
       <main className="w-full min-h-screen bg-[#f4f7f6] aysed-isolated-admin-portal select-none" dir="rtl">
-        <Toaster position="top-right" />
+        <Toaster position="top-right" toastOptions={{ duration: 1200 }} />
         <SuperAdminPortal 
           onSwitchToApps={() => {
             const adminComp = companies.find(c => c.id === 'comp-super-admin') || companies[0];
@@ -2033,7 +2103,7 @@ function MainActionManager() {
   return (
     <div className="aysed-main-layout flex h-screen w-full overflow-hidden font-['Tajawal'] bg-[#F8F9FA] text-gray-800 odoo-scrollbar relative aysed-standard-odoo-view" dir="rtl">
       <BackgroundRenderer theme={bgTheme as any} motionEnabled={motionEnabled} />
-      <Toaster position="top-right" />
+      <Toaster position="top-right" toastOptions={{ duration: 1200 }} />
 
       {currentApp !== null && (
         <OdooSidebar 
@@ -2092,12 +2162,6 @@ function MainActionManager() {
           onClose={() => setIsCopilotOpen(false)} 
           employees={employees} 
           contracts={contracts} 
-        />
-
-        <SmartNotificationsBanner 
-          notifications={notifications} 
-          onNavigateToApp={(app) => setCurrentApp(app === 'APP_LAUNCHER' || (app as string) === 'LAUNCHER' ? null : app)} 
-          employees={employees} 
         />
 
         <main className="flex-1 overflow-auto">
