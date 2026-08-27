@@ -82,10 +82,14 @@ export const LeaveClearanceDocument: React.FC<Props> = ({
 
         <div className="mt-4 text-center">
           <h2 className="text-xl font-black text-[#71639e] inline-block border-b-2 border-dashed border-[#71639e] pb-1 px-4">
-            سند تصفية مستحقات وبدل الإجازات (Leave Settlement Voucher)
+            {(settlement as any).settlementMode === 'ENCASHMENT_LIQUIDATION'
+              ? 'سند صرف وتصفية البدل النقدي لرصيد الإجازات (Leave Encashment Voucher)'
+              : 'سند تصفية مستحقات وبدل الإجازات (Leave Settlement Voucher)'}
           </h2>
           <p className="text-[11px] text-slate-500 font-bold mt-1">
-            وفق أحكام قانون العمل الكويتي رقم 6 لسنة 2010 (المادتان 70 و77) - قاعدة 26 يوم عمل
+            {(settlement as any).settlementMode === 'ENCASHMENT_LIQUIDATION'
+              ? 'صرف البدل النقدي لرصيد الإجازات بدون إجازة وفق أحكام قانون العمل الكويتي (المادة 70) - قاعدة 26 يوم عمل'
+              : 'وفق أحكام قانون العمل الكويتي رقم 6 لسنة 2010 (المادتان 70 و77) - قاعدة 26 يوم عمل'}
           </p>
         </div>
       </div>

@@ -285,23 +285,24 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
     <div className="dashboard-container bg-[#f8fafc] flex flex-col items-center relative z-10 space-y-3" dir="rtl">
       
       {/* 🔴 Dafthra-Style Top Ticker Bar */}
-      <div className="w-full max-w-7xl bg-white border border-slate-200 text-slate-800 px-4 py-2 rounded-lg shadow-2xs flex items-center justify-between gap-3 overflow-hidden">
-        <div className="flex items-center gap-2 shrink-0">
+      <div className="w-full max-w-7xl bg-white border border-slate-200 text-slate-800 px-4 py-2.5 rounded-lg shadow-2xs flex items-center justify-between gap-4 overflow-hidden">
+        <div className="flex items-center gap-2.5 shrink-0">
           <span className="flex h-2 w-2 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200">
+          <span className="bg-emerald-50 text-emerald-700 text-[11px] font-bold px-2.5 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
             Sayed ERP متصل
           </span>
         </div>
-        <div className="overflow-hidden whitespace-nowrap text-[11px] font-medium text-slate-600 flex-1">
+        <div className="overflow-hidden whitespace-nowrap text-[11px] font-medium text-slate-600 flex-1 px-2">
           <div className="inline-block animate-marquee">
             ⚠️ تنبيه: 3 إقامات موظفين تنتهي قريباً • 📄 مستندات بانتظار قراءة OCR • ⚖️ إنذار إداري جديد • 🇰🇼 نظام حماية الأجور (WPS) جاهز للتحويل.
           </div>
         </div>
-        <div className="text-[10px] font-mono font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
-          KWD 0.000
+        <div className="text-xs font-mono font-bold text-purple-700 bg-purple-50 border border-purple-200 px-3 py-1 rounded-md shrink-0 flex items-center gap-1.5 shadow-2xs">
+          <span className="text-[10px] text-purple-500 font-sans">العملة:</span>
+          <span>KWD 0.000</span>
         </div>
       </div>
 
@@ -339,13 +340,10 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
               <button
                 key={app.id}
                 onClick={() => onSelectApp(app.id)}
-                className="o_app_icon_card flex flex-col items-center justify-between text-center relative overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 shadow-xs"
+                className="o_app_icon_card flex flex-col items-center justify-between text-center relative overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#71639e]/40 shadow-xs p-4 bg-white rounded-xl border border-slate-200 hover:border-[#71639e] transition-all min-h-[180px]"
               >
-                <div className="w-full flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 uppercase font-mono tracking-wider">
-                    {app.titleEn}
-                  </span>
-                  <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full group-hover:bg-[#71639e] group-hover:text-white transition-colors duration-200">
+                <div className="w-full flex justify-end items-center mb-1">
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full group-hover:bg-[#71639e] group-hover:text-white transition-colors duration-200">
                     {app.badge}
                   </span>
                 </div>
@@ -364,9 +362,9 @@ export const OdooAppLauncher: React.FC<OdooAppLauncherProps> = ({ onSelectApp, c
                   </p>
                 </div>
 
-                <div className="mt-2 pt-2 border-t border-slate-100 w-full flex items-center justify-center text-[10px] text-slate-400 group-hover:text-[#71639e] font-bold transition-colors">
+                <div className="mt-auto pt-3 border-t border-slate-100 w-full flex items-center justify-center text-[11px] text-slate-500 group-hover:text-[#71639e] font-bold transition-colors">
                   <span>فتح التطبيق</span>
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
+                  <ArrowUpRight className="w-3.5 h-3.5 mr-1" />
                 </div>
               </button>);
           })}

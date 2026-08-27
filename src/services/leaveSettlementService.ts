@@ -7,7 +7,8 @@ import {
   UniversalSettlementResult, 
   LeaveSettlementVoucher,
   HrLeaveAllocation,
-  Employee
+  Employee,
+  LeaveRequest
 } from '../types';
 
 export type {
@@ -658,10 +659,26 @@ export function calculateAysedLeaveSettlement(input: AysedLeaveEngineInput): Ays
  * 8. إدارة وحفظ سندات التسوية في التخزين الدائم (Vouchers Persistence Engine)
  */
 export function getSavedSettlementVouchers(companyId?: string): LeaveSettlementVoucher[] {
-  const vouchers = getPersistentData<LeaveSettlementVoucher[]>(
+  let vouchers = getPersistentData<LeaveSettlementVoucher[]>(
     MANARA_STORAGE_KEYS.LEAVE_SETTLEMENT_VOUCHERS, 
     []
   );
+
+  // Automatic deduplication by voucherNumber or id
+  const seenMap = new Map<string, LeaveSettlementVoucher>();
+  const cleaned: LeaveSettlementVoucher[] = [];
+  for (const v of vouchers) {
+    const key = v.voucherNumber || v.id;
+    if (key && !seenMap.has(key)) {
+      seenMap.set(key, v);
+      cleaned.push(v);
+    }
+  }
+  if (cleaned.length !== vouchers.length) {
+    setPersistentData(MANARA_STORAGE_KEYS.LEAVE_SETTLEMENT_VOUCHERS, cleaned);
+    vouchers = cleaned;
+  }
+
   if (!companyId || companyId === 'comp-super-admin' || companyId === 'all') {
     return vouchers;
   }
@@ -673,13 +690,23 @@ export function saveSettlementVoucher(voucher: LeaveSettlementVoucher): LeaveSet
     MANARA_STORAGE_KEYS.LEAVE_SETTLEMENT_VOUCHERS, 
     []
   );
-  const index = existing.findIndex(v => v.id === voucher.id);
+  // Check if voucher with same id or voucherNumber already exists
+  const index = existing.findIndex(v => v.id === voucher.id || (voucher.voucherNumber && v.voucherNumber === voucher.voucherNumber));
   let updated: LeaveSettlementVoucher[];
   if (index >= 0) {
     updated = [...existing];
     updated[index] = { ...voucher, updatedAt: new Date().toISOString() };
   } else {
-    updated = [voucher, ...existing];
+    // Also check if any other duplicate exists by voucherNumber
+    const duplicateByNum = existing.find(v => v.voucherNumber && v.voucherNumber === voucher.voucherNumber);
+    if (duplicateByNum) {
+      // Update existing instead of creating new duplicate
+      const dupIdx = existing.findIndex(v => v.id === duplicateByNum.id);
+      updated = [...existing];
+      updated[dupIdx] = { ...voucher, id: duplicateByNum.id, updatedAt: new Date().toISOString() };
+    } else {
+      updated = [voucher, ...existing];
+    }
   }
   setPersistentData(MANARA_STORAGE_KEYS.LEAVE_SETTLEMENT_VOUCHERS, updated);
   return updated;
@@ -711,9 +738,13 @@ export function liquidateLeaveBalanceInAllocations(
   }
 
   let empAllocations = allocations.filter(
-    a => (a.employeeId === employeeId || a.employeeId === employee?.employeeCode || a.employeeId === employee?.id) && 
-         (a.leaveType === 'ANNUAL' || !a.leaveType) && 
-         (a.state === 'validate' || a.state === 'confirm' || !a.state)
+    a => {
+      const matchId = a.employeeId === employeeId || a.employeeId === employee?.id || a.employeeId === employee?.employeeCode;
+      const matchEmpCode = employee?.employeeCode && (a.employeeId === employee.employeeCode || (a as any).employeeCode === employee.employeeCode);
+      return (matchId || matchEmpCode) && 
+             (a.leaveType === 'ANNUAL' || !a.leaveType) && 
+             (a.state === 'validate' || a.state === 'confirm' || !a.state);
+    }
   );
 
   let updatedAllocations = [...allocations];
@@ -788,6 +819,32 @@ export function liquidateLeaveBalanceInAllocations(
   }
 
   const successfullyEncashed = encashedDays - Math.max(0, remainingToEncash);
+
+  // Odoo 18 logic: Automatically create an administrative leave deduction record in hr.leave (MANARA_STORAGE_KEYS.LEAVES)
+  if (successfullyEncashed > 0 && employee) {
+    try {
+      const existingLeaves = getPersistentData<LeaveRequest[]>(MANARA_STORAGE_KEYS.LEAVES, []);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const newLeaveReq: LeaveRequest = {
+        id: `encash-leave-${Date.now()}`,
+        employeeId: employee.id,
+        companyId: employee.companyId || 'comp-1',
+        leaveType: 'ANNUAL',
+        startDate: todayStr,
+        endDate: todayStr,
+        totalDays: Number(successfullyEncashed.toFixed(2)),
+        reason: `تصفية نقدية لرصيد الإجازة: ${successfullyEncashed.toFixed(2)} يوم (Encashment & Liquidation)`,
+        status: 'APPROVED', // Odoo 'validate' state
+        validatedBy: 'System HR Engine (Odoo 18)',
+        validatedAt: new Date().toISOString(),
+        hrNote: 'خصم تلقائي ناتج عن اعتماد تسييل ورصد البدل النقدي',
+        createdAt: new Date().toISOString(),
+      };
+      setPersistentData(MANARA_STORAGE_KEYS.LEAVES, [newLeaveReq, ...existingLeaves]);
+    } catch (e) {
+      console.error('Error creating encashment leave record:', e);
+    }
+  }
 
   return {
     success: true,
@@ -921,3 +978,79 @@ export const onLeaveValidate = async (
     };
   }
 };
+
+/**
+ * Function on_approve_settlement(settlement_id):
+ * 1. Deduct encashed_days from employee_available_balance
+ * 2. Update FIFO_Ledger (mark older allocations as consumed)
+ * 3. Push payment amount to Payroll_Input
+ * 4. Lock settlement record (Disable duplicate clicks)
+ */
+export function on_approve_settlement(
+  settlementId: string,
+  allocations: HrLeaveAllocation[],
+  onUpdateAllocations: (updated: HrLeaveAllocation[]) => void,
+  employees: Employee[],
+  onUpdateEmployees: (updated: Employee[]) => void
+): { success: boolean; message: string } {
+  const vouchers = getSavedSettlementVouchers();
+  const voucherIndex = vouchers.findIndex(v => v.id === settlementId || v.voucherNumber === settlementId);
+  if (voucherIndex === -1) {
+    return { success: false, message: `سند التسوية غير موجود برقم ${settlementId}` };
+  }
+
+  const voucher = vouchers[voucherIndex];
+  if (voucher.status === 'settled_locked' || voucher.status === 'paid') {
+    return { success: false, message: `سند التسوية هذا (${voucher.voucherNumber}) معتمد ومقفل مسبقاً لمنع النقر المزدوج والتكرار.` };
+  }
+
+  const employee = employees.find(e => e.id === voucher.employeeId || e.employeeCode === voucher.employeeCode);
+  const encashedDays = voucher.encashedLeaveDays || 0;
+
+  // 1 & 2. Deduct encashed_days from employee_available_balance & update FIFO_Ledger
+  if (encashedDays > 0 && employee) {
+    liquidateLeaveBalanceInAllocations(
+      employee.id,
+      encashedDays,
+      allocations,
+      onUpdateAllocations,
+      employee,
+      (updatedEmp) => {
+        const empIndex = employees.findIndex(e => e.id === updatedEmp.id);
+        if (empIndex >= 0) {
+          const newEmps = [...employees];
+          newEmps[empIndex] = updatedEmp;
+          onUpdateEmployees(newEmps);
+        }
+      }
+    );
+  }
+
+  // 3. Push payment amount to Payroll_Input
+  const payrollInputs = getPersistentData<any[]>(MANARA_STORAGE_KEYS.PAYSLIPS, []);
+  const settlementPayrollItem = {
+    id: `payroll-settlement-${voucher.id}`,
+    employeeId: voucher.employeeId,
+    employeeName: voucher.employeeName,
+    companyId: voucher.companyId,
+    type: 'LEAVE_SETTLEMENT',
+    amount: voucher.netSettlementPayout,
+    month: voucher.settlementDate ? voucher.settlementDate.substring(0, 7) : new Date().toISOString().substring(0, 7),
+    createdAt: new Date().toISOString(),
+  };
+  setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, [settlementPayrollItem, ...payrollInputs]);
+
+  // 4. Lock settlement record (Disable duplicate clicks / set status to settled_locked)
+  vouchers[voucherIndex] = {
+    ...voucher,
+    status: 'settled_locked',
+    updatedAt: new Date().toISOString(),
+  };
+  setPersistentData(MANARA_STORAGE_KEYS.LEAVE_SETTLEMENT_VOUCHERS, vouchers);
+
+  return {
+    success: true,
+    message: `تم اعتماد سند التسوية (${voucher.voucherNumber}) وتحديث رصيد FIFO وتوجيه مبلغ التسييل (${voucher.netSettlementPayout} KWD) إلى مسير الرواتب بنجاح وقفل السند نهائياً.`
+  };
+}
+

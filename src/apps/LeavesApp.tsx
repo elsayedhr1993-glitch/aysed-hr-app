@@ -7,7 +7,9 @@ import {
   calculateActualLeaveDays, 
   getCompensatedHolidays2026,
   cron_aysed_monthly_accrual,
-  getCarriedOverBalance
+  getCarriedOverBalance,
+  getGlobalCompensatoryDays,
+  formatEmployeeNationalityAndResidency
 } from '../utils/kuwaitLaw';
 import { 
   LeaveService, 
@@ -29,7 +31,7 @@ import {
   Calculator, FileText, Search, 
   History, Printer, Trash2, DollarSign,
   Filter, X, Info, AlertCircle, RefreshCw, Layers, Award,
-  Sparkles, ChevronRight, UserCheck, ShieldCheck, Edit3, Lock
+  Sparkles, ChevronRight, UserCheck, ShieldCheck, Edit3, Lock, Gift
 } from 'lucide-react';
 
 interface LeavesAppProps {
@@ -82,6 +84,19 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
   const [allocations, setAllocations] = useState<HrLeaveAllocation[]>(() => {
     return getPersistentData<HrLeaveAllocation[]>(MANARA_STORAGE_KEYS.LEAVE_ALLOCATIONS, []);
   });
+
+  // Reload allocations on external update
+  useEffect(() => {
+    const handleReload = () => {
+      setAllocations(getPersistentData<HrLeaveAllocation[]>(MANARA_STORAGE_KEYS.LEAVE_ALLOCATIONS, []));
+    };
+    window.addEventListener('manara_allocations_updated', handleReload);
+    window.addEventListener('storage', handleReload);
+    return () => {
+      window.removeEventListener('manara_allocations_updated', handleReload);
+      window.removeEventListener('storage', handleReload);
+    };
+  }, []);
 
   // Save allocations to persistent storage
   useEffect(() => {
@@ -159,12 +174,51 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
   const companyLeaves = (leaves || []).filter(l => !activeCompany || activeCompany.id === 'comp-1' || l.companyId === activeCompany.id || !l.companyId || l.companyId === 'comp-1');
   const activeSearchTerm = localSearch || searchTerm;
 
-  // Ensure baseline allocations exist for all active employees
+  // Ensure baseline allocations exist for all active employees and clean up any duplicates
   useEffect(() => {
     if (companyEmployees.length > 0) {
-      let hasNew = false;
-      const updatedAllocations = [...allocations];
+      let hasChange = false;
+      let updatedAllocations = [...allocations];
 
+      // 1. Clean up duplicate compensatory allocations in state and localStorage
+      companyEmployees.forEach(emp => {
+        const compDays = getGlobalCompensatoryDays(emp);
+        const empCompAllocs = updatedAllocations.filter(
+          a => (a.employeeId === emp.id || a.employeeId === emp.employeeCode) &&
+               (a.allocationType === 'compensatory_off' || (a.allocationType as string) === 'compensatory' || a.id?.startsWith('alloc-comp') || a.name?.includes('تعويضي') || a.name?.includes('بديل') || a.name?.includes('عطلة'))
+        );
+
+        if (compDays <= 0) {
+          if (empCompAllocs.length > 0) {
+            updatedAllocations = updatedAllocations.filter(
+              a => !( (a.employeeId === emp.id || a.employeeId === emp.employeeCode) &&
+                      (a.allocationType === 'compensatory_off' || (a.allocationType as string) === 'compensatory' || a.id?.startsWith('alloc-comp') || a.name?.includes('تعويضي') || a.name?.includes('بديل') || a.name?.includes('عطلة')) )
+            );
+            hasChange = true;
+          }
+        } else if (empCompAllocs.length > 1) {
+          // Keep only the first valid one and normalize its days to compDays
+          const primary = { ...empCompAllocs[0], numberOfDays: compDays, remainingDays: compDays };
+          updatedAllocations = updatedAllocations.filter(
+            a => !( (a.employeeId === emp.id || a.employeeId === emp.employeeCode) &&
+                    (a.allocationType === 'compensatory_off' || (a.allocationType as string) === 'compensatory' || a.id?.startsWith('alloc-comp') || a.name?.includes('تعويضي') || a.name?.includes('بديل') || a.name?.includes('عطلة')) )
+          );
+          updatedAllocations.push(primary);
+          hasChange = true;
+        } else if (empCompAllocs.length === 1 && empCompAllocs[0].numberOfDays !== compDays) {
+          const idx = updatedAllocations.findIndex(a => a.id === empCompAllocs[0].id);
+          if (idx >= 0) {
+            updatedAllocations[idx] = {
+              ...updatedAllocations[idx],
+              numberOfDays: compDays,
+              remainingDays: Math.max(0, compDays - (updatedAllocations[idx].consumedDays || 0))
+            };
+            hasChange = true;
+          }
+        }
+      });
+
+      // 2. Add regular opening balance if missing
       companyEmployees.forEach(emp => {
         const openingVal = getCarriedOverBalance(emp);
         const hasOpening = updatedAllocations.some(
@@ -187,15 +241,18 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
             notes: 'رصيد مرحل معتمد من نهاية عام 2025',
             createdAt: '2026-01-01T00:00:00.000Z'
           });
-          hasNew = true;
+          hasChange = true;
         }
       });
 
-      if (hasNew) {
+      if (hasChange) {
         setAllocations(updatedAllocations);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          window.localStorage.setItem('manara_leave_allocations_data', JSON.stringify(updatedAllocations));
+        }
       }
     }
-  }, [companyEmployees.length]);
+  }, [companyEmployees, allocations.length]);
 
   // Filtered leaves for requests tab
   const filteredLeaves = companyLeaves.filter(lev => {
@@ -215,9 +272,37 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
     return true;
   });
 
+  // Comprehensive active allocations for allocations tab (strictly deduplicated)
+  const comprehensiveAllocations = useMemo(() => {
+    const list: HrLeaveAllocation[] = [];
+    const seenIds = new Set<string>();
+
+    companyEmployees.forEach(emp => {
+      const baseline = buildEmployeeBaselineAllocations(emp, allocations);
+      baseline.forEach(b => {
+        const key = b.id || `${b.employeeId}-${b.allocationType}-${b.dateFrom}`;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          list.push(b);
+        }
+      });
+    });
+
+    // Also include any standalone allocations not covered by baseline
+    allocations.forEach(a => {
+      const key = a.id || `${a.employeeId}-${a.allocationType}-${a.dateFrom}`;
+      if (!seenIds.has(key)) {
+        seenIds.add(key);
+        list.push(a);
+      }
+    });
+
+    return list;
+  }, [allocations, companyEmployees]);
+
   // Filtered allocations for allocations tab
-  const filteredAllocations = allocations.filter(a => {
-    const emp = employees.find(e => e.id === a.employeeId);
+  const filteredAllocations = comprehensiveAllocations.filter(a => {
+    const emp = employees.find(e => e.id === a.employeeId || e.employeeCode === a.employeeId);
     const empName = emp ? emp.fullNameAr : '';
     const matchesSearch = (empName && empName.includes(activeSearchTerm)) || (a.name && a.name.includes(activeSearchTerm));
     if (!matchesSearch) return false;
@@ -239,10 +324,11 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
         const empAllocs = buildEmployeeBaselineAllocations(emp, allocations);
         const fifo = computeFifoLeaveAllocations(emp, empAllocs, companyLeaves);
         const totalOpening = fifo.allocations.filter(a => a.allocationType === 'regular').reduce((s, a) => s + (a.numberOfDays || 0), 0);
-        const totalAccrued = fifo.allocations.filter(a => a.allocationType === 'accrual').reduce((s, a) => s + (a.numberOfDays || 0), 0);
+        const totalAccrued = fifo.allocations.filter(a => a.allocationType === 'accrual' && !a.name?.includes('تعويضي') && !a.name?.includes('بديل') && !a.name?.includes('عطلة')).reduce((s, a) => s + (a.numberOfDays || 0), 0);
+        const totalCompensatory = getGlobalCompensatoryDays(emp);
         const totalTaken = fifo.totalConsumed;
-        const netAvailable = fifo.netAvailable;
-        return { emp, fifo, totalOpening, totalAccrued, totalTaken, netAvailable };
+        const netAvailable = Math.max(0, (totalOpening + totalAccrued + totalCompensatory) - totalTaken);
+        return { emp, fifo, totalOpening, totalAccrued, totalCompensatory, totalTaken, netAvailable };
       });
   }, [companyEmployees, activeSearchTerm, allocations, companyLeaves]);
 
@@ -257,26 +343,30 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
   const aggregateMetrics = useMemo(() => {
     let totalOpening = 0;
     let totalAccrued = 0;
+    let totalCompensatory = 0;
     let totalTaken = 0;
 
     companyEmployees.forEach(emp => {
       const empFifo = computeFifoLeaveAllocations(emp, buildEmployeeBaselineAllocations(emp, allocations), companyLeaves);
       const openingAllocs = empFifo.allocations.filter(a => a.allocationType === 'regular');
-      const accrualAllocs = empFifo.allocations.filter(a => a.allocationType === 'accrual');
+      const accrualAllocs = empFifo.allocations.filter(a => a.allocationType === 'accrual' && !a.name?.includes('تعويضي') && !a.name?.includes('بديل') && !a.name?.includes('عطلة'));
       
       const openingDays = openingAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
       const accrualDays = accrualAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
+      const compDays = getGlobalCompensatoryDays(emp);
 
       totalOpening += openingDays;
       totalAccrued += accrualDays;
+      totalCompensatory += compDays;
       totalTaken += empFifo.totalConsumed;
     });
 
-    const totalAvailable = Math.max(0, (totalOpening + totalAccrued) - totalTaken);
+    const totalAvailable = Math.max(0, (totalOpening + totalAccrued + totalCompensatory) - totalTaken);
 
     return {
       totalOpening,
       totalAccrued,
+      totalCompensatory,
       totalTaken,
       totalAvailable
     };
@@ -543,57 +633,70 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
       </div>
 
       {/* Odoo Enterprise Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500"> (Opening Balance)</span>
-            <div className="p-2 rounded-lg bg-amber-50 text-amber-700">
+            <span className="text-xs font-bold text-slate-500">الرصيد الافتتاحي (Opening)</span>
+            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
               <Calendar className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-black text-slate-900 font-mono">
+          <div className="mt-2 text-xl font-black text-slate-900 font-mono">
             {formatDaysDisplay(aggregateMetrics.totalOpening)}
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">مرحل من السنوات السابقة (Fixed Regular)</div>
+          <div className="text-[10px] text-slate-400 mt-1">مرحل من 2025 (Fixed Regular)</div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-purple-700">المكتسب لعام 2026 (Accrued 2026)</span>
-            <div className="p-2 rounded-lg bg-purple-50 text-purple-700">
+            <span className="text-xs font-bold text-purple-700">المكتسب 2026 (Accrued)</span>
+            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-700">
               <Award className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-black text-purple-900 font-mono">
+          <div className="mt-2 text-xl font-black text-purple-900 font-mono">
             {formatDaysDisplay(aggregateMetrics.totalAccrued)}
           </div>
-          <div className="text-[11px] text-purple-600 mt-1">بمعدل 2.5 يوم/شهر وفق المادة 70</div>
+          <div className="text-[10px] text-purple-600 mt-1">بمعدل 2.5 يوم/شهر (مادة 70)</div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+        <div className="bg-white rounded-xl border border-emerald-200 p-3.5 shadow-xs bg-emerald-50/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-600">المستهلك (Taken Days)</span>
-            <div className="p-2 rounded-lg bg-rose-50 text-rose-600">
+            <span className="text-xs font-bold text-emerald-800">أيام تعويضية (العطلات)</span>
+            <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
+              <Gift className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-xl font-black text-emerald-900 font-mono">
+            +{formatDaysDisplay(aggregateMetrics.totalCompensatory)}
+          </div>
+          <div className="text-[10px] text-emerald-700 mt-1">بديل العمل بالعطل الرسمية</div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-rose-600">المستهلك (Taken)</span>
+            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
               <FileText className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-black text-rose-700 font-mono">
+          <div className="mt-2 text-xl font-black text-rose-700 font-mono">
             {formatDaysDisplay(aggregateMetrics.totalTaken)}
           </div>
-          <div className="text-[11px] text-rose-500 mt-1">إجمالي الإجازات السنوية المعتمدة</div>
+          <div className="text-[10px] text-rose-500 mt-1">إجمالي الإجازات المستهلكة</div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#714B67] to-purple-900 text-white rounded-xl p-4 shadow-xs">
+        <div className="bg-gradient-to-br from-[#714B67] to-purple-900 text-white rounded-xl p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-purple-200">الرصيد المتاح الصافي (Net Available Days)</span>
-            <div className="p-2 rounded-lg bg-white/10 text-amber-300">
+            <span className="text-xs font-bold text-purple-200">الصافي المتاح (Net)</span>
+            <div className="p-1.5 rounded-lg bg-white/10 text-amber-300">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-black font-mono text-amber-300">
+          <div className="mt-2 text-xl font-black font-mono text-amber-300">
             {formatDaysDisplay(aggregateMetrics.totalAvailable)}
           </div>
-          <div className="text-[11px] text-purple-200 mt-1">المتاح للطلب والاستهلاك الآن</div>
+          <div className="text-[10px] text-purple-200 mt-1">المتاح للاستهلاك والتسوية</div>
         </div>
       </div>
 
@@ -871,6 +974,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                 <option value="ALL">جميع التخصيصات</option>
                 <option value="regular">تخصيص رصيد افتتاحي / ثابت (Regular)</option>
                 <option value="accrual">خطة استحقاق شهري (Accrual Plan)</option>
+                <option value="compensatory_off">أيام تعويضية عن العمل في العطلات (Compensatory Off)</option>
               </select>
             </div>
 
@@ -941,11 +1045,17 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                           </td>
                           <td className="p-3 text-center">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              alloc.allocationType === 'regular' 
-                                ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                                : 'bg-purple-100 text-purple-900 border border-purple-200'
+                              alloc.allocationType === 'compensatory_off' || (alloc as any).allocationType === 'compensatory' || alloc.name?.includes('تعويضي') || alloc.name?.includes('بديل')
+                                ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                                : alloc.allocationType === 'regular' 
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                                  : 'bg-purple-100 text-purple-900 border border-purple-200'
                             }`}>
-                              {alloc.allocationType === 'regular' ? 'ثابت / افتتاحي' : 'استحقاق شهري (2.5)'}
+                              {alloc.allocationType === 'compensatory_off' || (alloc as any).allocationType === 'compensatory' || alloc.name?.includes('تعويضي') || alloc.name?.includes('بديل')
+                                ? '🎁 يوم تعويضي (عطلة)'
+                                : alloc.allocationType === 'regular' 
+                                  ? 'ثابت / افتتاحي' 
+                                  : 'استحقاق شهري (2.5)'}
                             </span>
                           </td>
                           <td className="p-3 text-center font-mono text-slate-600">{alloc.dateFrom || '—'}</td>
@@ -1044,6 +1154,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                     <th className="p-3 min-w-[180px] whitespace-nowrap">الموظف</th>
                     <th className="p-3 w-32 text-center whitespace-nowrap">الرصيد الافتتاحي / المرحل</th>
                     <th className="p-3 w-32 text-center whitespace-nowrap">المكتسب لعام 2026</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap bg-[#5c3c54] text-amber-300">أيام تعويضية (العطلات)</th>
                     <th className="p-3 w-32 text-center whitespace-nowrap">المستهلك (Taken Days)</th>
                     <th className="p-3 w-32 text-center whitespace-nowrap">الرصيد المتاح الصافي</th>
                     <th className="p-3 w-36 text-center whitespace-nowrap">حالة الترحيل الشهري</th>
@@ -1053,34 +1164,47 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                 <tbody className="divide-y divide-slate-100">
                   {companyEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-slate-400 font-bold">
+                      <td colSpan={9} className="p-8 text-center text-slate-400 font-bold">
                         لا يوجد موظفين مسجلين في الشركة
                       </td>
                     </tr>) : (
                     filteredEmployeeBalances.map((item, idx) => {
-                      const { emp, totalOpening, totalAccrued, totalTaken, netAvailable } = item;
+                      const { emp, totalOpening, totalAccrued, totalCompensatory, totalTaken, netAvailable } = item;
                       return (
                         <tr key={emp.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
                           <td className="p-3 text-center font-mono text-slate-400">{idx + 1}</td>
                           <td className="p-3">
                             <div className="font-bold text-slate-900">{emp.fullNameAr}</div>
-                            <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+                            <div className="text-[10px] text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
                               <span>{emp.employeeCode}</span>
                               <span>•</span>
                               <span>{emp.jobTitle}</span>
+                              <span>•</span>
+                              <span className="text-purple-800 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                {formatEmployeeNationalityAndResidency(emp)}
+                              </span>
                             </div>
                           </td>
                           <td className="p-3 text-center font-mono text-slate-700">
                             {formatDaysDisplay(totalOpening)}
                           </td>
-                          <td className="p-3 text-center font-mono text-purple-700 font-bold">
-                            {formatDaysDisplay(totalAccrued)}
+                          <td className="p-3 text-center font-mono">
+                            <div className="text-purple-700 font-bold">{formatDaysDisplay(totalAccrued)}</div>
+                          </td>
+                          <td className="p-3 text-center font-mono">
+                            {totalCompensatory > 0 ? (
+                              <span className="font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-300 inline-block shadow-2xs">
+                                +{formatDaysDisplay(totalCompensatory)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">0 يوم</span>
+                            )}
                           </td>
                           <td className="p-3 text-center font-mono text-rose-700 font-bold">
                             {formatDaysDisplay(totalTaken)}
                           </td>
                           <td className="p-3 text-center font-mono">
-                            <span className="font-black text-sm text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <span className="font-black text-sm text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-300 shadow-2xs">
                               {formatDaysDisplay(netAvailable)}
                             </span>
                           </td>
@@ -1426,6 +1550,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                   >
                     <option value="regular">تخصيص ثابت / افتتاحي (Regular)</option>
                     <option value="accrual">خطة استحقاق شهري (Accrual Plan)</option>
+                    <option value="compensatory_off">يوم تعويضي عن العمل في العطلات (Compensatory Off)</option>
                   </select>
                 </div>
 
@@ -1502,9 +1627,17 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
         );
 
         const openingAllocs = empFifo.allocations.filter(a => a.allocationType === 'regular');
-        const accrualAllocs = empFifo.allocations.filter(a => a.allocationType === 'accrual');
+        const accrualAllocs = empFifo.allocations.filter(a => a.allocationType === 'accrual' && !a.name?.includes('تعويضي') && !a.name?.includes('بديل') && !a.name?.includes('عطلة'));
+        const compAllocs = empFifo.allocations.filter(a => 
+          a.allocationType === 'compensatory_off' || 
+          (a.allocationType as string) === 'compensatory' || 
+          a.name?.includes('تعويضي') || 
+          a.name?.includes('بديل') ||
+          a.name?.includes('عطلة')
+        );
         const openingDays = openingAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
         const accrualDays = accrualAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
+        const compDays = compAllocs.reduce((s, a) => s + (a.numberOfDays || 0), 0);
 
         return (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -1530,10 +1663,10 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
               </header>
 
               <div className="p-6 space-y-6 text-xs max-h-[80vh] overflow-y-auto">
-                {/* 4 Summary Metric Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Summary Metric Cards */}
+                <div className={`grid grid-cols-2 ${compDays > 0 ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3`}>
                   <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 text-center">
-                    <div className="text-amber-800 font-bold text-[10px]"> (Opening)</div>
+                    <div className="text-amber-800 font-bold text-[10px]">الرصيد الافتتاحي (Opening)</div>
                     <div className="text-base sm:text-lg font-black text-amber-900 font-mono mt-1">
                       {formatDaysDisplay(openingDays)}
                     </div>
@@ -1547,6 +1680,16 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                     </div>
                     <div className="text-[10px] text-purple-700 mt-0.5">بمعدل 2.5 يوم/شهر</div>
                   </div>
+
+                  {compDays > 0 && (
+                    <div className="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 text-center">
+                      <div className="text-emerald-800 font-bold text-[10px]">أيام تعويضية (Compensatory)</div>
+                      <div className="text-base sm:text-lg font-black text-emerald-900 font-mono mt-1">
+                        +{formatDaysDisplay(compDays)}
+                      </div>
+                      <div className="text-[10px] text-emerald-700 mt-0.5">بديل عطل رسمية</div>
+                    </div>
+                  )}
 
                   <div className="p-3.5 bg-rose-50/70 rounded-xl border border-rose-200 text-center">
                     <div className="text-rose-800 font-bold text-[10px]">المستهلك (Taken Days)</div>
@@ -1614,11 +1757,17 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                                 </td>
                                 <td className="p-3 text-center">
                                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    a.allocationType === 'regular' 
-                                      ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                                      : 'bg-purple-100 text-purple-900 border border-purple-200'
+                                    a.allocationType === 'compensatory_off' || (a as any).allocationType === 'compensatory' || a.name?.includes('تعويضي') || a.name?.includes('بديل')
+                                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                                      : a.allocationType === 'regular' 
+                                        ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                                        : 'bg-purple-100 text-purple-900 border border-purple-200'
                                   }`}>
-                                    {a.allocationType === 'regular' ? 'رصيد افتتاحي مرحل' : 'استحقاق شهري (2.5)'}
+                                    {a.allocationType === 'compensatory_off' || (a as any).allocationType === 'compensatory' || a.name?.includes('تعويضي') || a.name?.includes('بديل')
+                                      ? '🎁 يوم تعويضي (عطلة)'
+                                      : a.allocationType === 'regular' 
+                                        ? 'رصيد افتتاحي مرحل' 
+                                        : 'استحقاق شهري (2.5)'}
                                   </span>
                                 </td>
                                 <td className="p-3 text-center font-mono text-slate-600">{a.dateFrom || '—'}</td>
@@ -1722,7 +1871,7 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
 
               <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
                 <div className="text-[11px] text-slate-500">
-                  نظام التوزيع الآلي وفق قانون العمل الكويتي (المادة 70) ونموذج Odoo Enterprise Time Off (FIFO Ledger).
+                  نظام التوزيع الآلي وفق قانون العمل الكويتي (المادة 70) - Enterprise Time Off System (FIFO Ledger).
                 </div>
                 <button
                   onClick={() => setSelectedFifoEmployee(null)}

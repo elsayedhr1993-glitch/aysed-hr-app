@@ -694,7 +694,7 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
             <div className="relative">
               <input
                 type="text"
-                value={whatsAppConfig.instanceId}
+                value={whatsAppConfig.instanceId || ''}
                 onChange={(e) => setWhatsAppConfig(prev => ({ ...prev, instanceId: e.target.value }))}
                 placeholder="مثال: instance98421"
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-left font-mono focus:ring-2 focus:ring-[#714B67] focus:bg-white outline-none"
@@ -719,7 +719,7 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
             <div className="relative">
               <input
                 type={showToken ? 'text' : 'password'}
-                value={whatsAppConfig.apiToken}
+                value={whatsAppConfig.apiToken || ''}
                 onChange={(e) => setWhatsAppConfig(prev => ({ ...prev, apiToken: e.target.value }))}
                 placeholder="wpp_token_secret_key_..."
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-left font-mono focus:ring-2 focus:ring-[#714B67] focus:bg-white outline-none pl-16"
@@ -753,7 +753,7 @@ export const SystemIntegrationsPage: React.FC<SystemIntegrationsPageProps> = ({
             </label>
             <div className="flex items-center gap-2">
               <select
-                value={whatsAppConfig.defaultCountryCode}
+                value={whatsAppConfig.defaultCountryCode || '+965'}
                 onChange={(e) => setWhatsAppConfig(prev => ({ ...prev, defaultCountryCode: e.target.value }))}
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-[#714B67] focus:bg-white outline-none"
               >

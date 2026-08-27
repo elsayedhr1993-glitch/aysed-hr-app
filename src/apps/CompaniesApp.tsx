@@ -486,7 +486,7 @@ export const CompaniesApp: React.FC<CompaniesAppProps> = ({
                       <input
                         type="text"
                         required
-                        value={editingCompany.nameAr}
+                        value={editingCompany.nameAr || ''}
                         onChange={(e) => setEditingCompany({ ...editingCompany, nameAr: e.target.value })}
                         placeholder="مثال: عيادات ايليت الطبية المتخصصة"
                         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-[#714B67] outline-none"

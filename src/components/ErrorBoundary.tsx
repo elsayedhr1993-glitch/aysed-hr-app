@@ -18,6 +18,18 @@ export class ErrorBoundary extends Component<Props, State> {
     errorInfo: null,
   };
 
+  public componentDidMount() {
+    window.addEventListener('error', (event) => {
+      console.error('[Global Window Error]:', event.error);
+      this.setState({ hasError: true, error: event.error || new Error(event.message) });
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      console.warn('[Unhandled Promise Rejection caught gracefully]:', event.reason);
+      // Do not trigger hasError for background promise rejections (network/offline/firestore sync)
+      event.preventDefault();
+    });
+  }
+
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error, errorInfo: null };
   }

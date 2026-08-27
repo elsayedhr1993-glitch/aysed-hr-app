@@ -85,7 +85,8 @@ export function processRawLogsToAttendanceRecords(
   employees: Employee[],
   companyId: string,
   leaves: LeaveRequest[],
-  shift: ShiftConfig = DEFAULT_SHIFT
+  shift: ShiftConfig = DEFAULT_SHIFT,
+  contracts: Contract[] = []
 ): ParsedAttendanceResult {
   const logMap: Record<string, Record<string, string[]>> = {}; // empCode -> date -> times[]
   const unmatchedCodesSet = new Set<string>();
@@ -96,7 +97,7 @@ export function processRawLogsToAttendanceRecords(
     const date = formatDateStr(log.date);
     const time = formatTimeStr(log.time);
 
-    if (!code || !date) return;
+    if (!code || !date || !time) return;
 
     datesSet.add(date);
 
@@ -113,7 +114,6 @@ export function processRawLogsToAttendanceRecords(
   let matchedCount = 0;
 
   const shiftStartMins = timeToMinutes(shift.startTime);
-  const shiftEndMins = timeToMinutes(shift.endTime);
 
   Object.entries(logMap).forEach(([code, datesData]) => {
     const cleanCode = code.trim().toLowerCase();
@@ -127,11 +127,13 @@ export function processRawLogsToAttendanceRecords(
     // 6. Name match
     const emp = employees.find(
       e => e.companyId === companyId && (
-        (e.biometricId && e.biometricId.trim().toLowerCase() === cleanCode) ||
-        (e.badgeId && e.badgeId.trim().toLowerCase() === cleanCode) ||
-        (e.pinCode && e.pinCode.trim().toLowerCase() === cleanCode) ||
-        (e.employeeCode && e.employeeCode.trim().toLowerCase() === cleanCode) ||
-        (e.civilId && e.civilId.trim() === code.trim()) ||
+        (e.biometricId && String(e.biometricId).trim().toLowerCase() === cleanCode) ||
+        (e.badgeId && String(e.badgeId).trim().toLowerCase() === cleanCode) ||
+        (e.pinCode && String(e.pinCode).trim().toLowerCase() === cleanCode) ||
+        (e.biometricId && !isNaN(Number(e.biometricId)) && !isNaN(Number(code)) && Number(e.biometricId) === Number(code)) ||
+        (e.badgeId && !isNaN(Number(e.badgeId)) && !isNaN(Number(code)) && Number(e.badgeId) === Number(code)) ||
+        (e.employeeCode && String(e.employeeCode).trim().toLowerCase() === cleanCode) ||
+        (e.civilId && String(e.civilId).trim() === code.trim()) ||
         (e.fullNameAr && e.fullNameAr.includes(code.trim())) ||
         (e.fullNameEn && e.fullNameEn.toLowerCase().includes(cleanCode))
       )
@@ -145,26 +147,66 @@ export function processRawLogsToAttendanceRecords(
 
     const targetEmpId = emp ? emp.id : `unmatched-${code}`;
 
+    const empContract = contracts.find(c => (c.employeeId === targetEmpId || (emp && c.employeeId === emp.employeeCode)) && (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE'));
+    const standardHours = empContract?.plannedDailyHours || empContract?.dailyWorkHours || (empContract as any)?.dailyHours || (empContract as any)?.hours_per_day || shift.dailyWorkHours || 8;
+
     Object.entries(datesData).forEach(([dateStr, times]) => {
-      // Sort times chronologically
+      // 1. Sort times chronologically
       times.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
 
-      const firstPunch = times[0]; // Check In
-      const lastPunch = times.length > 1 ? times[times.length - 1] : shift.endTime; // Check Out or Shift End
+      // 2. Filter duplicate punches (< 3 minutes apart)
+      const filteredPunches: string[] = [];
+      times.forEach(time => {
+        const mins = timeToMinutes(time);
+        if (filteredPunches.length === 0) {
+          filteredPunches.push(time);
+        } else {
+          const lastMins = timeToMinutes(filteredPunches[filteredPunches.length - 1]);
+          if (mins - lastMins >= 3) {
+            filteredPunches.push(time);
+          }
+        }
+      });
 
-      const checkInMins = timeToMinutes(firstPunch);
-      const checkOutMins = timeToMinutes(lastPunch);
+      // 3. Dynamic Multi-Punch Pairing (In / Out pairs) & Pure Flexible Daily Accumulation
+      const punches: { in: string; out: string | null }[] = [];
+      let totalMinutesWorked = 0;
 
-      // Work Hours
-      const totalMinutesWorked = Math.max(0, checkOutMins - checkInMins);
-      const workHours = parseFloat((totalMinutesWorked / 60).toFixed(2));
-      const overtimeHours = Math.max(0, parseFloat((workHours - shift.dailyWorkHours).toFixed(2)));
+      if (filteredPunches.length >= 4) {
+        // Multi-Punch / Split Shift: pair (0,1), (2,3), etc.
+        for (let i = 0; i < filteredPunches.length; i += 2) {
+          const checkIn = filteredPunches[i];
+          const checkOut = i + 1 < filteredPunches.length ? filteredPunches[i + 1] : null;
 
-      // Lateness Calculation
-      let latenessMins = 0;
-      if (checkInMins > shiftStartMins + shift.graceMinutes) {
-        latenessMins = checkInMins - shiftStartMins;
+          if (checkOut) {
+            const minsIn = timeToMinutes(checkIn);
+            const minsOut = timeToMinutes(checkOut);
+            totalMinutesWorked += Math.max(0, minsOut - minsIn);
+          }
+          punches.push({ in: checkIn, out: checkOut });
+        }
+      } else if (filteredPunches.length >= 2) {
+        // Single Shift: First punch as Check-in, Last punch as Check-out
+        const first = filteredPunches[0];
+        const last = filteredPunches[filteredPunches.length - 1];
+        const minsIn = timeToMinutes(first);
+        const minsOut = timeToMinutes(last);
+        totalMinutesWorked = Math.max(0, minsOut - minsIn);
+        punches.push({ in: first, out: last });
+      } else if (filteredPunches.length === 1) {
+        // Only one punch recorded
+        punches.push({ in: filteredPunches[0], out: null });
       }
+
+      const firstPunch = filteredPunches[0] || '';
+      const lastPunch = filteredPunches.length > 1 ? filteredPunches[filteredPunches.length - 1] : '';
+
+      const workHours = parseFloat((totalMinutesWorked / 60).toFixed(2));
+      const overtimeHours = Math.max(0, parseFloat((workHours - standardHours).toFixed(2)));
+      const shortageHours = Math.max(0, parseFloat((standardHours - workHours).toFixed(2)));
+
+      // In pure flexible working hours, fixed start time lateness penalty is disabled (0)
+      let latenessMins = 0;
 
       // Check for approved hourly permission for this employee on this date
       const empPermission = leaves.find(
@@ -173,10 +215,6 @@ export function processRawLogsToAttendanceRecords(
           l.leaveType === 'HOURLY_PERMISSION' &&
           l.startDate === dateStr
       );
-
-      if (empPermission && empPermission.permissionMinutes) {
-        latenessMins = Math.max(0, latenessMins - empPermission.permissionMinutes);
-      }
 
       // Check if employee has approved full-day leave
       const empLeave = leaves.find(
@@ -189,12 +227,11 @@ export function processRawLogsToAttendanceRecords(
       let status: 'PRESENT' | 'LATE' | 'ABSENT' | 'ON_LEAVE' = 'PRESENT';
       if (empLeave) {
         status = 'ON_LEAVE';
-        latenessMins = 0;
-      } else if (latenessMins > 0) {
-        status = 'LATE';
+      } else if (filteredPunches.length === 0) {
+        status = 'ABSENT';
+      } else {
+        status = 'PRESENT';
       }
-
-      const punches = [{ in: firstPunch, out: lastPunch }];
 
       records.push({
         id: `att-${targetEmpId}-${dateStr}`,
@@ -206,6 +243,7 @@ export function processRawLogsToAttendanceRecords(
         punches,
         workHours,
         overtimeHours,
+        shortageHours,
         status,
         latenessMinutes: latenessMins,
       });
@@ -377,14 +415,24 @@ function parseRawTxtLines(text: string): RawBiometricLog[] {
   return logs;
 }
 
-// Calculate monthly attendance deductions (KWD) per employee
+// Calculate monthly attendance deductions (KWD) per employee under pure flexible hours
 export function calculateMonthlyAttendanceDeductions(
   attendanceList: AttendanceRecord[],
   employees: Employee[],
   contracts: Contract[],
   companyId: string,
   selectedMonth: string // YYYY-MM
-): Record<string, { latenessMinutes: number; latenessDeductionKwd: number; absentDays: number; absenceDeductionKwd: number; totalDeductionKwd: number }> {
+): Record<string, {
+  latenessMinutes: number;
+  latenessDeductionKwd: number;
+  absentDays: number;
+  absenceDeductionKwd: number;
+  shortageHours: number;
+  shortageDeductionKwd: number;
+  overtimeHours: number;
+  overtimeAmountKwd: number;
+  totalDeductionKwd: number;
+}> {
   const safeAttendance = attendanceList || [];
   const safeEmployees = employees || [];
   const safeContracts = contracts || [];
@@ -393,33 +441,52 @@ export function calculateMonthlyAttendanceDeductions(
     a => a && a.companyId === companyId && a.date && a.date.startsWith(selectedMonth)
   );
 
-  const deductionsMap: Record<string, { latenessMinutes: number; latenessDeductionKwd: number; absentDays: number; absenceDeductionKwd: number; totalDeductionKwd: number }> = {};
+  const deductionsMap: Record<string, {
+    latenessMinutes: number;
+    latenessDeductionKwd: number;
+    absentDays: number;
+    absenceDeductionKwd: number;
+    shortageHours: number;
+    shortageDeductionKwd: number;
+    overtimeHours: number;
+    overtimeAmountKwd: number;
+    totalDeductionKwd: number;
+  }> = {};
 
   const companyEmps = safeEmployees.filter(e => e && !e.isDeleted && e.companyId === companyId);
 
   companyEmps.forEach(emp => {
-    const cnt = safeContracts.find(c => c && c.employeeId === emp.id);
+    const cnt = safeContracts.find(c => c && (c.employeeId === emp.id || c.employeeId === emp.employeeCode));
     const basicSalary = cnt ? cnt.basicSalary : 800; // default 800 KWD
+    const standardDailyHours = cnt?.plannedDailyHours || cnt?.dailyWorkHours || (cnt as any)?.dailyHours || (cnt as any)?.hours_per_day || 8;
     const dailyWage = basicSalary / 26; // 26 working days under Kuwait Labor Law
-    const hourlyRate = dailyWage / 8;  // 8 hours per day
+    const hourlyRate = dailyWage / standardDailyHours;
 
     const empLogs = monthAttendance.filter(a => a && a.employeeId === emp.id);
 
-    const totalLateMins = empLogs.reduce((sum, a) => sum + (a.latenessMinutes || 0), 0);
     const absentCount = empLogs.filter(a => a && a.status === 'ABSENT').length;
+    const totalShortageHours = empLogs.reduce((sum, a) => sum + (a.shortageHours || 0), 0);
+    const totalOvertimeHours = empLogs.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
 
-    // Lateness Penalty KWD: minutes * (hourly rate / 60)
-    const latenessDedKwd = parseFloat((totalLateMins * (hourlyRate / 60)).toFixed(3));
-    // Absence Penalty KWD: absent days * daily wage
+    // Pure Flexible Hours: Net difference = Actual Hours - Contract Hours
+    // Shortage Deduction: Shortage hours * hourly wage
+    const shortageDedKwd = parseFloat((totalShortageHours * hourlyRate).toFixed(3));
+    // Absence Deduction: Absent days * daily wage
     const absenceDedKwd = parseFloat((absentCount * dailyWage).toFixed(3));
+    // Overtime Amount: Overtime hours * hourly wage * 1.25 (Kuwait Law standard)
+    const overtimeKwd = parseFloat((totalOvertimeHours * hourlyRate * 1.25).toFixed(3));
 
-    const totalDedKwd = parseFloat((latenessDedKwd + absenceDedKwd).toFixed(3));
+    const totalDedKwd = parseFloat((shortageDedKwd + absenceDedKwd).toFixed(3));
 
     deductionsMap[emp.id] = {
-      latenessMinutes: totalLateMins,
-      latenessDeductionKwd: latenessDedKwd,
+      latenessMinutes: 0,
+      latenessDeductionKwd: 0,
       absentDays: absentCount,
       absenceDeductionKwd: absenceDedKwd,
+      shortageHours: parseFloat(totalShortageHours.toFixed(2)),
+      shortageDeductionKwd: shortageDedKwd,
+      overtimeHours: parseFloat(totalOvertimeHours.toFixed(2)),
+      overtimeAmountKwd: overtimeKwd,
       totalDeductionKwd: totalDedKwd,
     };
   });

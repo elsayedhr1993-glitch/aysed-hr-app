@@ -850,8 +850,20 @@ body.has_admin_bar .o_main_navbar {
     border-bottom: 2px solid #008784;
 }
 
-body.admin_mode .o_main_navbar {
-    margin-top: 35px !important;
+/* Solid Enterprise UI & CLS Prevention */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms !important;
 }
+
+table {
+  table-layout: fixed;
+}
+
+.enterprise-container {
+  min-height: calc(100vh - 120px);
+}
+
 
 

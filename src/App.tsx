@@ -19,9 +19,9 @@ import {
   AttendanceRecord, Payslip, DocumentItem, AutomationRule, 
   CustodyItem, LoanAdvance, DisciplinaryWarning, EmployeeNote, DocumentTemplate, 
   GeneratedDocument, AuditLog, ShiftProfile, EmployeeShift, 
-  EmploymentCommencement, CompanySubscription, JobTitle, Department, EmployeeNotification, DailyMovement
+  EmploymentCommencement, CompanySubscription, JobTitle, Department, EmployeeNotification, DailyMovement, Candidate
 } from './types';
-import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts, initialSubscriptions } from './data/initialData';
+import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts, initialSubscriptions, initialCandidates } from './data/initialData';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { generateSmartNotifications } from './utils/notificationsEngine';
 import toast, { Toaster } from 'react-hot-toast';
@@ -138,15 +138,18 @@ function MainActionManager() {
   }, [companies]);
 
   const [activeCompany, setActiveCompany] = useState<Company>(() => {
-    const saved = localStorage.getItem('activeCompanyId');
-    const existingCompanies = getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, initialCompanies, MANARA_STORAGE_KEYS.TENANTS);
-    if (saved && saved !== 'comp-super-admin') {
-      const found = existingCompanies.find(c => c.id === saved) || null;
-      if (found) return found;
-    }
-    const nonAdminComps = existingCompanies.filter(c => c.id !== 'comp-super-admin');
-    if (nonAdminComps.length > 0) return nonAdminComps[0];
-    return existingCompanies.length > 0 ? existingCompanies[0] : null as any;
+    try {
+      const saved = localStorage.getItem('activeCompanyId');
+      const existingCompanies = getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, initialCompanies, MANARA_STORAGE_KEYS.TENANTS);
+      if (saved && saved !== 'comp-super-admin' && Array.isArray(existingCompanies)) {
+        const found = existingCompanies.find(c => c && c.id === saved) || null;
+        if (found) return found;
+      }
+      const nonAdminComps = Array.isArray(existingCompanies) ? existingCompanies.filter(c => c && c.id !== 'comp-super-admin') : [];
+      if (nonAdminComps.length > 0) return nonAdminComps[0];
+      if (Array.isArray(existingCompanies) && existingCompanies.length > 0 && existingCompanies[0]) return existingCompanies[0];
+    } catch (e) {}
+    return initialCompanies[0] as Company;
   });
 
   // Data state with persistent localStorage initialization
@@ -238,6 +241,9 @@ function MainActionManager() {
   );
   const [dailyMovements, setDailyMovements] = useState<DailyMovement[]>(() => 
     getPersistentData<DailyMovement[]>(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, [])
+  );
+  const [candidates, setCandidates] = useState<Candidate[]>(() => 
+    getPersistentData<Candidate[]>(MANARA_STORAGE_KEYS.CANDIDATES, initialCandidates)
   );
 
   // Quick Notification Modal State
@@ -543,6 +549,7 @@ function MainActionManager() {
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.SUBSCRIPTIONS, subscriptions); }, [subscriptions]);
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEE_NOTIFICATIONS, employeeNotifications); }, [employeeNotifications]);
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, dailyMovements); }, [dailyMovements]);
+  useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.CANDIDATES, candidates); }, [candidates]);
 
   // ضمان جلب البيانات وعدم فراغها أبداً (Fallback Seeding)
   useEffect(() => {
@@ -1225,10 +1232,6 @@ function MainActionManager() {
     }
   };
 
-  const handlePostAttendanceToPayroll = (month: string) => {
-    toast.success("Attendance posted to payroll for " + month);
-  };
-
   const handleSavePayslip = async (p: Payslip) => {
     const targetCompId = p.companyId || activeCompany?.id || 'comp-1';
     const completePayslip = { ...p, companyId: targetCompId };
@@ -1632,6 +1635,157 @@ function MainActionManager() {
     handleSaveEmployee(newEmp);
   };
 
+  const handleSaveCandidate = async (candidate: Candidate) => {
+    const updated = {
+      ...candidate,
+      companyId: candidate.companyId || activeCompany?.id || 'comp-1'
+    };
+    setCandidates(prev => {
+      const idx = prev.findIndex(c => c.id === updated.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updated;
+        return next;
+      }
+      return [updated, ...prev];
+    });
+    try {
+      await setDoc(doc(db, 'candidates', updated.id), cleanFirestoreData(updated), { merge: true });
+    } catch (e) {
+      console.warn('Candidate firestore save', e);
+    }
+  };
+
+  const handleConvertCandidateToEmployee = async (cand: Candidate) => {
+    const newEmpId = 'emp-' + Date.now();
+    const newEmp: Employee = {
+      id: newEmpId,
+      companyId: cand.companyId || activeCompany?.id || 'comp-1',
+      employeeCode: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
+      fullNameAr: cand.fullName,
+      fullNameEn: cand.fullName,
+      civilId: `2900101${Math.floor(10000 + Math.random() * 90000)}`,
+      civilIdExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      passportNo: '',
+      passportExpiry: new Date(Date.now() + 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      nationality: 'الكويت',
+      isKuwaiti: false,
+      residencyType: 'مادة 18 - قطاع أهلي',
+      gender: 'MALE',
+      dob: '1995-01-01',
+      department: cand.department || 'الإدارة العامة',
+      jobTitle: cand.appliedPosition || 'موظف',
+      joinDate: new Date().toISOString().split('T')[0],
+      status: 'ACTIVE',
+      bankName: 'بنك الكويت الوطني (NBK)',
+      iban: 'KW00NBK0000000000000000000000',
+      tags: cand.tags || [],
+      phone: cand.phone || '',
+      email: cand.email || '',
+    };
+
+    const newContract: Contract = {
+      id: 'cnt-' + Date.now(),
+      employeeId: newEmpId,
+      companyId: cand.companyId || activeCompany?.id || 'comp-1',
+      contractType: 'INDEFINITE',
+      startDate: new Date().toISOString().split('T')[0],
+      basicSalary: cand.expectedSalary || 500,
+      housingAllowance: 0,
+      transportAllowance: 0,
+      otherAllowance: 0,
+      noticePeriodDays: 90,
+      status: 'RUNNING',
+      dailyWorkHours: 8,
+      plannedDailyHours: 8,
+      workingHoursPerWeek: 48
+    };
+
+    await handleSaveEmployee(newEmp);
+    await handleSaveContract(newContract);
+    
+    // Mark candidate as hired
+    const updatedCand = { ...cand, stage: 'HIRED' as const };
+    await handleSaveCandidate(updatedCand);
+    toast.success(`تم تحويل المرشح (${cand.fullName}) إلى موظف نشط وإنشاء عقد العمل ومباشرة العمل بنجاح!`);
+  };
+
+  const handleDeleteCandidate = async (candId: string) => {
+    setCandidates(prev => prev.filter(c => c.id !== candId));
+    try {
+      await deleteDoc(doc(db, 'candidates', candId));
+    } catch (e) {
+      console.warn('Candidate delete firestore', e);
+    }
+  };
+
+  const handlePostAttendanceToPayroll = (month: string, deductionsMap?: Record<string, number>) => {
+    const compEmps = employees.filter(e => !e.isDeleted && e.companyId === (activeCompany?.id || 'comp-1'));
+    const thisMonthAttendance = attendance.filter(a => a.date.startsWith(month) && a.companyId === (activeCompany?.id || 'comp-1'));
+    
+    let totalDeductionsKWD = 0;
+    let affectedCount = 0;
+
+    const newPayslips: Payslip[] = [];
+
+    compEmps.forEach(emp => {
+      const contract = contracts.find(c => c.employeeId === emp.id && (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE'));
+      if (!contract) return;
+
+      const basic = contract.basicSalary;
+      const totalAllowances = (contract.housingAllowance || 0) + (contract.transportAllowance || 0) + (contract.otherAllowance || 0);
+      const gross = basic + totalAllowances;
+      const dailyWage = basic / 26;
+
+      const empAtt = thisMonthAttendance.filter(a => a.employeeId === emp.id);
+      const absentDays = empAtt.filter(a => a.status === 'ABSENT').length;
+      const totalShortageHours = empAtt.reduce((sum, a) => sum + (a.shortageHours || 0), 0);
+      const totalOvertimeHours = empAtt.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
+      const standardHours = contract.plannedDailyHours || contract.dailyWorkHours || 8;
+      const hourlyRate = (basic / 26) / standardHours;
+
+      const absenceDeduction = parseFloat((absentDays * dailyWage).toFixed(3));
+      const shortageDeduction = parseFloat((totalShortageHours * hourlyRate).toFixed(3));
+      const overtimeAmount = parseFloat((totalOvertimeHours * hourlyRate * 1.25).toFixed(3));
+
+      const totalCalculatedDeduction = deductionsMap && deductionsMap[emp.id] !== undefined 
+        ? deductionsMap[emp.id] 
+        : (absenceDeduction + shortageDeduction);
+
+      const netSalary = parseFloat((gross + overtimeAmount - totalCalculatedDeduction).toFixed(3));
+
+      if (totalCalculatedDeduction > 0) {
+        totalDeductionsKWD += totalCalculatedDeduction;
+        affectedCount++;
+      }
+
+      newPayslips.push({
+        id: 'pay-' + month + '-' + emp.id,
+        employeeId: emp.id,
+        companyId: activeCompany?.id || 'comp-1',
+        month,
+        basicSalary: basic,
+        allowances: totalAllowances,
+        grossSalary: gross,
+        latenessDeduction: totalCalculatedDeduction,
+        otherDeductions: shortageDeduction,
+        overtimeHours: totalOvertimeHours,
+        overtimeAmount: overtimeAmount,
+        netSalary: Math.max(0, netSalary),
+        paymentStatus: 'DRAFT'
+      });
+    });
+
+    setPayslips(prev => {
+      const filtered = prev.filter(p => !(p.companyId === (activeCompany?.id || 'comp-1') && p.month === month));
+      const merged = [...newPayslips, ...filtered];
+      setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, merged);
+      return merged;
+    });
+
+    toast.success(`تم ترحيل استقطاعات البصمة لشهر ${month} بنجاح إلى مسير الرواتب (${affectedCount} موظف - إجمالي ${totalDeductionsKWD.toFixed(3)} د.ك)`);
+  };
+
   const handleGenerateMonthlyPayslips = (month: string) => {
     const newPayslips: Payslip[] = [];
     const thisMonthAttendance = attendance.filter(a => a.date.startsWith(month));
@@ -1670,7 +1824,17 @@ function MainActionManager() {
       const dailyWage = basic / 26;
       const unpaidLeaveDeduction = parseFloat((unpaidLeaveDays * dailyWage).toFixed(3));
       const absenceDeduction = parseFloat((absentDays * dailyWage).toFixed(3));
+
+      const standardHours = contract.plannedDailyHours || contract.dailyWorkHours || 8;
+      const totalOvertimeHours = empAtt.reduce((sum, a) => sum + (a.overtimeHours || 0), 0);
+      const totalShortageHours = empAtt.reduce((sum, a) => sum + (a.shortageHours || 0), 0);
+
+      const hourlyRate = (basic / 26) / standardHours;
+      const overtimeAmount = parseFloat((totalOvertimeHours * hourlyRate * 1.25).toFixed(3));
+      const shortageDeduction = parseFloat((totalShortageHours * hourlyRate).toFixed(3));
+
       const gross = basic + totalAllowances;
+      const netSalary = parseFloat((gross + overtimeAmount - absenceDeduction - unpaidLeaveDeduction - shortageDeduction).toFixed(3));
       
       newPayslips.push({
         id: 'pay-' + month + '-' + emp.id,
@@ -1683,8 +1847,12 @@ function MainActionManager() {
         latenessDeduction: absenceDeduction,
         unpaidLeaveDeduction: unpaidLeaveDeduction,
         unpaidLeaveDays: unpaidLeaveDays,
-        otherDeductions: 0,
-        netSalary: payslipCalc.netSalary,
+        overtimeHours: totalOvertimeHours,
+        overtimeAmount: overtimeAmount,
+        shortageHours: totalShortageHours,
+        shortageDeduction: shortageDeduction,
+        otherDeductions: shortageDeduction,
+        netSalary: Math.max(0, netSalary),
         paymentStatus: 'DRAFT'
       });
     });
@@ -1734,7 +1902,7 @@ function MainActionManager() {
   
   const stats = {
     employeesCount: (employees || []).filter(e => e.companyId === activeCompanyId && !e.isDeleted).length,
-    candidatesCount: 0,
+    candidatesCount: (candidates || []).filter(c => c.companyId === activeCompanyId && c.stage !== 'HIRED').length,
     contractsCount: (contracts || []).filter(c => c.companyId === activeCompanyId).length,
     leavesPendingCount: (leaves || []).filter(l => l.companyId === activeCompanyId && l.status === 'SUBMITTED').length,
     documentsCount: (documents || []).filter(d => d.companyId === activeCompanyId).length,
@@ -1991,6 +2159,11 @@ function MainActionManager() {
               onSaveMovement={handleSaveMovement}
               onUpdateMovementState={handleUpdateMovementState}
               onDeleteMovement={handleDeleteMovement}
+              candidates={candidates}
+              onSaveCandidate={handleSaveCandidate}
+              onConvertCandidateToEmployee={handleConvertCandidateToEmployee}
+              onDeleteCandidate={handleDeleteCandidate}
+              onPostAttendanceToPayroll={handlePostAttendanceToPayroll}
               companies={companies}
               setCompanies={setCompanies}
               employeeNotifications={employeeNotifications}

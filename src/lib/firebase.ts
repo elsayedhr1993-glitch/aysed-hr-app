@@ -208,17 +208,15 @@ export function recordPurgedTenant(tokens: string[]) {
     localStorage.setItem('aysed_purged_tenants', JSON.stringify(updated));
 
     // Also persist to Firestore purged_tenants collection if possible
-    tokens.forEach(async t => {
+    tokens.forEach(t => {
       if (t && t.trim()) {
-        try {
-          const docKey = t.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-          if (docKey) {
-            await setDoc(doc(db, 'purged_tenants', docKey), {
-              token: t,
-              purgedAt: new Date().toISOString()
-            }, { merge: true });
-          }
-        } catch {}
+        const docKey = t.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        if (docKey) {
+          setDoc(doc(db, 'purged_tenants', docKey), {
+            token: t,
+            purgedAt: new Date().toISOString()
+          }, { merge: true }).catch(() => {});
+        }
       }
     });
   } catch (e) {

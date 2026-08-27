@@ -50,6 +50,7 @@ export interface Company {
   authorizedSignatureUrl?: string;
   subscriptionPlan?: string;
   status?: 'active' | 'suspended' | 'expired';
+  branches?: CompanyBranch[];
 }
 
 export interface Employee {
@@ -112,6 +113,8 @@ export interface Employee {
   shiftId?: string; // معرف الشفت المرتبط
   dailyWorkHours?: number; // ساعات العمل اليومية
   weeklyWorkHours?: number; // ساعات العمل الأسبوعية
+  branchId?: string; // معرف فرع الشركة (res.company / branch_id)
+  branchName?: string; // اسم الفرع
   isDeleted?: boolean; // الحذف اللطيف للأرشفة (Soft Delete)
   deletedAt?: string;
 }
@@ -165,6 +168,7 @@ export interface Contract {
   shiftId?: string; // الشفت المرتبط
   workingHoursPerWeek?: number; // ساعات العمل أسبوعياً (مثلاً 48 ساعة)
   dailyWorkHours?: number; // ساعات العمل اليومية (مثلاً 8 ساعات)
+  plannedDailyHours?: number; // ساعات العمل اليومية المعتمدة (8 / 10 / 12 ساعة)
 }
 
 export interface LeaveRequest {
@@ -206,7 +210,7 @@ export interface LeaveRequest {
   allocationBreakdown?: Array<{
     allocationId: string;
     allocationName: string;
-    allocationType: 'regular' | 'accrual';
+    allocationType: 'regular' | 'accrual' | 'compensatory_off' | 'compensatory';
     daysUsed: number;
   }>; // تتبع استهلاك التخصيصات بنظام FIFO
 }
@@ -220,7 +224,7 @@ export interface HrLeaveAllocation {
   employeeId: string;
   companyId: string;
   leaveType: 'ANNUAL' | 'SICK' | 'MATERNITY' | 'HAJJ' | 'UNPAID' | 'COMPASSIONATE' | 'BEREAVEMENT' | 'HOURLY_PERMISSION' | 'COMPENSATORY';
-  allocationType: 'regular' | 'accrual'; // 'regular' for fixed opening balance, 'accrual' for monthly plan
+  allocationType: 'regular' | 'accrual' | 'compensatory_off' | 'compensatory'; // 'regular' for fixed opening balance, 'accrual' for monthly plan, 'compensatory_off' for holidays
   accrualMonthKey?: string; // e.g. '2026-08'
   numberOfDays: number; // إجمالي الأيام المخصصة
   consumedDays?: number; // الأيام المستهلكة وفق مبدأ FIFO
@@ -429,6 +433,7 @@ export interface AttendanceRecord {
   punches?: { in: string; out: string; }[]; // لدعم الشفتات المتعددة (Split Shifts)
   workHours: number;
   overtimeHours: number;
+  shortageHours?: number;
   status: 'PRESENT' | 'LATE' | 'ABSENT' | 'ON_LEAVE';
   latenessMinutes: number;
   earlyLeaveMinutes?: number;
@@ -447,7 +452,10 @@ export interface Payslip {
   unpaidLeaveDays?: number;
   unpaidLeaveDeduction?: number;
   loanDeduction?: number;
+  overtimeHours?: number;
   overtimeAmount?: number;
+  shortageHours?: number;
+  shortageDeduction?: number;
   housingAllowance?: number;
   transportAllowance?: number;
   otherAllowance?: number;

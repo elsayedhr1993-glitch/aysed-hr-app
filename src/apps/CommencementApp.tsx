@@ -28,7 +28,7 @@ interface CommencementAppProps {
 export const STANDARD_WORKING_SCHEDULES = [
   {
     id: 'cal-std-8h-6d',
-    name: 'الدوام الصباحي القياسي - 48 ساعة (08:00 ص - 04:00 م | السبت - الخميس)',
+    name: 'دوام صباحي قياسي (8 ساعات): 08:00 - 16:00 (السبت - الخميس)',
     shortName: 'صباحي قياسي 8 ساعات',
     workHoursType: 'STANDARD' as const,
     dailyHours: 8,
@@ -38,19 +38,8 @@ export const STANDARD_WORKING_SCHEDULES = [
     typeBadge: 'دوام كامل (6 أيام)'
   },
   {
-    id: 'cal-std-8h-5d',
-    name: 'الدوام المكتبي 5 أيام - 40 ساعة (08:00 ص - 04:00 م | الأحد - الخميس)',
-    shortName: 'مكتبي 5 أيام 40 ساعة',
-    workHoursType: 'STANDARD' as const,
-    dailyHours: 8,
-    weeklyHours: 40,
-    workDays: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
-    timeRange: '08:00 - 16:00',
-    typeBadge: 'دوام كامل (5 أيام)'
-  },
-  {
     id: 'cal-eve-8h-6d',
-    name: 'الدوام المسائي القياسي - 48 ساعة (04:00 م - 12:00 ص | السبت - الخميس)',
+    name: 'دوام مسائي قياسي (8 ساعات): 16:00 - 00:00 (السبت - الخميس)',
     shortName: 'مسائي 8 ساعات',
     workHoursType: 'STANDARD' as const,
     dailyHours: 8,
@@ -61,7 +50,7 @@ export const STANDARD_WORKING_SCHEDULES = [
   },
   {
     id: 'cal-split-shifts',
-    name: 'دوام الفترتين المقسم - 48 ساعة (09:00 ص - 01:00 م و 05:00 م - 09:00 م)',
+    name: 'دوام الفترتين المقسم (Split Shift): 09:00 - 13:00 و 17:00 - 21:00',
     shortName: 'دوام فترتين مقسم',
     workHoursType: 'SHIFT' as const,
     dailyHours: 8,
@@ -71,19 +60,19 @@ export const STANDARD_WORKING_SCHEDULES = [
     typeBadge: 'شفتين مقسم'
   },
   {
-    id: 'cal-flexible-8h',
-    name: 'الدوام المرن الذكي - 8 ساعات يومية (حضور مرن 07:30 - 09:30)',
-    shortName: 'دوام مرن 8 ساعات',
-    workHoursType: 'FLEXIBLE' as const,
+    id: 'cal-std-8h-5d',
+    name: 'دوام مكتبي (5 أيام - 40 ساعة): 08:00 - 16:00 (الأحد - الخميس)',
+    shortName: 'مكتبي 5 أيام 40 ساعة',
+    workHoursType: 'STANDARD' as const,
     dailyHours: 8,
-    weeklyHours: 48,
-    workDays: ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
-    timeRange: '07:30 - 17:30 (مرن 8س)',
-    typeBadge: 'دوام مرن'
+    weeklyHours: 40,
+    workDays: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
+    timeRange: '08:00 - 16:00',
+    typeBadge: 'دوام كامل (5 أيام)'
   },
   {
     id: 'cal-part-time-4h',
-    name: 'الدوام الجزئي - 24 ساعة (09:00 ص - 01:00 م | السبت - الخميس)',
+    name: 'دوام جزئي (4 ساعات)',
     shortName: 'دوام جزئي 4 ساعات',
     workHoursType: 'PART_TIME' as const,
     dailyHours: 4,
@@ -91,6 +80,17 @@ export const STANDARD_WORKING_SCHEDULES = [
     workDays: ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
     timeRange: '09:00 - 13:00',
     typeBadge: 'دوام جزئي'
+  },
+  {
+    id: 'cal-flexible-8h',
+    name: 'دوام مرن (8 ساعات)',
+    shortName: 'دوام مرن 8 ساعات',
+    workHoursType: 'FLEXIBLE' as const,
+    dailyHours: 8,
+    weeklyHours: 48,
+    workDays: ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
+    timeRange: '07:30 - 17:30 (مرن 8س)',
+    typeBadge: 'دوام مرن'
   }
 ];
 
@@ -921,22 +921,19 @@ class HrCommencement(models.Model):
                 </div>
               </div>
 
-              {/* Odoo Section: تفاصيل الدوام وجدول العمل (Working Schedule) */}
+              {/* تفاصيل الدوام وجدول العمل */}
               <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-200 space-y-4">
                 <div className="flex items-center justify-between border-b border-purple-200 pb-2">
                   <div className="flex items-center gap-2 text-[#714B67] font-black text-xs">
                     <Timer className="w-4 h-4" />
                     <span>تفاصيل الدوام وجدول العمل (Working Schedule & Hours)</span>
                   </div>
-                  <span className="text-[10px] text-purple-700 font-mono bg-purple-100 px-2 py-0.5 rounded-full font-bold">
-                    resource_calendar_id
-                  </span>
                 </div>
 
-                {/* 1. Working Schedule Selection (resource_calendar_id) */}
+                {/* Working Schedule Selection */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    جدول ساعات العمل (Working Schedule) <span className="text-red-500">*</span>
+                    جدول العمل المعتمد (Working Schedule) <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={resourceCalendarId}
@@ -944,7 +941,7 @@ class HrCommencement(models.Model):
                     className="w-full bg-white border border-purple-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#714B67]/40 shadow-xs"
                     required
                   >
-                    <optgroup label="جداول ساعات العمل القياسية (Odoo Resource Calendars)">
+                    <optgroup label="جداول ساعات العمل المعتمدة">
                       {STANDARD_WORKING_SCHEDULES.map(sched => (
                         <option key={sched.id} value={sched.id}>
                           {sched.name} [{sched.typeBadge}]
@@ -961,43 +958,6 @@ class HrCommencement(models.Model):
                   <p className="text-[10px] text-slate-500 mt-1">
                     يرتبط هذا الجدول مباشرة بحسابات البصمة، ساعات العمل الإضافي، ومسير الرواتب.
                   </p>
-                </div>
-
-                {/* 2. Work Hours Type (Radio Widget widget="radio" as requested) */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-2">
-                    نوع الدوام (Work Hours Type)
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {[
-                      { type: 'STANDARD' as const, label: 'دوام كامل قياسي', desc: '8 ساعات يومياً (48س/أسبوعياً)' },
-                      { type: 'FLEXIBLE' as const, label: 'دوام مرن', desc: 'ساعات حضور مرنة' },
-                      { type: 'PART_TIME' as const, label: 'دوام جزئي', desc: '4 ساعات يومياً' },
-                      { type: 'SHIFT' as const, label: 'مناوبات وشفتات', desc: 'شفتات دورية أو مقسمة' },
-                      { type: 'CUSTOM' as const, label: 'ساعات مخصصة', desc: 'تحديد يدوي للساعات' },
-                    ].map((item) => (
-                      <label
-                        key={item.type}
-                        className={`flex flex-col p-2.5 rounded-xl border cursor-pointer transition ${
-                          workHoursType === item.type 
-                            ? 'bg-purple-100/90 border-[#714B67] text-purple-950 font-bold shadow-xs' 
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="work_hours_type"
-                            value={item.type}
-                            checked={workHoursType === item.type}
-                            onChange={() => setWorkHoursType(item.type)}
-                            className="text-[#714B67] focus:ring-[#714B67]"
-                          />
-                          <span className="text-xs">{item.label}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 pr-5 mt-0.5">{item.desc}</span>
-                      </label>))}
-                  </div>
                 </div>
 
                 {/* 3. Daily and Weekly Hours Breakdown */}
@@ -1330,7 +1290,58 @@ class HrCommencement(models.Model):
                 إغلاق
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  const printContent = document.getElementById('printable-commencement-document');
+                  if (!printContent) {
+                    window.print();
+                    return;
+                  }
+                  const win = window.open('', '_blank', 'width=800,height=900');
+                  if (win) {
+                    win.document.write(`
+                      <!DOCTYPE html>
+                      <html lang="ar" dir="rtl">
+                      <head>
+                        <meta charset="utf-8">
+                        <title>محضر مباشرة العمل الرسمي</title>
+                        <style>
+                          body { font-family: Tahoma, Arial, sans-serif; padding: 20px; color: #111; direction: rtl; text-align: right; }
+                          .print-container { max-width: 750px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; border-radius: 8px; background: #fff; }
+                          .flex { display: flex; }
+                          .justify-between { justify-content: space-between; }
+                          .items-center { align-items: center; }
+                          .border-b-2 { border-bottom: 2px solid #111; padding-bottom: 15px; margin-bottom: 20px; }
+                          .text-lg { font-size: 18px; font-weight: bold; }
+                          .text-xs { font-size: 12px; }
+                          .text-sm { font-size: 14px; }
+                          .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+                          .p-4 { padding: 12px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee; margin-bottom: 15px; }
+                          .text-center { text-align: center; }
+                          .font-bold { font-weight: bold; }
+                          .pt-8 { padding-top: 30px; }
+                          @media print {
+                            body { padding: 0; }
+                            .print-container { border: none; padding: 0; }
+                          }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="print-container">
+                          ${printContent.innerHTML}
+                        </div>
+                        <script>
+                          window.onload = function() {
+                            window.print();
+                          };
+                        </script>
+                      </body>
+                      </html>
+                    `);
+                    win.document.close();
+                  } else {
+                    window.print();
+                  }
+                }}
                 className="bg-[#714B67] hover:bg-[#5f3e57] text-white px-5 py-2 rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
@@ -1390,7 +1401,7 @@ class HrCommencement(models.Model):
                         </span>
                       </div>
                       <div className="p-2.5 bg-purple-50 rounded-lg border border-purple-200 col-span-2">
-                        <span className="text-[10px] text-purple-700 block font-bold">جدول ساعات العمل (resource_calendar_id)</span>
+                        <span className="text-[10px] text-purple-700 block font-bold">جدول ساعات العمل الرسمي</span>
                         <span className="font-bold text-purple-950">{schedName}</span>
                       </div>
                       <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">

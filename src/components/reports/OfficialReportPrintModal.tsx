@@ -13,7 +13,8 @@ import { PivotRowData } from './OdooPivotView';
 import { MeasureOption } from './OdooSearchBar';
 import { PrintWizardConfig } from './OdooReportPrintWizard';
 import { ReportCategory } from '../../apps/ReportsApp';
-import { getGlobalOpeningBalance, getGlobalAccrued2026 } from '../../utils/kuwaitLaw';
+import { getGlobalOpeningBalance, getGlobalAccrued2026, getGlobalCompensatoryDays, formatEmployeeNationalityAndResidency } from '../../utils/kuwaitLaw';
+import { getSavedSettlementVouchers } from '../../services/leaveSettlementService';
 import * as XLSX from 'xlsx';
 
 interface OfficialReportPrintModalProps {
@@ -79,7 +80,8 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
   const empLeaveMetrics = selectedEmployee ? (() => {
     const opening = getGlobalOpeningBalance(selectedEmployee);
     const accrued = getGlobalAccrued2026(selectedEmployee);
-    const totalAvailable = opening + accrued;
+    const compensatory = getGlobalCompensatoryDays(selectedEmployee);
+    const totalAvailable = opening + accrued + compensatory;
     
     const empLeaves = leaves.filter(
       l => !l.isHistorical && l.employeeId === selectedEmployee.id && (l.status === 'APPROVED' || (l.status as any) === 'VALIDATED')
@@ -152,8 +154,19 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
       const sourceList = activeList.length > 0 ? activeList : employees.map(emp => {
         const op = getGlobalOpeningBalance(emp);
         const ac = getGlobalAccrued2026(emp);
+        const comp = getGlobalCompensatoryDays(emp);
+        const totalAvail = op + ac + comp;
         const empL = leaves.filter(l => !l.isHistorical && l.employeeId === emp.id && (l.status === 'APPROVED' || (l.status as any) === 'VALIDATED'));
-        const tk = empL.reduce((s, l) => s + (l.totalDays || 0), 0);
+        const actualLeaveDays = empL.filter(l => !l.reason?.includes('تصفية نقدية') && !l.reason?.includes('Encashment')).reduce((s, l) => s + (l.totalDays || 0), 0);
+        const empVouchers = getSavedSettlementVouchers(activeCompany?.id).filter(v => v.employeeId === emp.id && (v.status === 'settled_locked' || v.status === 'paid'));
+        const encashDays = empVouchers.reduce((s, v) => s + (v.encashedLeaveDays || 0), 0);
+        const leaveEncashDays = empL.filter(l => l.reason?.includes('تصفية نقدية') || l.reason?.includes('Encashment')).reduce((s, l) => s + (l.totalDays || 0), 0);
+        const totalEncash = Math.max(leaveEncashDays, encashDays);
+        const totalDeducted = actualLeaveDays + totalEncash;
+        const paidConsumed = Math.min(totalAvail, totalDeducted);
+        const remaining = Math.max(0, totalAvail - totalDeducted);
+        const excess = Math.max(0, totalDeducted - totalAvail);
+
         return {
           employeeCode: emp.employeeCode,
           employeeName: emp.fullNameAr,
@@ -161,12 +174,12 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
           jobTitle: emp.jobTitle,
           carriedOver: op,
           accruedDays: ac,
-          totalAvailable: op + ac,
-          totalDays: tk,
-          paidConsumed: Math.min(tk, op + ac),
-          remainingDays: Math.max(0, (op + ac) - tk),
-          excessUnpaid: Math.max(0, tk - (op + ac)),
-          leaveStatus: ((op + ac) - tk) >= 15 ? 'رصيد كافٍ' : ((op + ac) - tk) > 0 ? 'رصيد منخفض' : 'رصيد مصفّر',
+          totalAvailable: totalAvail,
+          totalDays: totalDeducted,
+          paidConsumed: paidConsumed,
+          remainingDays: remaining,
+          excessUnpaid: excess,
+          leaveStatus: remaining >= 15 ? 'رصيد كافٍ' : remaining > 0 ? 'رصيد منخفض' : 'رصيد مصفّر',
         };
       });
 
@@ -181,7 +194,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
         'إجمالي الرصيد المتاح': item.totalAvailable || 0,
         'الأيام المستهلكة (مدفوعة)': item.paidConsumed || item.totalDays || 0,
         'صافي الرصيد المتبقي': item.remainingDays || 0,
-        'إجازة غير مدفوعة (خصم)': item.excessUnpaid || 0,
+        'أيام بدون راتب': item.excessUnpaid || 0,
         'حالة الرصيد': item.leaveStatus || 'مستقر',
       }));
     } else {
@@ -298,7 +311,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                   <div><span className="text-slate-500 block">المسمى الوظيفي:</span> <span className="text-slate-900 font-bold">{selectedEmployee.jobTitle}</span></div>
                   <div><span className="text-slate-500 block">القسم / الإدارة:</span> <span className="text-purple-900 font-bold">{selectedEmployee.department}</span></div>
                   <div><span className="text-slate-500 block">تاريخ التعيين / المباشرة:</span> <span className="font-mono text-slate-800 font-bold">{selectedEmployee.joinDate || '2023-01-01'}</span></div>
-                  <div><span className="text-slate-500 block">الجنسية والإقامة:</span> <span className="text-slate-800">{selectedEmployee.isKuwaiti ? '🇰🇼 كويتي (عمالة وطنية)' : `${selectedEmployee.nationality} (${selectedEmployee.residencyType})`}</span></div>
+                  <div><span className="text-slate-500 block">الجنسية والإقامة:</span> <span className="text-slate-800 font-bold">{formatEmployeeNationalityAndResidency(selectedEmployee)}</span></div>
                   <div><span className="text-slate-500 block">الراتب الأساسي:</span> <span className="font-mono text-slate-900 font-bold">{(selectedEmployeeContract?.basicSalary || 0).toLocaleString('en-US', { minimumFractionDigits: 3 })} د.ك</span></div>
                   <div><span className="text-slate-500 block">حالة العمل:</span> <span className="text-emerald-700 font-bold">على رأس العمل (ACTIVE)</span></div>
                 </div>
@@ -336,7 +349,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                       <strong className="text-base font-mono text-emerald-800 font-black">{empLeaveMetrics.remaining.toFixed(1)} يوم</strong>
                     </div>
                     <div className="p-3 bg-slate-50">
-                      <span className="text-[11px] text-slate-700 block font-bold mb-1">غير مدفوع (خصم)</span>
+                      <span className="text-[11px] text-slate-700 block font-bold mb-1">أيام بدون راتب</span>
                       <strong className="text-sm font-mono text-slate-800 font-black">{empLeaveMetrics.excessUnpaid.toFixed(1)} يوم</strong>
                     </div>
                   </div>
@@ -413,7 +426,7 @@ export const OfficialReportPrintModal: React.FC<OfficialReportPrintModalProps> =
                         <th className="p-2.5 border-l border-slate-700 text-center">إجمالي المتاح</th>
                         <th className="p-2.5 border-l border-slate-700 text-center">المستهلك</th>
                         <th className="p-2.5 border-l border-slate-700 text-center font-black bg-slate-900">صافي المتبقي</th>
-                        <th className="p-2.5 border-l border-slate-700 text-center">غير مدفوع</th>
+                        <th className="p-2.5 border-l border-slate-700 text-center">أيام بدون راتب</th>
                         <th className="p-2.5 text-center">حالة الرصيد</th>
                       </tr>
                     ) : (

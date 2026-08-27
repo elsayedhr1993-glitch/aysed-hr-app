@@ -9,7 +9,8 @@ import {
   Employee, Contract, LeaveRequest, AttendanceRecord, 
   Payslip, DocumentItem, CustodyItem, LoanAdvance, Company, ViewMode
 } from '../types';
-import { get_aysed_official_balance, calculate2026AccruedDays, getGlobalOpeningBalance, getGlobalAccrued2026, isEmployeeHiredIn2026OrLater } from '../utils/kuwaitLaw';
+import { getSavedSettlementVouchers } from '../services/leaveSettlementService';
+import { get_aysed_official_balance, calculate2026AccruedDays, getGlobalOpeningBalance, getGlobalAccrued2026, getGlobalCompensatoryDays, isEmployeeHiredIn2026OrLater, isKuwaitiEmployee } from '../utils/kuwaitLaw';
 import { OdooSearchBar, FilterOption, GroupByOption, MeasureOption } from '../components/reports/OdooSearchBar';
 import { OdooPivotView, PivotRowData } from '../components/reports/OdooPivotView';
 import { OdooGraphView } from '../components/reports/OdooGraphView';
@@ -342,7 +343,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       const basic = contract.basicSalary || 0;
       const allowances = (contract.housingAllowance || 0) + (contract.transportAllowance || 0) + (contract.otherAllowance || 0);
       const gross = basic + allowances;
-      const isKuwaiti = emp.isKuwaiti || emp.nationality?.includes('كويت') || false;
+      const isKuwaiti = isKuwaitiEmployee(emp);
       const pifss = 0;
       const net = gross;
 
@@ -353,7 +354,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         civilId: emp.civilId,
         department: emp.department || 'إدارة عامة',
         jobTitle: emp.jobTitle || 'موظف',
-        nationality: emp.nationality || 'غير محدد',
+        nationality: emp.nationality || (isKuwaiti ? 'كويتي' : 'غير محدد'),
         bankName: emp.bankName || 'بنك الكويت الوطني (NBK)',
         iban: emp.iban || 'KWNBK',
         basicSalary: basic,
@@ -470,17 +471,26 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
       const isJoinedIn2026OrLater = isEmployeeHiredIn2026OrLater(emp);
       const opening = getGlobalOpeningBalance(emp);
       const accrued = getGlobalAccrued2026(emp);
-      const totalAvailable = opening + accrued;
+      const compensatory = getGlobalCompensatoryDays(emp);
+      const totalAvailable = opening + accrued + compensatory;
       
       const empLeaves = companyLeaves.filter(
         l => !l.isHistorical && (l.employeeId === emp.id || l.employeeId === emp.employeeCode) && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED')
       );
-      const rawTakenDays = empLeaves.reduce((sum, l) => sum + (l.totalDays || 0), 0);
-      const totalTakenDays = rawTakenDays;
+      const actualLeaveDays = empLeaves.filter(l => !l.reason?.includes('تصفية نقدية') && !l.reason?.includes('Encashment')).reduce((sum, l) => sum + (l.totalDays || 0), 0);
       
-      const paidConsumed = Math.min(totalTakenDays, totalAvailable);
-      const remaining = Math.max(0, totalAvailable - totalTakenDays);
-      const excessUnpaid = Math.max(0, totalTakenDays - totalAvailable);
+      const empVouchers = getSavedSettlementVouchers(activeCompany?.id).filter(
+        v => v.employeeId === emp.id && (v.status === 'settled_locked' || v.status === 'paid')
+      );
+      const settlementEncashDays = empVouchers.reduce((sum, v) => sum + (v.encashedLeaveDays || 0), 0);
+      const leaveEncashDays = empLeaves.filter(l => l.reason?.includes('تصفية نقدية') || l.reason?.includes('Encashment')).reduce((sum, l) => sum + (l.totalDays || 0), 0);
+      const totalEncashmentDays = Math.max(leaveEncashDays, settlementEncashDays);
+
+      const totalDeducted = actualLeaveDays + totalEncashmentDays;
+      const totalTakenDays = totalDeducted;
+      const paidConsumed = Math.min(totalAvailable, totalDeducted);
+      const remaining = Math.max(0, totalAvailable - totalDeducted);
+      const excessUnpaid = Math.max(0, totalDeducted - totalAvailable);
 
       const leaveStatus = remaining >= 15 ? 'رصيد كافٍ' : remaining > 0 ? 'رصيد منخفض' : 'رصيد مصفّر وتجاوز (إجازة بدون راتب)';
 
@@ -493,7 +503,8 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         civilId: emp.civilId,
         department: emp.department || 'الموارد البشرية والإدارة',
         jobTitle: emp.jobTitle || 'موظف',
-        nationality: emp.nationality || 'غير محدد',
+        nationality: emp.nationality || (isKuwaitiEmployee(emp) ? 'كويتي' : 'غير محدد'),
+        residencyType: emp.residencyType || (isKuwaitiEmployee(emp) ? 'كويتي' : 'مادة 18 - قطاع أهلي'),
         carriedOver: opening,
         accruedDays: accrued,
         totalAvailable: totalAvailable,
@@ -571,7 +582,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         children: g.items.map(child => ({
           id: `child-${child.employeeId}`,
           label: `${child.employeeName} (${child.employeeCode})`,
-          subLabel: `${child.jobTitle} • رصيد متبقي: ${child.remainingDays} يوم • غير مدفوعة: ${child.excessUnpaid} يوم`,
+          subLabel: `${child.jobTitle} • رصيد متبقي: ${child.remainingDays} يوم • أيام بدون راتب: ${child.excessUnpaid} يوم`,
           recordsCount: 1,
           values: {
             count: 1,
@@ -880,7 +891,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
                        companyContracts.find(c => c.employeeId === emp.id);
       
       const salary = (contract?.basicSalary || 5) + (contract?.housingAllowance || 0) + (contract?.transportAllowance || 0);
-      const isKuwaiti = emp.isKuwaiti || emp.nationality?.includes('كويت');
+      const isKuwaiti = isKuwaitiEmployee(emp);
 
       return {
         id: emp.id,
@@ -1003,6 +1014,8 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
         return [
           { key: 'employeeCode', label: 'كود الموظف', align: 'center' },
           { key: 'employeeName', label: 'اسم الموظف' },
+          { key: 'nationality', label: 'الجنسية' },
+          { key: 'residencyType', label: 'نوع الإقامة' },
           { key: 'department', label: 'القسم' },
           { key: 'jobTitle', label: 'المسمى الوظيفي' },
           { key: 'carriedOver', label: 'الافتتاحي (مرحل)', align: 'center' },
@@ -1113,10 +1126,10 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-black text-slate-9">
-                منظومة التقارير والتحليلات (Odoo Reporting & Pivot Analysis Engine)
+                منظومة التقارير والتحليلات (HRMS Pivot Engine v18)
               </h1>
-              <span className="text-[1px] bg-purple-1 text-purple-8 px-2 py-.5 rounded font-bold">
-                Odoo 18 Matrix
+              <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">
+                HRMS Matrix
               </span>
             </div>
             <p className="text-xs text-slate-5 mt-.5">

@@ -162,9 +162,13 @@ export function fromEmployeeDbRow(row: any): Employee {
     civilIdExpiry: row.civil_id_expiry || row.civilIdExpiry || '',
     passportNo: row.passport_no || row.passportNo || '',
     passportExpiry: row.passport_expiry || row.passportExpiry || '',
-    nationality: row.nationality || 'كويتي',
-    isKuwaiti: row.nationality?.includes('كويت') || false,
-    residencyType: (row.residency_type || 'كويتي') as any,
+    nationality: row.nationality || '',
+    isKuwaiti: Boolean(
+      row.nationality
+        ? (row.nationality.includes('كويت') || row.nationality === 'كويتي')
+        : (row.isKuwaiti || row.is_kuwaiti)
+    ),
+    residencyType: (row.residency_type || row.residencyType || (row.nationality?.includes('كويت') ? 'كويتي' : 'مادة 18 - قطاع أهلي')) as any,
     gender: (row.gender || 'MALE') as 'MALE' | 'FEMALE',
     dob: row.dob || '',
     department: row.department || '',
@@ -475,22 +479,27 @@ export const TenantDatabaseService = {
   async saveAttendance(record: AttendanceRecord, targetCompanyId?: string): Promise<boolean> {
     const compId = targetCompanyId || record.companyId || 'comp-super-admin';
     if (isSupabaseConfigured) {
+      const payload = {
+        id: record.id,
+        company_id: compId,
+        employee_id: record.employeeId,
+        date: record.date,
+        check_in: record.checkIn,
+        check_out: record.checkOut,
+        work_hours: record.workHours,
+        overtime_hours: record.overtimeHours,
+        status: record.status,
+        updated_at: new Date().toISOString()
+      };
       try {
-        await supabase.from('attendance').upsert([{
-          id: record.id,
-          company_id: compId,
-          employee_id: record.employeeId,
-          date: record.date,
-          check_in: record.checkIn,
-          check_out: record.checkOut,
-          work_hours: record.workHours,
-          overtime_hours: record.overtimeHours,
-          status: record.status,
-          updated_at: new Date().toISOString()
-        }], { onConflict: 'id' });
-      } catch (sbErr) {
-        console.warn('[TenantDatabaseService] Supabase attendance upsert fallback:', sbErr);
-      }
+        await supabase.from('attendance').upsert([payload], { onConflict: 'id' });
+      } catch (e) {}
+      try {
+        await supabase.from('hr_attendance').upsert([payload], { onConflict: 'id' });
+      } catch (e) {}
+      try {
+        await supabase.from('attendance_logs').upsert([payload], { onConflict: 'id' });
+      } catch (e) {}
     }
 
     try {

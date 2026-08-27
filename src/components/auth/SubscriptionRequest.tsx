@@ -229,7 +229,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
                 <input 
                   type="text" 
                   required
-                  value={formData.name}
+                  value={formData.name || ''}
                   className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs"
                   placeholder="محمد العازمي"
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -244,7 +244,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
                 <input 
                   type="email" 
                   required
-                  value={formData.email}
+                  value={formData.email || ''}
                   className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs font-mono"
                   placeholder="name@company.com"
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -261,7 +261,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
                 <input 
                   type="text" 
                   required
-                  value={formData.company_name}
+                  value={formData.company_name || ''}
                   className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs"
                   placeholder="مؤسسة الأعمال الحديثة"
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
@@ -276,7 +276,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
                 <input 
                   type="tel" 
                   required
-                  value={formData.phone}
+                  value={formData.phone || ''}
                   className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold placeholder:text-slate-400 shadow-xs font-mono"
                   placeholder="9xxxxxxx"
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
@@ -290,7 +290,7 @@ export const SubscriptionRequest: React.FC<SubscriptionRequestProps> = ({ onBack
             <div className="relative">
               <Users className="absolute right-3 top-3 text-slate-500" size={16} />
               <select 
-                value={formData.employee_count}
+                value={formData.employee_count || '1-10'}
                 className="w-full pr-9 pl-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#714B67] outline-none text-slate-900 text-xs font-bold appearance-none cursor-pointer shadow-xs"
                 onChange={(e) => setFormData({...formData, employee_count: e.target.value})}
               >

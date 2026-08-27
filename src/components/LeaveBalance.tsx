@@ -239,7 +239,7 @@ export function LeaveBalances({ overrideCompanyId }: { overrideCompanyId?: strin
                               min="0"
                               step="0.5"
                               autoFocus
-                              value={editingCarry[r.id]}
+                              value={editingCarry[r.id] ?? ''}
                               onChange={(e) => setEditingCarry((prev) => ({ ...prev, [r.id]: e.target.value }))}
                               onKeyDown={(e) => { if (e.key === 'Enter') saveCarryForward(r.id); if (e.key === 'Escape') setEditingCarry((prev) => { const n = { ...prev }; delete n[r.id]; return n; }); }}
                               disabled={isSaving}

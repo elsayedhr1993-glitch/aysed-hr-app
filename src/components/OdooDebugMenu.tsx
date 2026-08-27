@@ -225,9 +225,6 @@ export const OdooDebugMenu: React.FC<OdooDebugMenuProps> = ({
                       <Bug className="w-4 h-4 text-amber-400" />
                       <span>أدوات المطور (Odoo Debug)</span>
                     </div>
-                    <span className="text-[10px] bg-purple-800 text-purple-200 px-2 py-0.5 rounded font-mono font-bold border border-purple-600">
-                      {currentModel}
-                    </span>
                   </div>
 
                   {/* Menu Items */}

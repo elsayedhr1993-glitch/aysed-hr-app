@@ -143,6 +143,11 @@ export interface AppRouterProps {
   onSaveMovement: (m: any) => void;
   onUpdateMovementState: (id: string, state: any) => void;
   onDeleteMovement: (id: string) => void;
+  candidates?: any[];
+  onSaveCandidate?: (cand: any) => void;
+  onConvertCandidateToEmployee?: (cand: any) => void;
+  onDeleteCandidate?: (id: string) => void;
+  onPostAttendanceToPayroll?: (month: string, deductionsMap?: Record<string, number>) => void;
 }
 
 /**
@@ -298,7 +303,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       case 'HOLIDAYS': return { title: 'العطلات الرسمية لدولة الكويت', code: 'hr.holiday' };
       case 'REPORTS': return { title: 'التقارير والتحليلات البيانية', code: 'hr.report' };
       case 'COMPANIES': return { title: 'إدارة الشركات والفروع', code: 'res.company' };
-      case 'EXCLUSIVE_INNOVATIONS': return { title: 'حزمة الابتكارات الحصرية', code: 'hr.innovations' };
+      case 'EXCLUSIVE_INNOVATIONS': case 'INNOVATIONS': return { title: 'حزمة الابتكارات الحصرية', code: 'hr.innovations' };
+      case 'AI_COPILOT': return { title: 'المستشار الذكي (AI Copilot)', code: 'ai.copilot' };
+      case 'HOLIDAY_WORK': return { title: 'إدارة العمل بالعطلات والأعياد', code: 'hr.holiday.work' };
+      case 'LEAVE_TYPES_CONFIG': return { title: 'إعدادات وأنواع الإجازات', code: 'hr.leave.type' };
       case 'NOTIFICATIONS': return { title: 'محرك الإشعارات والواتساب', code: 'hr.notification' };
       case 'AUTOMATION': return { title: 'الأتمتة والـ Studio', code: 'base.automation' };
       case 'AUDIT_LOGS': return { title: 'سجل الرقابة وتتبع العمليات', code: 'audit.log' };
@@ -352,7 +360,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             activeCompany={activeCompany}
             onSaveAttendance={handleSaveAttendance}
             onSaveAttendanceBatch={handleSaveAttendanceBatch}
-            onPostAttendanceToPayroll={() => {}}
+            onPostAttendanceToPayroll={props.onPostAttendanceToPayroll || (() => {})}
             onNavigateToApp={(app) => setActiveApp(app)}
           />);
 
@@ -583,9 +591,9 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       return (
         <AICopilotApp
           activeCompany={activeCompany}
-          employees={employees}
-          contracts={contracts}
-          leaves={leaves}
+          employees={scopedEmployees}
+          contracts={scopedContracts}
+          leaves={scopedLeaves}
         />);
 
     case 'SHIFTS':
@@ -593,7 +601,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
         <ShiftsApp
           shifts={shifts}
           employeeShifts={employeeShifts}
-          employees={employees}
+          employees={scopedEmployees}
           activeCompany={activeCompany}
           onSaveShift={handleSaveShift}
           onDeleteShift={handleDeleteShift}
@@ -604,8 +612,8 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     case 'COMMENCEMENT':
       return (
         <CommencementApp
-          employees={employees}
-          contracts={contracts}
+          employees={scopedEmployees}
+          contracts={scopedContracts}
           shifts={shifts}
           commencements={commencements}
           activeCompany={activeCompany}
@@ -636,11 +644,11 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       return (
         <ExclusiveInnovationsSuite
           activeCompany={activeCompany}
-          employees={employees.filter(e => !e.isDeleted)}
-          contracts={contracts}
-          leaves={leaves}
-          attendance={attendance}
-          documents={documents}
+          employees={scopedEmployees.filter(e => !e.isDeleted)}
+          contracts={scopedContracts}
+          leaves={scopedLeaves}
+          attendance={scopedAttendance}
+          documents={scopedDocuments}
           onAddAttendance={(rec) => handleSaveAttendance(rec)}
           onNavigateToApp={(app) => setActiveApp(app)}
         />);
@@ -655,10 +663,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     case 'RECRUITMENT':
       return (
         <RecruitmentApp
-          candidates={[]}
+          candidates={props.candidates || []}
           activeCompany={activeCompany}
-          onSaveCandidate={() => {}}
-          onConvertCandidateToEmployee={() => {}}
+          onSaveCandidate={props.onSaveCandidate || (() => {})}
+          onConvertCandidateToEmployee={props.onConvertCandidateToEmployee || (() => {})}
         />);
 
     case 'COMPANIES': {

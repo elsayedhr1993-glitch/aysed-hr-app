@@ -155,7 +155,7 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold text-white truncate">Aysed S HR 2026</div>
-            <div className="text-[9px] text-purple-300 truncate">Odoo 17 & Kuwait Law</div>
+            <div className="text-[9px] text-purple-300 truncate">Aysed S HR 2026 - Kuwait Law</div>
           </div>
         </div>
 

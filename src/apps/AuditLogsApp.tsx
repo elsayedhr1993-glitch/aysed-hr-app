@@ -227,7 +227,7 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
                 </td>
               </tr>) : (
               paginatedLogs.map((log, idx) => (
-                <tr key={log.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                <tr key={log.id || `audit-log-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                   <td className="p-3 font-mono text-slate-600 font-bold">
                     {new Date(log.timestamp).toLocaleString('ar-KW')}
                   </td>

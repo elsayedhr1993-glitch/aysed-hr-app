@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Employee, Contract, LeaveRequest, AttendanceRecord, DocumentItem } from '../../types';
 import { ReportCategory } from '../../apps/ReportsApp';
-import { get_aysed_official_balance, getGlobalOpeningBalance, getGlobalAccrued2026, isEmployeeHiredIn2026OrLater } from '../../utils/kuwaitLaw';
+import { get_aysed_official_balance, getGlobalOpeningBalance, getGlobalAccrued2026, isEmployeeHiredIn2026OrLater, isKuwaitiEmployee, formatEmployeeNationalityAndResidency } from '../../utils/kuwaitLaw';
 
 interface OdooScopeBarProps {
   employees: Employee[];
@@ -214,8 +214,10 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className="font-bold">{emp.fullNameAr}</span>
-                                {emp.isKuwaiti && (
+                                {isKuwaitiEmployee(emp) && (
                                   <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">كويتي</span>)}
+                                {!isKuwaitiEmployee(emp) && emp.nationality && (
+                                  <span className="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-medium">{emp.nationality}</span>)}
                               </div>
                               <div className="text-[10px] text-slate-400 flex items-center gap-2">
                                 <span>{emp.jobTitle} • {emp.department}</span>
@@ -279,12 +281,12 @@ export const OdooScopeBar: React.FC<OdooScopeBarProps> = ({
                   <span className="text-[10px] font-mono bg-purple-950/80 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded">
                     {selectedEmployee.employeeCode}
                   </span>
-                  {selectedEmployee.isKuwaiti ? (
+                  {isKuwaitiEmployee(selectedEmployee) ? (
                     <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-700/60 px-2 py-0.5 rounded font-bold">
                       🇰🇼 عمالة وطنية (تأمينات)
                     </span>) : (
                     <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-700/60 px-2 py-0.5 rounded font-bold">
-                      مادة 18 (وافد)
+                      {formatEmployeeNationalityAndResidency(selectedEmployee)}
                     </span>)}
                 </div>
 

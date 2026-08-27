@@ -1,5 +1,5 @@
 import { Employee, LeaveRequest, HrLeaveAllocation, AttendanceRecord } from '../types';
-import { calculate2026AccruedDays, isEmployeeHiredIn2026OrLater, getGlobalOpeningBalance, getGlobalAccrued2026 } from '../utils/kuwaitLaw';
+import { calculate2026AccruedDays, isEmployeeHiredIn2026OrLater, getGlobalOpeningBalance, getGlobalAccrued2026, getGlobalCompensatoryDays } from '../utils/kuwaitLaw';
 
 export const LEAVE_ACCRUAL_RATE_PER_MONTH = 2.5; // 30 days per year / 12 months = 2.5 days/month according to Kuwait Labor Law
 
@@ -42,7 +42,7 @@ export interface FifoAllocationResult {
     allocationUsages: Array<{
       allocationId: string;
       allocationName: string;
-      allocationType: 'regular' | 'accrual';
+      allocationType: 'regular' | 'accrual' | 'compensatory_off' | 'compensatory';
       daysUsed: number;
     }>;
   }>;
@@ -117,13 +117,17 @@ export function computeFifoLeaveAllocations(
   allocations: HrLeaveAllocation[],
   leaves: LeaveRequest[]
 ): FifoAllocationResult {
-  // Filter allocations for this employee (ANNUAL leave type, approved or validated state)
+  // Filter allocations for this employee (ANNUAL or COMPENSATORY leave type, approved or validated state)
   const empAllocations = allocations
-    .filter(a => (a.employeeId === employee.id || a.employeeId === employee.employeeCode) && a.leaveType === 'ANNUAL' && (a.state === 'validate' || a.state === 'confirm' || !a.state))
+    .filter(a => 
+      (a.employeeId === employee.id || a.employeeId === employee.employeeCode) && 
+      (a.leaveType === 'ANNUAL' || a.leaveType === 'COMPENSATORY' || (a.allocationType as string) === 'compensatory_off' || (a as any).allocationType === 'compensatory' || (a.name && (a.name.includes('تعويضي') || a.name.includes('بديل'))) || (a.notes && (a.notes.includes('تعويضي') || a.notes.includes('بديل')))) && 
+      (a.state === 'validate' || (a.state as string) === 'validated' || a.state === 'confirm' || !a.state)
+    )
     .map(a => ({
       ...a,
-      consumedDays: 0,
-      remainingDays: a.numberOfDays
+      consumedDays: a.consumedDays || 0,
+      remainingDays: a.remainingDays !== undefined ? a.remainingDays : a.numberOfDays
     }));
 
   // Sort allocations chronologically by dateFrom ASC (FIFO: earliest date first)
@@ -217,9 +221,22 @@ export function buildEmployeeBaselineAllocations(
 ): HrLeaveAllocation[] {
   const is2026Joined = isEmployeeHiredIn2026OrLater(emp);
 
-  const currentEmpAllocations = existingAllocations.filter(a => a.employeeId === emp.id);
+  const currentEmpAllocations = existingAllocations.filter(a => a.employeeId === emp.id || a.employeeId === emp.employeeCode);
   const result: HrLeaveAllocation[] = [...currentEmpAllocations];
 
+  // 0. Sanitize allocation types: ensure compensatory allocations are labeled 'compensatory_off'
+  result.forEach(a => {
+    if (
+      (a.id && a.id.startsWith('alloc-comp')) ||
+      (a.name && (a.name.includes('تعويضي') || a.name.includes('بديل') || a.name.includes('عطلة'))) ||
+      (a.notes && (a.notes.includes('تعويضي') || a.notes.includes('بديل') || a.notes.includes('عطلة')))
+    ) {
+      a.allocationType = 'compensatory_off';
+      a.leaveType = 'ANNUAL';
+    }
+  });
+
+  // 1. Regular Opening Balance (2025 Carried Over)
   const openingVal = getGlobalOpeningBalance(emp);
   const hasRegularAlloc = result.some(a => a.allocationType === 'regular');
 
@@ -240,26 +257,31 @@ export function buildEmployeeBaselineAllocations(
       createdAt: '2026-01-01T00:00:00.000Z'
     });
   } else {
-    // If regular allocations exist, NEVER overwrite user-defined numberOfDays to 0 if they set it.
-    // If openingVal > 0 and an allocation has 0 or undefined, update it to openingVal.
     result.forEach(a => {
       if (a.allocationType === 'regular') {
         if (openingVal > 0 && (a.numberOfDays === 0 || a.numberOfDays === undefined)) {
           a.numberOfDays = openingVal;
           a.remainingDays = Math.max(0, openingVal - (a.consumedDays || 0));
         } else if (a.numberOfDays !== undefined && a.numberOfDays > 0) {
-          // Keep the user-defined days and compute remaining accurately
           a.remainingDays = Math.max(0, (a.numberOfDays || 0) - (a.consumedDays || 0));
         }
       }
     });
   }
 
-  // Ensure 2026 Accrual dynamically prorated based on hire date
+  // 2. Ensure 2026 Monthly Accrual is ALWAYS present and accurate
   const accruedDays = getGlobalAccrued2026(emp);
   const monthsCount = Math.round(accruedDays / 2.5);
-  const hasAccrual = result.some(a => a.allocationType === 'accrual');
-  if (!hasAccrual) {
+  
+  // Look specifically for monthly accruals (excluding compensatory records)
+  const monthlyAccrualAllocs = result.filter(a => 
+    a.allocationType === 'accrual' && 
+    !a.name?.includes('تعويضي') && 
+    !a.name?.includes('بديل') && 
+    !a.name?.includes('عطلة')
+  );
+
+  if (monthlyAccrualAllocs.length === 0) {
     result.push({
       id: `alloc-accrued-${emp.id}-2026-aug`,
       name: `استحقاق عام 2026 (حتى أغسطس - ${monthsCount} أشهر × 2.5 يوم)`,
@@ -276,18 +298,98 @@ export function buildEmployeeBaselineAllocations(
       createdAt: '2026-08-01T00:00:00.000Z'
     });
   } else {
-    // Ensure existing accrual total matches dynamic calculation if not customized
-    result.forEach(a => {
-      if (a.allocationType === 'accrual') {
-        if (a.numberOfDays === undefined || a.numberOfDays === 0) {
-          a.numberOfDays = accruedDays;
-        }
-        a.remainingDays = Number(Math.max(0, (a.numberOfDays || 0) - (a.consumedDays || 0)).toFixed(2));
+    // If consolidated baseline exists, ensure it reflects current accrued days
+    const consolidated = monthlyAccrualAllocs.find(a => a.id?.includes('accrued') || (!a.accrualMonthKey && a.name?.includes('استحقاق عام 2026')));
+    if (consolidated) {
+      if (consolidated.numberOfDays === undefined || consolidated.numberOfDays === 0 || consolidated.numberOfDays < accruedDays) {
+        consolidated.numberOfDays = accruedDays;
       }
-    });
+      consolidated.remainingDays = Number(Math.max(0, (consolidated.numberOfDays || 0) - (consolidated.consumedDays || 0)).toFixed(2));
+    }
   }
 
-  return result;
+  // 3. Compensatory Days from Holiday Work (strictly deduplicated and synced with getGlobalCompensatoryDays)
+  const compDays = getGlobalCompensatoryDays(emp);
+  
+  // Identify all existing compensatory allocations for this employee
+  const isCompAlloc = (a: HrLeaveAllocation) => 
+    a.allocationType === 'compensatory_off' || 
+    (a as any).allocationType === 'compensatory' ||
+    (a.id && a.id.startsWith('alloc-comp')) ||
+    a.name?.includes('تعويضي') ||
+    a.name?.includes('بديل') ||
+    a.name?.includes('عطلة') ||
+    a.notes?.includes('تعويضي') ||
+    a.notes?.includes('بديل') ||
+    a.notes?.includes('عطلة');
+
+  // Filter out any invalid/duplicate compensatory allocations
+  const nonCompAllocs = result.filter(a => !isCompAlloc(a));
+  const rawCompAllocs = result.filter(isCompAlloc);
+
+  if (compDays <= 0) {
+    // If no compensatory days are due, do not include any placeholder compensatory allocations
+    return [...nonCompAllocs];
+  }
+
+  // Deduplicate compensatory allocations:
+  // If specific holiday work allocations exist (e.g. alloc-comp-hwr-...), prefer them and drop generic placeholder
+  const specificCompAllocs = rawCompAllocs.filter(a => a.id && a.id.startsWith('alloc-comp-hwr-'));
+  
+  let finalCompAllocs: HrLeaveAllocation[] = [];
+  if (specificCompAllocs.length > 0) {
+    // Deduplicate specific allocations by ID or date
+    const seen = new Set<string>();
+    specificCompAllocs.forEach(a => {
+      const key = a.id || `${a.dateFrom}-${a.name}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        finalCompAllocs.push({
+          ...a,
+          allocationType: 'compensatory_off',
+          leaveType: 'ANNUAL',
+          state: 'validate'
+        });
+      }
+    });
+
+    // Ensure total days in finalCompAllocs equals compDays
+    const currentSum = finalCompAllocs.reduce((s, a) => s + (Number(a.numberOfDays) || 0), 0);
+    if (currentSum !== compDays && finalCompAllocs.length > 0) {
+      // Normalize to match compDays
+      finalCompAllocs[0].numberOfDays = compDays;
+      finalCompAllocs[0].remainingDays = Math.max(0, compDays - (finalCompAllocs[0].consumedDays || 0));
+    }
+  } else if (rawCompAllocs.length > 0) {
+    // Take the first valid allocation and set its days strictly to compDays
+    const primary = { ...rawCompAllocs[0] };
+    primary.id = primary.id || `alloc-comp-${emp.id}-holiday`;
+    primary.allocationType = 'compensatory_off';
+    primary.leaveType = 'ANNUAL';
+    primary.numberOfDays = compDays;
+    primary.remainingDays = Math.max(0, compDays - (primary.consumedDays || 0));
+    primary.state = 'validate';
+    finalCompAllocs = [primary];
+  } else {
+    // Create single authoritative compensatory allocation
+    finalCompAllocs = [{
+      id: `alloc-comp-${emp.id}-holiday`,
+      name: `يوم تعويضي معتمد (بديل عن العمل في عطلة رسمية)`,
+      employeeId: emp.id,
+      companyId: emp.companyId || 'comp-1',
+      leaveType: 'ANNUAL',
+      allocationType: 'compensatory_off',
+      numberOfDays: compDays,
+      consumedDays: 0,
+      remainingDays: compDays,
+      dateFrom: '2026-07-01',
+      state: 'validate',
+      notes: `رصيد أيام تعويضية بديلة عن عطل رسمية (${compDays} يوم) وفق المادة 70`,
+      createdAt: new Date().toISOString()
+    }];
+  }
+
+  return [...nonCompAllocs, ...finalCompAllocs];
 }
 
 /**

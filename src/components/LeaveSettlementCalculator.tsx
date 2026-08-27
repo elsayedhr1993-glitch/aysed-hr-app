@@ -167,7 +167,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   const [selectedLeaveId, setSelectedLeaveId] = useState<string>('custom');
 
   // Dynamic Financial Items Form Inputs
-  const [consumedLeaveDays, setConsumedLeaveDays] = useState<number>(30);
+  const [consumedLeaveDays, setConsumedLeaveDays] = useState<number>(0);
   const [statutoryLeaveDays, setStatutoryLeaveDays] = useState<number>(0);
   const [unpaidLeaveDays, setUnpaidLeaveDays] = useState<number>(0);
 
@@ -179,10 +179,24 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     return phys.workingDays > 0 ? phys.workingDays : Math.min(26, Math.max(1, today.getDate() - 1));
   });
 
+  // Auto-sync encashment days when employee or mode changes
+  useEffect(() => {
+    if (settlementMode === 'ENCASHMENT_LIQUIDATION') {
+      setEncashmentDays(netAvailable);
+      setIncludeEncashment(true);
+      setIncludeProratedSalary(false);
+      setWorkedDaysInMonth(0);
+      setTicketAllowance(0);
+      setConsumedLeaveDays(0);
+      setStatutoryLeaveDays(0);
+      setUnpaidLeaveDays(0);
+    }
+  }, [selectedEmpId, netAvailable, settlementMode]);
+
   // Auto-sync worked days when departure date changes
   const handleDepartureDateChange = (newDateStr: string) => {
     setDepartureDate(newDateStr);
-    if (includeProratedSalary) {
+    if (includeProratedSalary && settlementMode !== 'ENCASHMENT_LIQUIDATION') {
       const phys = calculatePhysicalWorkedDays(newDateStr);
       if (phys.workingDays >= 0) {
         setWorkedDaysInMonth(phys.workingDays);
@@ -203,15 +217,27 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   const handleModeChange = (mode: 'LEAVE_WITH_TRAVEL' | 'ENCASHMENT_LIQUIDATION' | 'CUSTOM') => {
     setSettlementMode(mode);
     if (mode === 'ENCASHMENT_LIQUIDATION') {
+      // وضع صرف رصيد الإجازات فقط بدون إجازة:
+      // يتم تسييل الرصيد المتاح فقط، واستبعاد راتب أيام العمل وتذاكر السفر تلقائياً
       setIncludeEncashment(true);
       setEncashmentDays(netAvailable);
       setConsumedLeaveDays(0);
       setStatutoryLeaveDays(0);
-      setVoucherNotes('تسييل وتصفية رصيد الإجازات بالكامل وصرف البدل النقدي الموحد وفق المادة 70 من قانون العمل الكويتي');
+      setUnpaidLeaveDays(0);
+      setIncludeProratedSalary(false);
+      setWorkedDaysInMonth(0);
+      setTicketAllowance(0);
+      setIncludeOvertime(false);
+      setHousingAllowance(0);
+      setVoucherNotes('صرف البدل النقدي لرصيد الإجازات بدون إجازة (تسوية رصيد الإجازات فقط) وفق المادة 70 من قانون العمل الكويتي');
     } else if (mode === 'LEAVE_WITH_TRAVEL') {
       setIncludeEncashment(false);
       setEncashmentDays(0);
-      setConsumedLeaveDays(Math.min(netAvailable, 30));
+      setConsumedLeaveDays(0);
+      setIncludeProratedSalary(true);
+      const phys = calculatePhysicalWorkedDays(departureDate);
+      setWorkedDaysInMonth(phys.workingDays > 0 ? phys.workingDays : 1);
+      setTicketAllowance(150);
       setVoucherNotes('تسوية وتصفية مستحقات إجازة وسفر وفق أحكام قانون العمل الكويتي (المادة 70)');
     } else {
       setVoucherNotes('تسوية مستحقات مالية شاملة مخصصة للموظف');
@@ -279,7 +305,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
         const regularTaken = found.annualDeductedDays ?? Math.max(0, (found.totalDays || 0) - statutory);
         setConsumedLeaveDays(regularTaken);
       } else {
-        setConsumedLeaveDays(found.totalDays || 30);
+        setConsumedLeaveDays(found.paidDays !== undefined ? found.paidDays : (found.totalDays || 0));
         setStatutoryLeaveDays(0);
       }
       setUnpaidLeaveDays(found.unpaidDays || found.excessDays || 0);
@@ -388,76 +414,86 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     toast.success('تم حذف البند المخصص');
   };
 
+  const [isSavingVoucher, setIsSavingVoucher] = useState(false);
+
   // Save Voucher Handler
   const handleSaveVoucher = () => {
-    if (!settlementResult || !selectedEmp) return;
+    if (!settlementResult || !selectedEmp || isSavingVoucher) return;
+    setIsSavingVoucher(true);
 
-    // Check for duplicate settlement voucher for the same employee
-    const existingLockedVoucher = savedVouchers.find(v => v.employeeId === selectedEmp.id && (v.status === 'settled_locked' || v.status === 'paid'));
-    if (existingLockedVoucher && settlementState !== 'paid') {
-      toast.error(`عذراً، الموظف ${selectedEmp.fullNameAr} لديه بالفعل سند تسوية معتمد ومقفل برقم (${existingLockedVoucher.voucherNumber}). لا يمكن إنشاء سند تسوية تكراري لنفس الموظف إلا بعد إلغاء قفل السند السابق من الأرشيف.`);
-      return;
+    try {
+      // Check for duplicate settlement voucher for the same employee or voucher number
+      const existingLockedVoucher = savedVouchers.find(v => (v.employeeId === selectedEmp.id || v.voucherNumber === settlementResult.voucherNumber) && (v.status === 'settled_locked' || v.status === 'paid'));
+      if (existingLockedVoucher && settlementState !== 'paid') {
+        toast.error(`عذراً، الموظف ${selectedEmp.fullNameAr} أو سند التسوية برقم (${settlementResult.voucherNumber}) مسجل ومقفل مسبقاً.`);
+        setIsSavingVoucher(false);
+        return;
+      }
+
+      // Automatically liquidate / deduct days if encashment or leave consumption is selected
+      const daysToLiquidate = settlementMode === 'ENCASHMENT_LIQUIDATION'
+        ? (encashmentDays > 0 ? encashmentDays : netAvailable)
+        : (consumedLeaveDays + (includeEncashment ? encashmentDays : 0));
+      if (daysToLiquidate > 0 && onUpdateAllocations) {
+        liquidateLeaveBalanceInAllocations(
+          selectedEmp.id,
+          daysToLiquidate,
+          allocations,
+          onUpdateAllocations,
+          selectedEmp,
+          onUpdateEmployee
+        );
+      }
+
+      const newVoucher: LeaveSettlementVoucher = {
+        id: `voucher-${Date.now()}`,
+        voucherNumber: settlementResult.voucherNumber,
+        companyId: activeCompany?.id || selectedEmp.companyId || 'comp-1',
+        employeeId: selectedEmp.id,
+        employeeName: selectedEmp.fullNameAr,
+        employeeCode: selectedEmp.employeeCode || '',
+        civilId: selectedEmp.civilId || '',
+        jobTitle: selectedEmp.jobTitle || '',
+        department: selectedEmp.department || '',
+        joinDate: selectedEmp.joinDate || '',
+        settlementMode,
+        settlementDate,
+        departureDate,
+        returnDate,
+        status: 'settled_locked', // Locked & Protected State
+        basicSalary,
+        grossSalary,
+        dailyWage,
+        hourlyWage,
+        carriedOverBalance: carriedOverBal,
+        accruedBalance: accruedBalance,
+        totalAvailableBefore: netAvailable,
+        consumedLeaveDays,
+        statutoryLeaveDays,
+        encashedLeaveDays: includeEncashment ? encashmentDays : 0,
+        unpaidLeaveDays,
+        remainingBalanceAfter: settlementResult.remainingBalanceAfter,
+        items: settlementResult.items,
+        totalEarnings: settlementResult.totalEarnings,
+        totalDeductions: settlementResult.totalDeductions,
+        netSettlementPayout: settlementResult.netSettlementPayout,
+        paymentMethod,
+        bankName: selectedEmp.bankName,
+        iban: selectedEmp.iban,
+        notes: voucherNotes,
+        preparedBy: 'المحاسبة',
+        reviewedBy: 'السيد (Sayed) - HR',
+        approvedBy: 'المدير العام',
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedList = saveSettlementVoucher(newVoucher);
+      setSavedVouchers(updatedList);
+      setSettlementState('paid');
+      toast.success(`تم حفظ وقفل سند التسوية رقم (${newVoucher.voucherNumber}) ومزامنة الأيام نهائياً!`);
+    } finally {
+      setIsSavingVoucher(false);
     }
-
-    // Automatically liquidate / deduct days if encashment or leave consumption is selected
-    const daysToLiquidate = includeEncashment ? encashmentDays : (consumedLeaveDays > 0 ? consumedLeaveDays : (settlementMode === 'ENCASHMENT_LIQUIDATION' ? netAvailable : 0));
-    if (daysToLiquidate > 0 && onUpdateAllocations) {
-      liquidateLeaveBalanceInAllocations(
-        selectedEmp.id,
-        daysToLiquidate,
-        allocations,
-        onUpdateAllocations,
-        selectedEmp,
-        onUpdateEmployee
-      );
-    }
-
-    const newVoucher: LeaveSettlementVoucher = {
-      id: `voucher-${Date.now()}`,
-      voucherNumber: settlementResult.voucherNumber,
-      companyId: activeCompany?.id || selectedEmp.companyId || 'comp-1',
-      employeeId: selectedEmp.id,
-      employeeName: selectedEmp.fullNameAr,
-      employeeCode: selectedEmp.employeeCode || '',
-      civilId: selectedEmp.civilId || '',
-      jobTitle: selectedEmp.jobTitle || '',
-      department: selectedEmp.department || '',
-      joinDate: selectedEmp.joinDate || '',
-      settlementMode,
-      settlementDate,
-      departureDate,
-      returnDate,
-      status: 'settled_locked', // Locked & Protected State
-      basicSalary,
-      grossSalary,
-      dailyWage,
-      hourlyWage,
-      carriedOverBalance: carriedOverBal,
-      accruedBalance: accruedBalance,
-      totalAvailableBefore: netAvailable,
-      consumedLeaveDays,
-      statutoryLeaveDays,
-      encashedLeaveDays: includeEncashment ? encashmentDays : 0,
-      unpaidLeaveDays,
-      remainingBalanceAfter: settlementResult.remainingBalanceAfter,
-      items: settlementResult.items,
-      totalEarnings: settlementResult.totalEarnings,
-      totalDeductions: settlementResult.totalDeductions,
-      netSettlementPayout: settlementResult.netSettlementPayout,
-      paymentMethod,
-      bankName: selectedEmp.bankName,
-      iban: selectedEmp.iban,
-      notes: voucherNotes,
-      preparedBy: 'المحاسبة',
-      reviewedBy: 'السيد (Sayed) - HR',
-      approvedBy: 'المدير العام',
-      createdAt: new Date().toISOString(),
-    };
-
-    const updatedList = saveSettlementVoucher(newVoucher);
-    setSavedVouchers(updatedList);
-    setSettlementState('paid');
-    toast.success(`تم حفظ وقفل سند التسوية رقم (${newVoucher.voucherNumber}) ومزامنة الأيام نهائياً!`);
   };
 
   // Execute Encashment & Deduct from Allocations
@@ -772,8 +808,8 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     </p>
                   </div>
                   <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white border border-slate-200 shadow-2xs text-slate-700 w-fit">
-                    {settlementMode === 'LEAVE_WITH_TRAVEL' && '✈️ تسوية إجازة مع سفر ومباشرة'}
-                    {settlementMode === 'ENCASHMENT_LIQUIDATION' && '💰 تسييل وتصفية رصيد موحد'}
+                    {settlementMode === 'LEAVE_WITH_TRAVEL' && '✈️ تسوية إجازة وسفر (شاملة أيام العمل والتذاكر)'}
+                    {settlementMode === 'ENCASHMENT_LIQUIDATION' && '💰 صرف رصيد إجازات فقط بدون إجازة (تسوية الرصيد فقط)'}
                     {settlementMode === 'CUSTOM' && '⚙️ تسوية شاملة مخصصة'}
                   </span>
                 </div>
@@ -802,16 +838,16 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     onClick={() => handleModeChange('ENCASHMENT_LIQUIDATION')}
                     className={`p-3 rounded-xl border text-right transition cursor-pointer flex flex-col justify-between ${
                       settlementMode === 'ENCASHMENT_LIQUIDATION'
-                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-300'
                         : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'
                     }`}
                   >
                     <div className="font-bold text-xs flex items-center justify-between">
-                      <span>تسييل وتصفية رصيد موحد</span>
+                      <span>صرف رصيد إجازات فقط بدون إجازة</span>
                       {settlementMode === 'ENCASHMENT_LIQUIDATION' && <Check size={14} className="text-amber-200" />}
                     </div>
                     <p className={`text-[10px] mt-1 line-clamp-2 ${settlementMode === 'ENCASHMENT_LIQUIDATION' ? 'text-amber-100' : 'text-slate-500'}`}>
-                      صرف نقدي موحد لرصيد الإجازات المتبقي كاملاً كبند مالي واحد بدون تكرار
+                      تسييل وصرف البدل النقدي للرصيد المتاح فقط (مستبعد منه أيام العمل وتذاكر السفر)
                     </p>
                   </button>
 
@@ -835,6 +871,20 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                 </div>
               </div>
 
+              {settlementMode === 'ENCASHMENT_LIQUIDATION' && (
+                <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-amber-700 shrink-0" />
+                    <span>
+                      <strong>نمط تسييل وصرف رصيد الإجازات فقط:</strong> تم ضبط التسوية لتشمل صرف البدل النقدي لرصيد الإجازات ({encashmentDays.toFixed(2)} يوم) فقط، وتم استبعاد راتب أيام العمل وتذاكر السفر تلقائياً ليكون الصرف مقتصراً على رصيد الإجازات.
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-amber-950 bg-amber-200/70 px-2 py-0.5 rounded border border-amber-300">
+                    {(encashmentDays * dailyWage).toFixed(3)} د.ك
+                  </span>
+                </div>
+              )}
+
               {/* 2-Column Responsive Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
@@ -846,7 +896,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                       <h3 className="font-bold text-xs sm:text-sm text-slate-800 flex items-center gap-2">
                         <FileText size={16} className="text-[#714B67]" />
-                        <span>بيانات الإجازة وتواريخ المغادرة</span>
+                        <span>بيانات التسوية وتاريخ الصرف</span>
                       </h3>
                       <span className="text-[11px] bg-purple-100 text-[#714B67] font-bold px-2 py-0.5 rounded">
                         قاعدة 26 يوم
@@ -859,9 +909,12 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         <select
                           value={selectedLeaveId}
                           onChange={(e) => handleSelectLeave(e.target.value)}
-                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-bold text-slate-800 outline-none focus:border-[#714B67]"
+                          disabled={settlementMode === 'ENCASHMENT_LIQUIDATION'}
+                          className={`w-full bg-white border border-slate-300 rounded-xl p-2 font-bold text-slate-800 outline-none focus:border-[#714B67] ${
+                            settlementMode === 'ENCASHMENT_LIQUIDATION' ? 'opacity-60 cursor-not-allowed bg-slate-100' : ''
+                          }`}
                         >
-                          <option value="custom">-- إدخال يدوي مخصص --</option>
+                          <option value="custom">-- {settlementMode === 'ENCASHMENT_LIQUIDATION' ? 'صرف رصيد بدون إجازة' : 'إدخال يدوي مخصص'} --</option>
                           {employeeLeavesForSettlement.map(l => (
                             <option key={l.id} value={l.id}>
                               {l.leaveType === 'BEREAVEMENT' ? 'إجازة عزاء (م77)' : l.leaveType === 'ANNUAL' ? 'سنوية' : l.leaveType} ({l.startDate} - {l.totalDays} يوم)
@@ -871,7 +924,9 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                       </div>
 
                       <div>
-                        <label className="block font-bold text-slate-600 mb-1">تاريخ المغادرة (Departure):</label>
+                        <label className="block font-bold text-slate-600 mb-1">
+                          {settlementMode === 'ENCASHMENT_LIQUIDATION' ? 'تاريخ تسوية الصرف:' : 'تاريخ المغادرة (Departure):'}
+                        </label>
                         <input
                           type="date"
                           value={departureDate}
@@ -881,7 +936,9 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                       </div>
 
                       <div>
-                        <label className="block font-bold text-slate-600 mb-1">تاريخ العودة المتوقع:</label>
+                        <label className="block font-bold text-slate-600 mb-1">
+                          {settlementMode === 'ENCASHMENT_LIQUIDATION' ? 'تاريخ استحقاق التسوية:' : 'تاريخ العودة المتوقع:'}
+                        </label>
                         <input
                           type="date"
                           value={returnDate}
@@ -892,58 +949,86 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     </div>
 
                     {/* Days Configuration */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-200">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">أيام الإجازة السنوية (المستهلكة):</label>
-                        <DecimalInput
-                          min={0}
-                          value={consumedLeaveDays}
-                          onChange={setConsumedLeaveDays}
-                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-black text-slate-900 outline-none focus:border-[#714B67]"
-                        />
-                        <span className="text-[10px] text-slate-500 mt-0.5 block">تخصم من رصيد الإجازات السنوي</span>
-                      </div>
+                    {settlementMode !== 'ENCASHMENT_LIQUIDATION' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-200">
+                        <div>
+                          <label className="block font-bold text-slate-700 mb-1">أيام الإجازة السنوية (المستهلكة):</label>
+                          <DecimalInput
+                            min={0}
+                            value={consumedLeaveDays}
+                            onChange={setConsumedLeaveDays}
+                            className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-black text-slate-900 outline-none focus:border-[#714B67]"
+                          />
+                          <span className="text-[10px] text-slate-500 mt-0.5 block">تخصم من رصيد الإجازات السنوي</span>
+                        </div>
 
-                      <div>
-                        <label className="block font-bold text-emerald-800 mb-1">إجازة وفاة / عزاء (المادة 77):</label>
-                        <DecimalInput
-                          min={0}
-                          max={3}
-                          value={statutoryLeaveDays}
-                          onChange={setStatutoryLeaveDays}
-                          className="w-full bg-emerald-50/60 border border-emerald-300 rounded-xl p-2 font-mono font-black text-emerald-950 outline-none focus:border-emerald-500"
-                        />
-                        <span className="text-[10px] text-emerald-700 mt-0.5 block">مدفوعة بالراتب (معفاة من الخصم من الرصيد - 0.000 د.ك إضافي)</span>
-                      </div>
+                        <div>
+                          <label className="block font-bold text-emerald-800 mb-1">إجازة وفاة / عزاء (المادة 77):</label>
+                          <DecimalInput
+                            min={0}
+                            max={3}
+                            value={statutoryLeaveDays}
+                            onChange={setStatutoryLeaveDays}
+                            className="w-full bg-emerald-50/60 border border-emerald-300 rounded-xl p-2 font-mono font-black text-emerald-950 outline-none focus:border-emerald-500"
+                          />
+                          <span className="text-[10px] text-emerald-700 mt-0.5 block">مدفوعة بالراتب (معفاة من الخصم من الرصيد - 0.000 د.ك إضافي)</span>
+                        </div>
 
-                      <div>
-                        <label className="block font-bold text-rose-700 mb-1">أيام بدون راتب (تجاوز):</label>
-                        <DecimalInput
-                          min={0}
-                          value={unpaidLeaveDays}
-                          onChange={setUnpaidLeaveDays}
-                          className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-black text-rose-700 outline-none focus:border-rose-400"
-                        />
-                        <span className="text-[10px] text-rose-600 mt-0.5 block">تخصم من مدة الخدمة</span>
+                        <div>
+                          <label className="block font-bold text-rose-700 mb-1">أيام بدون راتب (تجاوز):</label>
+                          <DecimalInput
+                            min={0}
+                            value={unpaidLeaveDays}
+                            onChange={setUnpaidLeaveDays}
+                            className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-black text-rose-700 outline-none focus:border-rose-400"
+                          />
+                          <span className="text-[10px] text-rose-600 mt-0.5 block">تخصم من مدة الخدمة</span>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="font-bold block">رصيد الإجازات المستحق للصرف بدون إجازة:</span>
+                          <span className="text-[11px] text-amber-800">
+                            الرصيد المتاح حالياً للموظف هو ({netAvailable.toFixed(2)} يوم) - تم تعيينه تلقائياً في بند الصرف أدناه.
+                          </span>
+                        </div>
+                        <span className="font-mono font-black text-sm text-amber-950 bg-white px-2.5 py-1 rounded border border-amber-300">
+                          {netAvailable.toFixed(2)} يوم
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* 1. Pro-rated Salary Line Item Section */}
                   <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-slate-800">
                         <input
                           type="checkbox"
                           checked={includeProratedSalary}
-                          onChange={(e) => setIncludeProratedSalary(e.target.checked)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIncludeProratedSalary(checked);
+                            if (checked && workedDaysInMonth === 0) {
+                              const phys = calculatePhysicalWorkedDays(departureDate);
+                              setWorkedDaysInMonth(phys.workingDays > 0 ? phys.workingDays : 1);
+                            }
+                          }}
                           className="rounded text-[#714B67] focus:ring-[#714B67] w-4 h-4"
                         />
                         <span>احتساب راتب أيام العمل الفعلية للشهر الحالي (Dynamic Base Salary Proration)</span>
                       </label>
-                      <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                        +{includeProratedSalary ? ((workedDaysInMonth * (grossSalary / 26)).toFixed(3)) : '0.000'} د.ك
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {settlementMode === 'ENCASHMENT_LIQUIDATION' && !includeProratedSalary && (
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                            مستبعد تلقائياً (صرف رصيد فقط)
+                          </span>
+                        )}
+                        <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                          +{includeProratedSalary ? ((workedDaysInMonth * (grossSalary / 26)).toFixed(3)) : '0.000'} د.ك
+                        </span>
+                      </div>
                     </div>
 
                     {includeProratedSalary && (
@@ -1035,7 +1120,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
                   {/* 3. Leave Balance Encashment Section */}
                   <div className="bg-amber-50/60 border border-amber-300 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <label className="flex items-center gap-2 cursor-pointer font-black text-xs text-amber-950">
                         <input
                           type="checkbox"
@@ -1051,15 +1136,27 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         />
                         <span>البدل النقدي لرصيد الإجازات المتبقي / تسييل الرصيد (Encashment)</span>
                       </label>
-                      <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                        +{includeEncashment ? ((encashmentDays * dailyWage).toFixed(3)) : '0.000'} د.ك
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIncludeEncashment(true);
+                            setEncashmentDays(netAvailable);
+                          }}
+                          className="text-[11px] bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-xl font-bold shadow-2xs transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>💰 تسييل كامل الرصيد ({netAvailable} يوم) لتصفيره</span>
+                        </button>
+                        <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-300">
+                          +{includeEncashment ? ((encashmentDays * dailyWage).toFixed(3)) : '0.000'} د.ك
+                        </span>
+                      </div>
                     </div>
 
                     {includeEncashment && (
-                      <div className="space-y-2 pt-2 border-t border-amber-200 text-xs">
+                      <div className="space-y-2 pt-3 border-t border-amber-200 text-xs">
                         <div className="flex items-center justify-between">
-                          <label className="font-bold text-slate-700">عدد الأيام المراد صرف بدلها النقدي:</label>
+                          <label className="font-bold text-slate-700">عدد الأيام المراد صرف بدلها النقدي وتصفيرها:</label>
                           <button
                             type="button"
                             onClick={() => {
@@ -1074,15 +1171,15 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         <div className="flex items-center gap-2">
                           <DecimalInput
                             min={0}
-                            max={Math.max(0, netAvailable - consumedLeaveDays)}
+                            max={netAvailable}
                             value={encashmentDays}
                             onChange={setEncashmentDays}
-                            className="w-full bg-white border border-amber-300 rounded-xl p-2 font-mono font-black text-amber-950 outline-none focus:border-amber-600"
+                            className="w-full bg-white border border-amber-300 rounded-xl p-2.5 font-mono font-black text-amber-950 outline-none focus:border-amber-600 shadow-2xs"
                           />
-                          <span className="text-xs font-bold text-slate-500 min-w-[30px]">يوم</span>
+                          <span className="text-xs font-bold text-slate-600 min-w-[30px]">يوم</span>
                         </div>
                         <p className="text-[10px] text-amber-800 font-medium">
-                          * عند الاعتماد أو الضغط على "تسييل وصرف البدل النقدي"، يتم خصم هذه الأيام مباشرة من رصيد الموظف وسجل التخصيصات.
+                          * عند الحفظ والاعتماد، سيتم خصم هذه الأيام بالكامل من رصيد الموظف وسجل التخصيصات (FIFO) لتصبح إجمالي الأيام المتبقية (0.0 يوم).
                         </p>
                       </div>
                     )}

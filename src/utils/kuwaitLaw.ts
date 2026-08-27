@@ -285,6 +285,73 @@ export function calculatePIFSS(isKuwaiti: boolean, grossSalary: number): number 
 }
 
 /**
+ * Determine if employee is Kuwaiti national based on nationality / isKuwaiti flag
+ */
+export function isKuwaitiEmployee(emp: { nationality?: string; isKuwaiti?: boolean } | null | undefined): boolean {
+  if (!emp) return false;
+  if (emp.nationality && emp.nationality.trim()) {
+    const nat = emp.nationality.trim().toLowerCase();
+    return nat === 'كويتي' || nat === 'كويتية' || nat.includes('كويت') || nat === 'kuwaiti' || nat === 'kw';
+  }
+  return Boolean(emp.isKuwaiti);
+}
+
+/**
+ * Get country flag emoji for common nationalities
+ */
+export function getNationalityFlag(nationality?: string): string {
+  if (!nationality) return '🌐';
+  const nat = nationality.trim().toLowerCase();
+  if (nat.includes('كويت') || nat.includes('kuwait')) return '🇰🇼';
+  if (nat.includes('مصر') || nat.includes('egypt')) return '🇪🇬';
+  if (nat.includes('ايران') || nat.includes('إيران') || nat.includes('iran')) return '🇮🇷';
+  if (nat.includes('سور') || nat.includes('syria')) return '🇸🇾';
+  if (nat.includes('لبنان') || nat.includes('leban')) return '🇱🇧';
+  if (nat.includes('اردن') || nat.includes('أردن') || nat.includes('jordan')) return '🇯🇴';
+  if (nat.includes('هند') || nat.includes('india')) return '🇮🇳';
+  if (nat.includes('باكستان') || nat.includes('pakistan')) return '🇵🇰';
+  if (nat.includes('فلبين') || nat.includes('philip')) return '🇵🇭';
+  if (nat.includes('سعود') || nat.includes('saudi')) return '🇸🇦';
+  if (nat.includes('امارات') || nat.includes('إمارات') || nat.includes('uae')) return '🇦🇪';
+  if (nat.includes('عمان') || nat.includes('عُمان') || nat.includes('oman')) return '🇴🇲';
+  if (nat.includes('بحرين') || nat.includes('bahrain')) return '🇧🇭';
+  if (nat.includes('قطر') || nat.includes('qatar')) return '🇶🇦';
+  if (nat.includes('يمن') || nat.includes('yemen')) return '🇾🇪';
+  if (nat.includes('سودان') || nat.includes('sudan')) return '🇸🇩';
+  if (nat.includes('عراق') || nat.includes('iraq')) return '🇮🇶';
+  if (nat.includes('تونس') || nat.includes('tunis')) return '🇹🇳';
+  if (nat.includes('مغرب') || nat.includes('morocco')) return '🇲🇦';
+  if (nat.includes('جزائر') || nat.includes('algeria')) return '🇩🇿';
+  if (nat.includes('بنغلاد') || nat.includes('بنغال') || nat.includes('bangla')) return '🇧🇩';
+  if (nat.includes('ترك') || nat.includes('turk')) return '🇹🇷';
+  if (nat.includes('امريك') || nat.includes('أمريك') || nat.includes('usa')) return '🇺🇸';
+  if (nat.includes('بريطان') || nat.includes('uk')) return '🇬🇧';
+  if (nat.includes('كند') || nat.includes('canada')) return '🇨🇦';
+  return '🌐';
+}
+
+/**
+ * Format Employee Nationality & Residency display for reports and cards
+ */
+export function formatEmployeeNationalityAndResidency(emp: { nationality?: string; residencyType?: string; isKuwaiti?: boolean } | null | undefined): string {
+  if (!emp) return 'غير محدد';
+  const isKw = isKuwaitiEmployee(emp);
+  if (isKw) {
+    return '🇰🇼 كويتي (عمالة وطنية)';
+  }
+  
+  const flag = getNationalityFlag(emp.nationality);
+  const natName = emp.nationality && emp.nationality.trim() && emp.nationality !== 'غير محدد'
+    ? emp.nationality.trim() 
+    : 'وافد';
+  const resType = emp.residencyType && emp.residencyType !== 'كويتي' 
+    ? emp.residencyType 
+    : 'مادة 18 - قطاع أهلي';
+  
+  return `${flag} ${natName} (${resType})`;
+}
+
+/**
  * Calculate Monthly Leave Accrual for 2026 (2.5 days / month according to Kuwait Labor Law)
  * - For employees joined before 2026 or in January 2026: Starts from January 2026 (12 months = 30 days total).
  * - For employees hired in 2026 (e.g. February 2026): Starts from their hire month (e.g. February = 11 months = 27.5 days total).
@@ -629,6 +696,99 @@ export function getOpeningBalance(emp: any): number {
 
 export function getGlobalOpeningBalance(emp: any): number {
   return getCarriedOverBalance(emp);
+}
+
+export function getGlobalCompensatoryDays(emp: any): number {
+  if (!emp) return 0.0;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const targetEmpId = String(emp.id || '');
+      const targetEmpCode = String(emp.employeeCode || '');
+      const targetCivilId = String(emp.civilId || '');
+
+      // 1. Primary & Authoritative Source: approved work_on_holidays (manara_holiday_work_records)
+      const rawHolidays = window.localStorage.getItem('manara_holiday_work_records');
+      if (rawHolidays) {
+        const parsedH = JSON.parse(rawHolidays);
+        if (Array.isArray(parsedH)) {
+          const empHolidays = parsedH.filter((h: any) => {
+            const holEmpId = String(h.employeeId || '');
+            const matchesEmp = (targetEmpId && holEmpId === targetEmpId) || 
+                               (targetEmpCode && holEmpId === targetEmpCode) ||
+                               (targetCivilId && holEmpId === targetCivilId);
+            if (!matchesEmp) return false;
+
+            const isDayComp = h.compensationType === 'day';
+            const isApproved = h.state === 'approved' || h.state === 'done' || !h.state;
+            return isDayComp && isApproved;
+          });
+
+          if (empHolidays.length > 0) {
+            // Deduplicate by holiday date/name to prevent duplicate entries for the same holiday
+            const dateMap = new Map<string, number>();
+            empHolidays.forEach((h: any) => {
+              const dateKey = h.date || h.holidayName || h.id || 'default_date';
+              const hours = Number(h.hoursWorked) || 8;
+              const daysCalculated = hours >= 8 ? Math.max(1, Number((hours / 8).toFixed(2))) : Number((hours / 8).toFixed(2));
+              if (!dateMap.has(dateKey) || (dateMap.get(dateKey)! < daysCalculated)) {
+                dateMap.set(dateKey, daysCalculated);
+              }
+            });
+
+            let holidayDays = 0;
+            dateMap.forEach(d => { holidayDays += d; });
+            return holidayDays;
+          }
+        }
+      }
+
+      // 2. Secondary Source: If no holiday work records exist, check manual leave allocations
+      const rawAllocs = window.localStorage.getItem('manara_leave_allocations_data');
+      if (rawAllocs) {
+        const parsed = JSON.parse(rawAllocs);
+        if (Array.isArray(parsed)) {
+          const compAllocs = parsed.filter((a: any) => {
+            const allocEmpId = String(a.employeeId || '');
+            const matchesEmp = (targetEmpId && allocEmpId === targetEmpId) || 
+                               (targetEmpCode && allocEmpId === targetEmpCode) ||
+                               (targetCivilId && allocEmpId === targetCivilId);
+            if (!matchesEmp) return false;
+
+            const isCompType = a.allocationType === 'compensatory_off' || 
+                               a.allocationType === 'compensatory' || 
+                               a.leaveType === 'COMPENSATORY';
+            const isCompName = a.name && (a.name.includes('تعويضي') || a.name.includes('بديل عن عمل') || a.name.includes('عطلة') || a.name.includes('بديل'));
+            const isCompNotes = a.notes && (a.notes.includes('تعويضي') || a.notes.includes('عطلة') || a.notes.includes('بديل') || a.notes.includes('عطلات'));
+
+            const isValidState = a.state === 'validate' || a.state === 'validated' || a.state === 'confirm' || !a.state;
+            return (isCompType || isCompName || isCompNotes) && isValidState;
+          });
+
+          if (compAllocs.length > 0) {
+            // Deduplicate: If specific hwr allocations exist, use only them
+            const specific = compAllocs.filter((a: any) => a.id && a.id.startsWith('alloc-comp-hwr-'));
+            const listToCount = specific.length > 0 ? specific : compAllocs;
+
+            const dateMap = new Map<string, number>();
+            listToCount.forEach((a: any) => {
+              const key = a.dateFrom || (a.id && !a.id.includes('holiday') ? a.id : 'default_comp');
+              const days = Number(a.numberOfDays) || 0;
+              if (!dateMap.has(key) || dateMap.get(key)! < days) {
+                dateMap.set(key, days);
+              }
+            });
+
+            let allocDays = 0;
+            dateMap.forEach(v => { allocDays += v; });
+            return allocDays;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[kuwaitLaw] getGlobalCompensatoryDays error:', e);
+  }
+  return 0.0;
 }
 
 export function getCurrentYearAccrued(emp: any, asOfDate: Date = new Date(2026, 7, 31)): number {

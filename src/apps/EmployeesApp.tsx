@@ -76,6 +76,21 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   onSelectEmployeeForLeaves,
   onOpenNotificationModal,
 }) => {
+  const companyBranches = React.useMemo(() => {
+    if (activeCompany?.branches && activeCompany.branches.length > 0) {
+      return activeCompany.branches;
+    }
+    const saved = localStorage.getItem(`geofence_branches_${activeCompany?.id || 'comp-1'}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return [
+      { id: 'hq', branchName: 'كافة الفروع / المركز الرئيسي' }
+    ];
+  }, [activeCompany]);
   const [editingEmp, setEditingEmp] = useState<Partial<Employee> | null>(selectedEmpForForm);
   const [activeTab, setActiveTab] = useState<'WORK' | 'PRIVATE' | 'HR_SETTINGS' | 'LEGAL' | 'BANK' | 'DOCUMENTS'>('WORK');
   const [civilIdError, setCivilIdError] = useState<string | null>(null);
@@ -250,9 +265,9 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       fullNameAr: '',
       fullNameEn: '',
       civilId: '',
-      isKuwaiti: true,
-      nationality: 'كويتي',
-      residencyType: 'كويتي',
+      isKuwaiti: false,
+      nationality: 'مصري',
+      residencyType: 'مادة 18 - قطاع أهلي',
       status: 'ACTIVE',
       department: isMOH ? 'الجلدية والليزر والتجميل' : 'الموارد البشرية والإدارة',
       jobTitle: isMOH ? 'طبيب' : 'موظف',
@@ -336,7 +351,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
         fullNameAr: scannedData.fullNameAr || scannedData.fullName || prev?.fullNameAr || '',
         fullNameEn: scannedData.fullNameEn || prev?.fullNameEn || '',
         civilId: cleanCivilId || prev?.civilId || '',
-        nationality: scannedData.nationality || prev?.nationality || 'كويتي',
+        nationality: scannedData.nationality || prev?.nationality || '',
         civilIdExpiry: scannedData.expiryDate || prev?.civilIdExpiry || '',
         dob: parsedDob || prev?.dob || '',
         gender: (parsedGender as 'MALE' | 'FEMALE') || prev?.gender || 'MALE',
@@ -393,9 +408,13 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       civilIdExpiry: editingEmp.civilIdExpiry || '2028-12-31',
       passportNo: editingEmp.passportNo || '',
       passportExpiry: editingEmp.passportExpiry || '2029-12-31',
-      nationality: editingEmp.nationality || 'كويتي',
-      isKuwaiti: editingEmp.isKuwaiti ?? (editingEmp.nationality === 'كويتي'),
-      residencyType: editingEmp.residencyType || (editingEmp.isKuwaiti ? 'كويتي' : 'مادة 18 - قطاع أهلي'),
+      nationality: editingEmp.nationality?.trim() || 'مصري',
+      isKuwaiti: Boolean(
+        editingEmp.nationality?.trim()
+          ? (editingEmp.nationality.trim().includes('كويت') || editingEmp.nationality.trim() === 'كويتي' || editingEmp.nationality.trim().toLowerCase() === 'kuwaiti')
+          : editingEmp.isKuwaiti
+      ),
+      residencyType: (editingEmp.nationality?.includes('كويت') || editingEmp.nationality === 'كويتي') ? 'كويتي' : (editingEmp.residencyType && editingEmp.residencyType !== 'كويتي' ? editingEmp.residencyType : 'مادة 18 - قطاع أهلي'),
       gender: editingEmp.gender || 'MALE',
       dob: editingEmp.dob || '1990-01-01',
       department: editingEmp.department || 'الموارد البشرية والإدارة',
@@ -451,7 +470,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => setShowSoftDeletedModal(true)}
             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition flex items-center gap-1.5 shadow-xs cursor-pointer relative"
@@ -568,7 +587,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
       {/* Search & Filter Bar */}
       <div className="bg-white rounded-xl border border-slate-200 mb-4 shadow-sm p-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 px-3 py-1.5 focus-within:border-[#714B67] transition">
             <Search className="w-4 h-4 text-slate-400 mr-2" />
             <input
@@ -640,7 +659,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
       {/* KANBAN VIEW */}
       {localViewMode === 'KANBAN' && filteredEmps.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-8">
           {filteredEmps.map(emp => {
             const empDocs = documents.filter(d => d.employeeId === emp.id);
             return (
@@ -722,7 +741,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
 
       {/* LIST VIEW */}
       {localViewMode === 'LIST' && filteredEmps.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
           <div className="overflow-x-auto max-h-[70vh] odoo-scrollbar">
             <table className="w-full text-right text-xs table-auto">
               <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
@@ -1304,6 +1323,28 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   </div>
 
                   <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">الفرع التابع له (Branch)</label>
+                    <select
+                      value={editingEmp.branchId || ''}
+                      onChange={(e) => {
+                        const bId = e.target.value;
+                        const found = companyBranches.find((b: any) => b.id === bId);
+                        setEditingEmp({ 
+                          ...editingEmp, 
+                          branchId: bId,
+                          branchName: found ? found.branchName : undefined
+                        });
+                      }}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
+                    >
+                      <option value="">اختر الفرع...</option>
+                      {companyBranches.map((b: any) => (
+                        <option key={b.id} value={b.id}>{b.branchName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ الالتحاق بالعمل</label>
                     <input
                       type="date"
@@ -1366,7 +1407,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">نوع الإقامة / التوطين</label>
                     <select
-                      value={editingEmp.residencyType || 'كويتي'}
+                      value={editingEmp.residencyType || (editingEmp.nationality?.includes('كويت') ? 'كويتي' : 'مادة 18 - قطاع أهلي')}
                       onChange={(e) => setEditingEmp({ ...editingEmp, residencyType: e.target.value as any })}
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
                     >

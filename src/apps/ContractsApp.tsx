@@ -361,55 +361,58 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                 />
               </div>
 
-              {/* تفاصيل الدوام وجدول العمل Odoo resource_calendar_id */}
+              {/* تفاصيل الدوام وجدول العمل */}
               <div className="col-span-1 md:col-span-2 bg-purple-50/70 p-3.5 rounded-xl border border-purple-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-[#714B67]">تفاصيل الدوام وجدول ساعات العمل (Working Schedule)</span>
-                  <span className="text-[10px] font-mono text-purple-700 bg-purple-100 px-2 py-0.5 rounded font-bold">resource_calendar_id</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1 text-[11px]">جدول العمل المعتمد بالعقد</label>
-                    <select
-                      value={editingContract.resourceCalendarId || 'cal-std-8h-6d'}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const schedName = val === 'cal-std-8h-6d' ? 'الدوام الصباحي القياسي 8 ساعات (08:00 - 16:00)' :
-                                          val === 'cal-std-8h-5d' ? 'الدوام المكتبي 5 أيام 40 ساعة (الأحد - الخميس)' :
-                                          val === 'cal-eve-8h-6d' ? 'الدوام المسائي 8 ساعات (16:00 - 00:00)' :
-                                          val === 'cal-split-shifts' ? 'دوام الفترتين المقسم (09:00 - 13:00 / 17:00 - 21:00)' :
-                                          val === 'cal-flexible-8h' ? 'الدوام المرن 8 ساعات' : 'دوام جزئي 4 ساعات';
-                        setEditingContract({
-                          ...editingContract,
-                          resourceCalendarId: val,
-                          workingSchedule: schedName,
-                        });
-                      }}
-                      className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none"
-                    >
-                      <option value="cal-std-8h-6d">الدوام الصباحي القياسي 8 ساعات (08:00 - 16:00 | السبت - الخميس)</option>
-                      <option value="cal-std-8h-5d">الدوام المكتبي 5 أيام 40 ساعة (08:00 - 16:00 | الأحد - الخميس)</option>
-                      <option value="cal-eve-8h-6d">الدوام المسائي القياسي 8 ساعات (16:00 - 00:00 | السبت - الخميس)</option>
-                      <option value="cal-split-shifts">دوام الفترتين المقسم (09:00 - 13:00 و 17:00 - 21:00)</option>
-                      <option value="cal-flexible-8h">الدوام المرن 8 ساعات</option>
-                      <option value="cal-part-time-4h">دوام جزئي 4 ساعات</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 text-[11px]">جدول العمل المعتمد بالعقد</label>
+                  <select
+                    value={editingContract.resourceCalendarId || 'cal-std-8h-6d'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const schedName = 
+                        val === 'cal-std-8h-6d' ? 'دوام صباحي قياسي (8 ساعات): 08:00 - 16:00 (السبت - الخميس)' :
+                        val === 'cal-eve-8h-6d' ? 'دوام مسائي قياسي (8 ساعات): 16:00 - 00:00 (السبت - الخميس)' :
+                        val === 'cal-split-shifts' ? 'دوام الفترتين المقسم (Split Shift): 09:00 - 13:00 و 17:00 - 21:00' :
+                        val === 'cal-std-8h-5d' ? 'دوام مكتبي (5 أيام - 40 ساعة): 08:00 - 16:00 (الأحد - الخميس)' :
+                        val === 'cal-part-time-4h' ? 'دوام جزئي (4 ساعات)' : 'دوام مرن (8 ساعات)';
+                      const wType = 
+                        val === 'cal-split-shifts' ? 'SHIFT' :
+                        val === 'cal-part-time-4h' ? 'PART_TIME' :
+                        val === 'cal-flexible-8h' ? 'FLEXIBLE' : 'STANDARD';
+                      setEditingContract({
+                        ...editingContract,
+                        resourceCalendarId: val,
+                        workingSchedule: schedName,
+                        workHoursType: wType
+                      });
+                    }}
+                    className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none"
+                  >
+                    <option value="cal-std-8h-6d">دوام صباحي قياسي (8 ساعات): 08:00 - 16:00 (السبت - الخميس)</option>
+                    <option value="cal-eve-8h-6d">دوام مسائي قياسي (8 ساعات): 16:00 - 00:00 (السبت - الخميس)</option>
+                    <option value="cal-split-shifts">دوام الفترتين المقسم (Split Shift): 09:00 - 13:00 و 17:00 - 21:00</option>
+                    <option value="cal-std-8h-5d">دوام مكتبي (5 أيام - 40 ساعة): 08:00 - 16:00 (الأحد - الخميس)</option>
+                    <option value="cal-part-time-4h">دوام جزئي (4 ساعات)</option>
+                    <option value="cal-flexible-8h">دوام مرن (8 ساعات)</option>
+                  </select>
+                </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1 text-[11px]">نوع الدوام</label>
-                    <select
-                      value={editingContract.workHoursType || 'STANDARD'}
-                      onChange={(e) => setEditingContract({ ...editingContract, workHoursType: e.target.value })}
-                      className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none"
-                    >
-                      <option value="STANDARD">دوام كامل قياسي (8 ساعات)</option>
-                      <option value="FLEXIBLE">دوام مرن</option>
-                      <option value="PART_TIME">دوام جزئي (4 ساعات)</option>
-                      <option value="SHIFT">مناوبات وشفتات</option>
-                      <option value="CUSTOM">ساعات مخصصة</option>
-                    </select>
-                  </div>
+                <div className="mt-3">
+                  <label className="block font-bold text-slate-700 mb-1 text-[11px]">ساعات العمل اليومية المعتمدة (Planned Daily Hours)</label>
+                  <select
+                    value={editingContract.plannedDailyHours || 8}
+                    onChange={(e) => setEditingContract({ ...editingContract, plannedDailyHours: Number(e.target.value) })}
+                    className="w-full border border-purple-300 rounded p-2 text-xs font-bold text-slate-800 bg-white outline-none"
+                  >
+                    <option value={8}>8 ساعات (القياسي)</option>
+                    <option value={10}>10 ساعات</option>
+                    <option value={12}>12 ساعة</option>
+                    <option value={4}>4 ساعات (دوام جزئي)</option>
+                    <option value={6}>6 ساعات</option>
+                  </select>
                 </div>
               </div>
             </div>

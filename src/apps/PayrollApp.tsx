@@ -648,7 +648,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                   <input
                     type="number"
                     step="0.001"
-                    value={structureForm.basicSalary}
+                    value={structureForm.basicSalary ?? 0}
                     onChange={(e) => setStructureForm({ ...structureForm, basicSalary: parseFloat(e.target.value) || 0 })}
                     className="w-full border border-slate-300 rounded p-2 outline-none font-mono font-bold text-xs focus:border-purple-600 bg-white"
                     required
@@ -660,7 +660,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                   <input
                     type="number"
                     step="0.001"
-                    value={structureForm.housingAllowance}
+                    value={structureForm.housingAllowance ?? 0}
                     onChange={(e) => setStructureForm({ ...structureForm, housingAllowance: parseFloat(e.target.value) || 0 })}
                     className="w-full border border-slate-300 rounded p-2 outline-none font-mono font-bold text-xs focus:border-purple-600 bg-white"
                   />
@@ -671,7 +671,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                   <input
                     type="number"
                     step="0.001"
-                    value={structureForm.transportAllowance}
+                    value={structureForm.transportAllowance ?? 0}
                     onChange={(e) => setStructureForm({ ...structureForm, transportAllowance: parseFloat(e.target.value) || 0 })}
                     className="w-full border border-slate-300 rounded p-2 outline-none font-mono font-bold text-xs focus:border-purple-600 bg-white"
                   />
@@ -682,7 +682,7 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                   <input
                     type="number"
                     step="0.001"
-                    value={structureForm.otherAllowance}
+                    value={structureForm.otherAllowance ?? 0}
                     onChange={(e) => setStructureForm({ ...structureForm, otherAllowance: parseFloat(e.target.value) || 0 })}
                     className="w-full border border-slate-300 rounded p-2 outline-none font-mono font-bold text-xs focus:border-purple-600 bg-white"
                   />
