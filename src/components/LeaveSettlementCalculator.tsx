@@ -194,6 +194,13 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     }
   }, [selectedEmpId, netAvailable, settlementMode]);
 
+  // Additional safety check to keep encashmentDays in sync with netAvailable during liquidation
+  useEffect(() => {
+    if (settlementMode === 'ENCASHMENT_LIQUIDATION' && netAvailable > 0 && encashmentDays !== netAvailable) {
+      setEncashmentDays(netAvailable);
+    }
+  }, [netAvailable, settlementMode]);
+
   // Auto-sync worked days when departure date changes
   const handleDepartureDateChange = (newDateStr: string) => {
     setDepartureDate(newDateStr);

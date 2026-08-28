@@ -37,6 +37,8 @@ interface OdooTopBarProps {
   onOpenAdmin?: () => void;
   onAddNew?: () => void;
   onExport?: () => void;
+  onLoadDemoData?: () => void;
+  onPurgeSystemData?: () => void;
 }
 
 const APP_MODELS: Record<ActiveApp, string> = {
@@ -129,6 +131,8 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   onOpenAdmin,
   onAddNew,
   onExport,
+  onLoadDemoData,
+  onPurgeSystemData,
 }) => {
   const [showCompanyMenu, setShowCompanyMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -519,6 +523,34 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
                   )}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Quick Demo Data & Clear Demo Buttons */}
+          <div className="hidden sm:flex items-center gap-1.5 shrink-0 border-r border-white/20 pr-2">
+            {onLoadDemoData && (
+              <button
+                type="button"
+                onClick={onLoadDemoData}
+                className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                title="توليد بيانات تجريبية (Load Demo Data)"
+              >
+                <span>⚡ توليد بيانات تجريبية</span>
+              </button>
+            )}
+            {onPurgeSystemData && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('هل أنت متأكد من مسح البيانات التجريبية وإعادة تصفير النظام؟')) {
+                    onPurgeSystemData();
+                  }
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                title="مسح البيانات التجريبية (Clear Demo Data)"
+              >
+                <span>🗑️ مسح البيانات</span>
+              </button>
             )}
           </div>
 

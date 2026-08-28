@@ -45,8 +45,9 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
   });
 
   const handleSave = () => {
-    if (!editingContract?.employeeId || !editingContract?.basicSalary) {
-      alert('يرجى اختيار الموظف وإدخال الراتب الأساسي');
+    const basic = Number(editingContract?.basicSalary) || 0;
+    if (!editingContract?.employeeId || basic <= 0) {
+      alert('يرجى اختيار الموظف وإدخال الراتب الأساسي الفعلي (لا يمكن أن يساوي صفراً)');
       return;
     }
 
@@ -135,9 +136,13 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                 companyId: activeCompany?.id || 'comp-1',
                 contractType: 'INDEFINITE',
                 noticePeriodDays: 90,
-                basicSalary: 800,
-                housingAllowance: 150,
+                basicSalary: 0,
+                housingAllowance: 0,
+                transportAllowance: 0,
+                otherAllowance: 0,
                 status: 'RUNNING',
+                employeeId: '',
+                startDate: '',
               });
             }}
             className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded shadow flex items-center gap-2 transition"
@@ -177,9 +182,13 @@ export const ContractsApp: React.FC<ContractsAppProps> = ({
                         companyId: activeCompany?.id || 'comp-1',
                         contractType: 'INDEFINITE',
                         noticePeriodDays: 90,
-                        basicSalary: 800,
-                        housingAllowance: 150,
+                        basicSalary: 0,
+                        housingAllowance: 0,
+                        transportAllowance: 0,
+                        otherAllowance: 0,
                         status: 'RUNNING',
+                        employeeId: '',
+                        startDate: '',
                       });
                     }}
                     className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded shadow transition"

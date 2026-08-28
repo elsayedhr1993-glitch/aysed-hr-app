@@ -7,19 +7,30 @@ if (typeof window !== 'undefined') {
 }
 
 export interface ScannedData {
-  documentType: 'civil_id' | 'license' | 'contract' | 'passport' | 'other';
+  documentType?: 'civil_id' | 'license' | 'contract' | 'passport' | 'other';
+  civilId?: string;
   fullNameAr?: string;
   fullName?: string;
   fullNameEn?: string;
-  civilId?: string;
-  expiryDate?: string;
-  dob?: string;
   nationality?: string;
+  gender?: string;
+  birthDate?: string;
+  dob?: string;
+  unifiedNo?: string;
+  passportNo?: string;
+  profession?: string;
+  jobTitle?: string;
+  expiryDate?: string;
+  issueDate?: string;
+  bloodGroup?: string;
+  address?: {
+    block?: string;
+    street?: string;
+    building?: string;
+    area?: string;
+  };
   rawText?: string;
   confidenceScore?: number;
-  jobTitle?: string;
-  passportNo?: string;
-  gender?: string;
   residencyType?: string;
   mohLicenseNo?: string;
   contractSalary?: number;

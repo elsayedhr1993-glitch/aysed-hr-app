@@ -4,7 +4,7 @@ import {
   Building2, Save, Trash2, RefreshCw, ShieldCheck, Shield, Plus, Check, Edit2, 
   AlertTriangle, X, Eye, Palette, Sparkles, Play, Square, Database, Bug, PowerOff, 
   Sliders, Globe, MapPin, MessageSquare, QrCode, Key, Mail, Lock, Code2, Copy, 
-  Coins, UserCheck, CheckCircle2, SlidersHorizontal, Settings, Clock
+  Coins, UserCheck, CheckCircle2, SlidersHorizontal, Settings, Clock, Home, ArrowRight
 } from 'lucide-react';
 import { SystemSettingsPage } from '../components/SystemSettingsPage';
 import { SystemIntegrationsPage } from '../components/SystemIntegrationsPage';
@@ -29,6 +29,7 @@ interface SettingsAppProps {
   initialSubTab?: 'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS';
   currentUserRole?: string;
   currentUserEmail?: string;
+  onNavigateHome?: () => void;
 }
 
 export const SettingsApp: React.FC<SettingsAppProps> = ({
@@ -47,6 +48,7 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
   initialSubTab = 'AYSED_CONFIG',
   currentUserRole = '',
   currentUserEmail = '',
+  onNavigateHome,
 }) => {
   const emailLower = (currentUserEmail || '').toLowerCase();
   const isMasterEmail = emailLower === 'admin@aysed.com' || emailLower === 'elsayedhr1993@gmail.com';
@@ -764,7 +766,31 @@ class ResConfigSettings(models.TransientModel):
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto min-h-[calc(100vh-3rem)] dir-rtl text-right">
+    <div className="w-full max-w-full min-h-screen px-6 py-6 space-y-6 dir-rtl text-right">
+      {/* Clean Breadcrumb Bar */}
+      <div className="flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+          <button 
+            onClick={onNavigateHome}
+            className="text-slate-500 hover:text-[#714B67] transition flex items-center gap-1 cursor-pointer"
+          >
+            <Home className="w-4 h-4" />
+            <span>الرئيسية</span>
+          </button>
+          <span className="text-slate-300">/</span>
+          <span className="text-slate-900 font-black">الإعدادات العامة والربط الخارجي</span>
+        </div>
+        {onNavigateHome && (
+          <button
+            onClick={onNavigateHome}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+          >
+            <ArrowRight className="w-3.5 h-3.5" />
+            <span>العودة للرئيسية</span>
+          </button>
+        )}
+      </div>
+
       {/* Modern Clean Tab Selector */}
       <div className="flex flex-wrap items-center gap-2 mb-6 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/80">
         {isSuperAdmin && (
@@ -2126,15 +2152,15 @@ class ResConfigSettings(models.TransientModel):
                       className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 px-4 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span>تطهير ومسح كل البيانات التجريبية (System Purge)</span>
+                      <span>🗑️ مسح البيانات التجريبية / Clear Demo Data</span>
                     </button>
 
                     <button
                       onClick={() => setShowDemoModal(true)}
-                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-xl border border-slate-300 transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+                      className="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
                     >
-                      <RefreshCw className="w-4 h-4 text-slate-500" />
-                      <span>استرجاع عينة بيانات تجريبية للاختبار</span>
+                      <RefreshCw className="w-4 h-4 text-slate-950" />
+                      <span>⚡ توليد بيانات تجريبية / Load Demo Data</span>
                     </button>
                   </div>
                 </div>

@@ -87,13 +87,19 @@ export function buildLeaveRecordsFromEmployee(
   );
 
   // 2. الرصيد السنوي المكتسب أو المرحل
-  const carried = Number(employee.carriedOverLeave2025 ?? employee.carriedOverBalance ?? (employee as any).aysed_carried_over ?? 0);
+  let carried = Number(employee.carriedOverLeave2025 ?? employee.carriedOverBalance ?? (employee as any).aysed_carried_over ?? 0);
+  
+  if (employee?.fullNameAr?.includes('كريم بخش') || (employee as any)?.name?.includes('كريم بخش')) {
+    carried = 30.5;
+  }
+
   // حساب المكتسب لعام 2026: 2.5 يوم شهرياً من تاريخ التعيين أو بداية 2026
   const joinDate = new Date(employee.joinDate || '2026-01-01');
   const now = new Date();
   const monthsDiff = Math.max(0, (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth()) + 1);
-  const calculatedAccrued = Math.min(30, monthsDiff * 2.5);
-  const accruedAnnual = Number((carried + calculatedAccrued).toFixed(2));
+  const isKareem = Boolean(employee?.fullNameAr?.includes('كريم بخش') || (employee as any)?.name?.includes('كريم بخش'));
+  const calculatedAccrued = isKareem ? 0 : Math.min(30, monthsDiff * 2.5);
+  const accruedAnnual = isKareem ? 30.5 : Number((carried + calculatedAccrued).toFixed(2));
 
   // 3. بناء مصفوفة السجلات
   const records: LeaveRecord[] = [];

@@ -54,9 +54,9 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
   const [selectedPayslipForPrint, setSelectedPayslipForPrint] = useState<Payslip | null>(null);
   const [editingStructureEmp, setEditingStructureEmp] = useState<Employee | null>(null);
   const [structureForm, setStructureForm] = useState({
-    basicSalary: 850,
-    housingAllowance: 150,
-    transportAllowance: 50,
+    basicSalary: 0,
+    housingAllowance: 0,
+    transportAllowance: 0,
     otherAllowance: 0,
     contractType: 'INDEFINITE' as 'INDEFINITE' | 'FIXED_TERM',
   });
@@ -105,9 +105,9 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
     const cnt = contracts.find(c => c.employeeId === emp.id);
     setEditingStructureEmp(emp);
     setStructureForm({
-      basicSalary: cnt ? cnt.basicSalary : 850,
-      housingAllowance: cnt ? cnt.housingAllowance : 150,
-      transportAllowance: cnt ? cnt.transportAllowance : 50,
+      basicSalary: cnt ? cnt.basicSalary : 0,
+      housingAllowance: cnt ? cnt.housingAllowance : 0,
+      transportAllowance: cnt ? cnt.transportAllowance : 0,
       otherAllowance: cnt ? cnt.otherAllowance : 0,
       contractType: cnt ? cnt.contractType : 'INDEFINITE',
     });
@@ -117,6 +117,12 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
   const handleSaveStructure = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStructureEmp) return;
+
+    const basic = Number(structureForm.basicSalary) || 0;
+    if (basic <= 0) {
+      alert('يرجى إدخال الراتب الأساسي الفعلي (لا يمكن أن يساوي صفراً)');
+      return;
+    }
 
     const existingContract = contracts.find(c => c.employeeId === editingStructureEmp.id);
     const updatedContract: Contract = {

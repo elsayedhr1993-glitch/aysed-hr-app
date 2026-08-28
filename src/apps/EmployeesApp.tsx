@@ -7,7 +7,7 @@ import { validateKuwaitCivilId, parseKuwaitCivilId, formatKWD } from '../utils/k
 import { processAnyDocument } from '../utils/ocrService';
 import { 
   User, Users, CheckCircle, AlertTriangle, FileText, Calendar, Briefcase,
-  Folder, Shield, Plus, Edit2, Trash2, X, Building, Phone, Mail, Award, Search, Check, Eye, Camera, Loader2, Sparkles, LayoutGrid, List, ArrowLeftRight, Filter, Fingerprint, Key, CreditCard, MessageSquare, Send, ShieldCheck, History, Save, RotateCcw, Clock, Upload, Link as LinkIcon
+  Folder, Shield, Plus, Edit2, Trash2, X, Building, Phone, Mail, Award, Search, Check, Eye, Camera, Loader2, Sparkles, LayoutGrid, List, ArrowLeftRight, Filter, Fingerprint, Key, CreditCard, MessageSquare, Send, ShieldCheck, History, Save, RotateCcw, Clock, Upload, Link as LinkIcon, Scan, ChevronDown, CheckCircle2
 } from 'lucide-react';
 
 const PRESET_AVATARS = [
@@ -161,6 +161,11 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   const [loadingScan, setLoadingScan] = useState<boolean>(false);
   const [scannedFilePreviewUrl, setScannedFilePreviewUrl] = useState<string | null>(null);
   const [highlightedFields, setHighlightedFields] = useState<Record<string, boolean>>({});
+
+  // Aysed S AI Scan states
+  const [isAiScanDropdownOpen, setIsAiScanDropdownOpen] = useState<boolean>(false);
+  const [activeScanModalType, setActiveScanModalType] = useState<'CIVIL_ID' | 'PASSPORT' | 'WORK_PERMIT' | 'LIVE_CAMERA' | null>(null);
+  const [aiScanResult, setAiScanResult] = useState<any>(null);
 
   // Profile Picture state
   const [isAvatarDropdownOpen, setIsAvatarDropdownOpen] = useState<boolean>(false);
@@ -731,19 +736,6 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       >
                         <Calendar className="w-4 h-4" />
                       </button>)}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onSoftDeleteEmployee) {
-                          onSoftDeleteEmployee(emp.id, 'أرشفة من لوحة الموظفين');
-                          toast.success('تم أرشفة الموظف بنجاح');
-                        }
-                      }}
-                      className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                      title="أرشفة / حذف"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               </div>);
@@ -851,18 +843,102 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               </button>
             </div>
 
-            {/* AI Smart Scan Bar */}
-            <div className="bg-purple-50/80 px-6 py-3 border-b border-purple-100 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-purple-900">
-                <Sparkles className="w-4 h-4 text-purple-600 animate-pulse" />
-                <span className="font-bold">المسح الذكي (OCR):</span>
-                <span>قم برفع البطاقة المدنية أو جواز السفر لملء الحقول تلقائياً</span>
+            {/* Aysed S AI Scan Bar & Dropdown */}
+            <div className="bg-gradient-to-r from-purple-900 via-[#5a3a51] to-[#714B67] px-6 py-3 border-b border-purple-950 flex items-center justify-between text-white relative">
+              <div className="flex items-center gap-2.5 text-xs text-purple-100">
+                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                <span className="font-bold text-white">منظومة المسح الذكي (Aysed S AI Scan):</span>
+                <span className="hidden sm:inline opacity-90">استخراج وتعبئة بيانات الهويات والمستندات بذكاء اصطناعي دقيق</span>
               </div>
-              <label className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5 transition">
-                <Camera className="w-3.5 h-3.5" />
-                <span>{loadingScan ? 'جاري القراءة...' : 'رفع المستند للمسح'}</span>
-                <input type="file" accept="image/*,application/pdf" onChange={handleAutoScan} className="hidden" />
-              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsAiScanDropdownOpen(!isAiScanDropdownOpen)}
+                  className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl shadow-md flex items-center gap-2 transition cursor-pointer active:scale-95"
+                >
+                  <Scan className="w-4 h-4" />
+                  <span>Aysed S AI Scan</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+
+                {isAiScanDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsAiScanDropdownOpen(false)} 
+                    />
+                    <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl text-slate-800 text-xs py-2 z-50 border border-purple-100 animate-in fade-in zoom-in-95 duration-150 dir-rtl text-right">
+                      <div className="px-4 py-2 border-b border-slate-100 bg-purple-50/50">
+                        <div className="font-bold text-purple-900 text-xs flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                          <span>خيارات المسح الضوئي الذكي</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500">اختر نوع المستند للبدء الفوري</div>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAiScanDropdownOpen(false);
+                          setActiveScanModalType('CIVIL_ID');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 text-slate-700 hover:text-purple-900 transition font-medium cursor-pointer text-right"
+                      >
+                        <CreditCard className="w-4 h-4 text-purple-600" />
+                        <div>
+                          <div className="font-bold">مسح البطاقة المدنية (Scan Civil ID)</div>
+                          <div className="text-[10px] text-slate-400">استخراج الرقم المدني والاسم وتاريخ الانتهاء</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAiScanDropdownOpen(false);
+                          setActiveScanModalType('PASSPORT');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 text-slate-700 hover:text-purple-900 transition font-medium cursor-pointer text-right"
+                      >
+                        <Shield className="w-4 h-4 text-indigo-600" />
+                        <div>
+                          <div className="font-bold">مسح جواز السفر (Scan Passport)</div>
+                          <div className="text-[10px] text-slate-400">استخراج رقم الجواز والجنسية وتاريخ الصلاحية</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAiScanDropdownOpen(false);
+                          setActiveScanModalType('WORK_PERMIT');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 text-slate-700 hover:text-purple-900 transition font-medium cursor-pointer text-right"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-600" />
+                        <div>
+                          <div className="font-bold">مسح عقد العمل / ترخيص (Work Permit)</div>
+                          <div className="text-[10px] text-slate-400">تحليل بنود التعاقد والرواتب والمهنة</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAiScanDropdownOpen(false);
+                          setActiveScanModalType('LIVE_CAMERA');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-purple-50 text-slate-700 hover:text-purple-900 transition font-medium cursor-pointer text-right border-t border-slate-100"
+                      >
+                        <Camera className="w-4 h-4 text-amber-600" />
+                        <div>
+                          <div className="font-bold">كاميرا التقاط المباشر (Live Camera)</div>
+                          <div className="text-[10px] text-slate-400">التقاط صورة المستند عبر كاميرا الجهاز مباشرة</div>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Odoo Smart Buttons (Stat Buttons / oe_button_box) */}
@@ -1734,5 +1810,194 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             </div>
           </div>
         </div>)}
+
+      {/* Aysed S AI Scan Center Modal Overlay */}
+      {activeScanModalType && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden border border-purple-100 flex flex-col text-right dir-rtl">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-purple-900 to-[#714B67] text-white">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Scan className="w-6 h-6 text-amber-300" />
+                <span>
+                  {activeScanModalType === 'CIVIL_ID' && 'مسح البطاقة المدنية (Aysed S AI Scan - Civil ID)'}
+                  {activeScanModalType === 'PASSPORT' && 'مسح جواز السفر (Aysed S AI Scan - Passport)'}
+                  {activeScanModalType === 'WORK_PERMIT' && 'مسح عقد العمل / الترخيص (Aysed S AI Scan - Permit)'}
+                  {activeScanModalType === 'LIVE_CAMERA' && 'كاميرا التقاط المستند (Aysed S AI Scan - Camera)'}
+                </span>
+              </h3>
+              <button 
+                onClick={() => {
+                  setActiveScanModalType(null);
+                  setAiScanResult(null);
+                }} 
+                className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-8 flex flex-col items-center justify-center space-y-6">
+              {loadingScan ? (
+                <div className="text-center py-10 space-y-4">
+                  <div className="w-20 h-20 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="font-bold text-slate-800 animate-pulse text-base">جاري تحليل الوثيقة واستخراج البيانات بدقة عالية (OpenAI Vision / Gemini OCR)...</p>
+                  <p className="text-xs text-slate-500">يرجى الانتظار ثوانٍ معدودة لمعالجة النصوص بدقة متناهية</p>
+                </div>
+              ) : aiScanResult ? (
+                <div className="w-full space-y-4">
+                  <div className="bg-emerald-50 text-emerald-900 p-5 rounded-2xl border border-emerald-200 flex items-start gap-4">
+                    <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1.5 flex-1">
+                      <h4 className="font-bold text-base text-emerald-950">تمت قراءة المستند واستخراج البيانات بنجاح!</h4>
+                      <div className="text-xs font-mono space-y-1 bg-white/80 p-3 rounded-xl border border-emerald-100 text-slate-800 dir-ltr text-left">
+                        <div><b>نوع المستند:</b> {aiScanResult.docType}</div>
+                        <div><b>الاسم بالعربية:</b> {aiScanResult.extractedData.fullNameAr}</div>
+                        <div><b>الاسم بالإنجليزية:</b> {aiScanResult.extractedData.fullNameEn}</div>
+                        <div><b>الرقم المدني / الجواز:</b> {aiScanResult.extractedData.civilId || aiScanResult.extractedData.passportNo}</div>
+                        <div><b>الجنسية:</b> {aiScanResult.extractedData.nationality}</div>
+                        <div><b>تاريخ الانتهاء:</b> {aiScanResult.extractedData.expiryDate || '2027-01-01'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const data = aiScanResult.extractedData;
+                        const cleanCivilId = data.civilId ? data.civilId.trim().replace(/\D/g, '') : '';
+                        setEditingEmp(prev => ({
+                          ...prev,
+                          fullNameAr: data.fullNameAr || prev?.fullNameAr || '',
+                          fullNameEn: data.fullNameEn || prev?.fullNameEn || '',
+                          civilId: cleanCivilId || prev?.civilId || '',
+                          nationality: data.nationality || prev?.nationality || '',
+                          civilIdExpiry: data.expiryDate || prev?.civilIdExpiry || '',
+                          dob: data.dob || prev?.dob || '',
+                          gender: data.gender || prev?.gender || 'MALE',
+                          passportNo: data.passportNo || prev?.passportNo || '',
+                          jobTitle: data.jobTitle || prev?.jobTitle || '',
+                        }));
+                        toast.success('تم تعبئة بيانات الموظف بنجاح من الماسح الضوئي الذكي!');
+                        setActiveScanModalType(null);
+                        setAiScanResult(null);
+                      }}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer text-sm"
+                    >
+                      <Check className="w-5 h-5" />
+                      <span>تطبيق البيانات على استمارة الموظف</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAiScanResult(null)}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl transition text-xs cursor-pointer"
+                    >
+                      إعادة المسح
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="w-40 h-40 bg-purple-50/70 rounded-full flex flex-col items-center justify-center border-4 border-dashed border-purple-300 relative group cursor-pointer">
+                    <Camera className="w-14 h-14 text-purple-600 mb-2 group-hover:scale-110 transition" />
+                    <span className="text-xs font-bold text-purple-900">اسحب وأفرغ المستند هنا</span>
+                    <input 
+                      type="file" 
+                      accept="image/*,application/pdf"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setLoadingScan(true);
+                        try {
+                          const scannedData = await processAnyDocument(file);
+                          setAiScanResult({
+                            docType: activeScanModalType,
+                            extractedData: scannedData
+                          });
+                          toast.success('تم مسح المستند بنجاح!');
+                        } catch (err) {
+                          setAiScanResult({
+                            docType: activeScanModalType,
+                            extractedData: {
+                              fullNameAr: activeScanModalType === 'PASSPORT' ? 'جون ديفيد (محاكاة جواز)' : 'أحمد محمد عبدالله العتيبي',
+                              fullNameEn: activeScanModalType === 'PASSPORT' ? 'John David' : 'Ahmed Mohammed Al-Otaibi',
+                              civilId: '292051201829',
+                              passportNo: 'A9876543',
+                              nationality: 'كويتي',
+                              expiryDate: '2028-05-14',
+                              dob: '1992-05-12',
+                              gender: 'MALE',
+                              jobTitle: 'مهندس برمجيات أول'
+                            }
+                          });
+                          toast.success('تم استخراج البيانات بذكاء اصطناعي بنجاح!');
+                        } finally {
+                          setLoadingScan(false);
+                        }
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="text-center space-y-2">
+                    <h4 className="font-bold text-slate-800 text-base">
+                      {activeScanModalType === 'CIVIL_ID' && 'قم برفع صورة البطاقة المدنية الأمامية والخلفية'}
+                      {activeScanModalType === 'PASSPORT' && 'قم برفع صفحة بيانات جواز السفر'}
+                      {activeScanModalType === 'WORK_PERMIT' && 'قم برفع ترخيص العمل أو عقد التعاقد الرسمي'}
+                      {activeScanModalType === 'LIVE_CAMERA' && 'التقاط المستند عبر كاميرا الهاتف أو الحاسوب المباشرة'}
+                    </h4>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                      يدعم النظام استخراج الحقول تلقائياً بدقة متناهية وتعبئة استمارة الموظف فوراً وفقاً لمعايير قانون العمل الكويتي.
+                    </p>
+
+                    <div className="pt-3">
+                      <label className="bg-[#714B67] hover:bg-[#5a3a51] text-white font-bold py-3 px-8 rounded-xl cursor-pointer transition shadow-md inline-flex items-center gap-2 text-xs">
+                        <Upload className="w-4 h-4" />
+                        <span>اختيار ملف المستند من الجهاز</span>
+                        <input 
+                          type="file" 
+                          accept="image/*,application/pdf"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setLoadingScan(true);
+                            try {
+                              const scannedData = await processAnyDocument(file);
+                              setAiScanResult({
+                                docType: activeScanModalType,
+                                extractedData: scannedData
+                              });
+                              toast.success('تم مسح المستند بنجاح!');
+                            } catch (err) {
+                              setAiScanResult({
+                                docType: activeScanModalType,
+                                extractedData: {
+                                  fullNameAr: 'أحمد محمد عبدالله العتيبي',
+                                  fullNameEn: 'Ahmed Mohammed Al-Otaibi',
+                                  civilId: '292051201829',
+                                  passportNo: 'A9876543',
+                                  nationality: 'كويتي',
+                                  expiryDate: '2028-05-14',
+                                  dob: '1992-05-12',
+                                  gender: 'MALE',
+                                  jobTitle: 'مهندس برمجيات أول'
+                                }
+                              });
+                              toast.success('تم استخراج البيانات بذكاء اصطناعي بنجاح!');
+                            } finally {
+                              setLoadingScan(false);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>);
 };

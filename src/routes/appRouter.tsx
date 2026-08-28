@@ -156,6 +156,8 @@ export interface AppRouterProps {
  */
 export const AppRouter: React.FC<AppRouterProps> = (props) => {
   const {
+    currentApp,
+    setCurrentApp,
     activeApp,
     setActiveApp,
     currentUserEmail,
@@ -690,6 +692,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
             currentUserEmail={currentUserEmail}
             currentUserRole={currentUserRole}
             initialSubTab="COMPANY"
+            onNavigateHome={() => setCurrentApp && setCurrentApp(null)}
           />);
       }
       return (
@@ -721,6 +724,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           setMotionEnabled={setMotionEnabled}
           currentUserEmail={currentUserEmail}
           currentUserRole={currentUserRole}
+          onNavigateHome={() => setCurrentApp && setCurrentApp(null)}
         />);
 
     case 'NOTIFICATIONS':

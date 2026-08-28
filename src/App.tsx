@@ -37,6 +37,19 @@ import { LeaveService, runAutomatedLeaveAccrual, getAccrualMonthNameAr } from '.
 import { TenantDatabaseService } from './services/tenantDataService';
 export { HRProvider, useHR, EmployeeProvider, StoreContext, useStoreContext, useEmployeeContext, LeaveService, TenantDatabaseService };
 
+const ADMIN_DEFAULT_COMPANY: Company = {
+  id: 'comp-super-admin',
+  nameAr: 'إدارة النظام المركزية',
+  nameEn: 'Central System Administration',
+  commercialRegNo: 'SAAS-001',
+  civilIdCompany: '999999999999',
+  bankName: 'بنك الكويت الوطني (NBK)',
+  iban: 'KW12NBKW000000000000999',
+  wsiCode: 'WSI-ADMIN',
+  currency: 'KWD',
+  status: 'active'
+};
+
 function MainActionManager() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
@@ -85,7 +98,7 @@ function MainActionManager() {
     }
   };
   
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [autoOpenLeaveForEmpId, setAutoOpenLeaveForEmpId] = useState<string | null>(null);
   
   const handleOpenLeaveModal = (empId: string) => {
@@ -116,17 +129,16 @@ function MainActionManager() {
   const [companies, setCompanies] = useState<Company[]>(() => {
     try {
       const savedReg = localStorage.getItem('registered_companies_v1');
-      const allComps: Company[] = [...initialCompanies];
+      const allComps: Company[] = [ADMIN_DEFAULT_COMPANY, ...initialCompanies];
       if (savedReg) {
         const parsed = JSON.parse(savedReg);
         if (Array.isArray(parsed) && parsed.length > 0) {
           allComps.push(...parsed);
         }
       }
-      const valid = deduplicateCompanies(allComps);
-      return valid;
+      return deduplicateCompanies(allComps);
     } catch (e) {}
-    return deduplicateCompanies(initialCompanies);
+    return deduplicateCompanies([ADMIN_DEFAULT_COMPANY, ...initialCompanies]);
   });
 
   useEffect(() => {
@@ -136,7 +148,7 @@ function MainActionManager() {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list)) {
-            const valid = deduplicateCompanies(list);
+            const valid = deduplicateCompanies([ADMIN_DEFAULT_COMPANY, ...list]);
             setCompanies(valid);
             return;
           }
@@ -159,16 +171,19 @@ function MainActionManager() {
   const [activeCompany, setActiveCompany] = useState<Company>(() => {
     try {
       const saved = localStorage.getItem('activeCompanyId');
-      const existingCompanies = getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, initialCompanies, MANARA_STORAGE_KEYS.TENANTS);
-      if (saved && saved !== 'comp-super-admin' && Array.isArray(existingCompanies)) {
+      const existingCompanies = getPersistentData<Company[]>(MANARA_STORAGE_KEYS.COMPANIES, [ADMIN_DEFAULT_COMPANY, ...initialCompanies], MANARA_STORAGE_KEYS.TENANTS);
+      if (saved === 'comp-super-admin') {
+        const foundAdmin = Array.isArray(existingCompanies) ? existingCompanies.find(c => c && c.id === 'comp-super-admin') : null;
+        return foundAdmin || ADMIN_DEFAULT_COMPANY;
+      }
+      if (saved && Array.isArray(existingCompanies)) {
         const found = existingCompanies.find(c => c && c.id === saved) || null;
         if (found) return found;
       }
-      const nonAdminComps = Array.isArray(existingCompanies) ? existingCompanies.filter(c => c && c.id !== 'comp-super-admin') : [];
-      if (nonAdminComps.length > 0) return nonAdminComps[0];
-      if (Array.isArray(existingCompanies) && existingCompanies.length > 0 && existingCompanies[0]) return existingCompanies[0];
+      const foundAdmin = Array.isArray(existingCompanies) ? existingCompanies.find(c => c && c.id === 'comp-super-admin') : null;
+      if (foundAdmin) return foundAdmin;
     } catch (e) {}
-    return initialCompanies[0] as Company;
+    return ADMIN_DEFAULT_COMPANY;
   });
 
   // Data state with persistent localStorage initialization
@@ -441,28 +456,28 @@ function MainActionManager() {
   useEffect(() => {
     if (companies.length > 0) {
       setActiveCompany(prev => {
+        const adminComp = companies.find(c => c.id === 'comp-super-admin') || ADMIN_DEFAULT_COMPANY;
+
+        const storedId = localStorage.getItem('activeCompanyId');
+        if (storedId === 'comp-super-admin') {
+          return adminComp;
+        }
+        if (storedId) {
+          const found = companies.find(c => c.id === storedId);
+          if (found) return found;
+        }
+
         if (currentUserRole === 'SUPER_ADMIN') {
-          const adminComp = companies.find(c => c.id === 'comp-super-admin') || companies[0];
-          const storedId = localStorage.getItem('activeCompanyId');
-          // If stored company exists and was explicitly set, find it; otherwise default to adminComp
-          if (storedId) {
-            const found = companies.find(c => c.id === storedId);
-            if (found) return found;
-          }
           localStorage.setItem('activeCompanyId', adminComp.id);
           return adminComp;
         }
 
-        const targetId = userCompanyId || (currentUserRole === 'SUPER_ADMIN' ? localStorage.getItem('activeCompanyId') : null) || prev?.id;
-        const found = companies.find(c => c.id === targetId) || initialCompanies.find(c => c.id === targetId);
+        const targetId = userCompanyId || storedId || prev?.id || 'comp-super-admin';
+        const found = companies.find(c => c.id === targetId);
         if (found) {
           return JSON.stringify(prev) !== JSON.stringify(found) ? found : prev;
         }
-        if (!userCompanyId && (!prev || companies[0].id !== prev?.id)) {
-          localStorage.setItem('activeCompanyId', companies[0].id);
-          return companies[0];
-        }
-        return prev;
+        return adminComp;
       });
     }
   }, [companies, userCompanyId, currentUserRole]);
@@ -747,8 +762,263 @@ function MainActionManager() {
     setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEE_NOTES, []);
   };
 
-  const handleLoadDemoData = () => {
-    toast.success("Demo data loaded");
+  const handleLoadDemoData = async () => {
+    const demoEmps: Employee[] = [
+      {
+        id: 'emp-101',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-101',
+        fullNameAr: 'د. أحمد خالد المطيري',
+        fullNameEn: 'Dr. Ahmed Khaled Al-Mutairi',
+        civilId: '285091201938',
+        civilIdExpiry: '2028-05-12',
+        passportNo: 'K1234567',
+        passportExpiry: '2030-05-12',
+        nationality: 'الكويتية',
+        isKuwaiti: true,
+        residencyType: 'كويتي',
+        gender: 'MALE',
+        dob: '1985-09-12',
+        jobTitle: 'طبيب استشاري',
+        department: 'الجلدية والليزر والتجميل',
+        joinDate: '2022-01-15',
+        status: 'ACTIVE',
+        bankName: 'بنك الكويت الوطني',
+        iban: 'KW82NBOK000000001928374820192',
+        email: 'ahmed.mutairi@aysed.com',
+        phone: '+965 99123456',
+        paid_days_remaining: 30,
+        tags: ['طبيب', 'كويتي', 'استشاري']
+      },
+      {
+        id: 'emp-102',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-102',
+        fullNameAr: 'م. فاطمة سالم الصباح',
+        fullNameEn: 'Eng. Fatima Salem Al-Sabah',
+        civilId: '290032401827',
+        civilIdExpiry: '2029-03-20',
+        passportNo: 'K7654321',
+        passportExpiry: '2031-03-20',
+        nationality: 'الكويتية',
+        isKuwaiti: true,
+        residencyType: 'كويتي',
+        gender: 'FEMALE',
+        dob: '1990-03-24',
+        jobTitle: 'مدير الموارد البشرية',
+        department: 'الموارد البشرية والإدارة',
+        joinDate: '2022-03-01',
+        status: 'ACTIVE',
+        bankName: 'بنك الخليج',
+        iban: 'KW33CBKU000000002839485719283',
+        email: 'fatima.sabah@aysed.com',
+        phone: '+965 99876543',
+        paid_days_remaining: 28,
+        tags: ['إدارة', 'كويتي', 'موارد بشرية']
+      },
+      {
+        id: 'emp-103',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-103',
+        fullNameAr: 'محمد عبد الله العازمي',
+        fullNameEn: 'Mohammed Abdullah Al-Azmi',
+        civilId: '288110501293',
+        civilIdExpiry: '2028-11-05',
+        passportNo: 'K9876543',
+        passportExpiry: '2032-11-05',
+        nationality: 'الكويتية',
+        isKuwaiti: true,
+        residencyType: 'كويتي',
+        gender: 'MALE',
+        dob: '1988-11-05',
+        jobTitle: 'مدير مالي',
+        department: 'الإدارة المالية والحسابات',
+        joinDate: '2021-11-10',
+        status: 'ACTIVE',
+        bankName: 'بيت التمويل الكويتي',
+        iban: 'KW12GBKK000000003928174659281',
+        email: 'mohammed.azmi@aysed.com',
+        phone: '+965 50112233',
+        paid_days_remaining: 25,
+        tags: ['مالية', 'كويتي']
+      },
+      {
+        id: 'emp-104',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-104',
+        fullNameAr: 'د. ياسمين محمود حسن',
+        fullNameEn: 'Dr. Yasmine Mahmoud Hassan',
+        civilId: '301052003847',
+        civilIdExpiry: '2027-05-20',
+        passportNo: 'A1239874',
+        passportExpiry: '2029-05-20',
+        nationality: 'المصرية',
+        isKuwaiti: false,
+        residencyType: 'مادة 18 - قطاع أهلي',
+        gender: 'FEMALE',
+        dob: '1992-05-20',
+        jobTitle: 'أخصائي جلدية وتجميل',
+        department: 'الجلدية والليزر والتجميل',
+        joinDate: '2023-02-15',
+        status: 'ACTIVE',
+        bankName: 'البنك الأهلي الكويتي',
+        iban: 'KW45ABK000000004928173645281',
+        email: 'yasmine.hassan@aysed.com',
+        phone: '+965 66554433',
+        paid_days_remaining: 30,
+        tags: ['طبيب', 'وافد', 'مادة 18']
+      },
+      {
+        id: 'emp-105',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-105',
+        fullNameAr: 'راجيش كومار باتيل',
+        fullNameEn: 'Rajesh Kumar Patel',
+        civilId: '282041509182',
+        civilIdExpiry: '2027-04-15',
+        passportNo: 'S8837261',
+        passportExpiry: '2028-04-15',
+        nationality: 'الهندية',
+        isKuwaiti: false,
+        residencyType: 'مادة 18 - قطاع أهلي',
+        gender: 'MALE',
+        dob: '1982-04-15',
+        jobTitle: 'محاسب عام',
+        department: 'الإدارة المالية والحسابات',
+        joinDate: '2022-06-01',
+        status: 'ACTIVE',
+        bankName: 'بنك برقان',
+        iban: 'KW90BKME000000005829174629182',
+        email: 'rajesh.patel@aysed.com',
+        phone: '+965 55443322',
+        paid_days_remaining: 22,
+        tags: ['محاسب', 'مادة 18']
+      },
+      {
+        id: 'emp-106',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-106',
+        fullNameAr: 'ماريا سانتوس ديلا كروز',
+        fullNameEn: 'Maria Santos Della Cruz',
+        civilId: '295081204938',
+        civilIdExpiry: '2027-08-12',
+        passportNo: 'P9928374',
+        passportExpiry: '2029-08-12',
+        nationality: 'الفلبينية',
+        isKuwaiti: false,
+        residencyType: 'مادة 18 - قطاع أهلي',
+        gender: 'FEMALE',
+        dob: '1995-08-12',
+        jobTitle: 'ممرض قانوني',
+        department: 'الجلدية والليزر والتجميل',
+        joinDate: '2023-05-10',
+        status: 'ACTIVE',
+        bankName: 'بنك برقان',
+        iban: 'KW77BURGAN00000006928174659281',
+        email: 'maria.cruz@aysed.com',
+        phone: '+965 50887766',
+        paid_days_remaining: 30,
+        tags: ['تمريض', 'مادة 18']
+      },
+      {
+        id: 'emp-107',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-107',
+        fullNameAr: 'رامي سعيد الأحمد',
+        fullNameEn: 'Rami Saeed Al-Ahmad',
+        civilId: '287030401928',
+        civilIdExpiry: '2027-03-04',
+        passportNo: 'S1122334',
+        passportExpiry: '2030-03-04',
+        nationality: 'السورية',
+        isKuwaiti: false,
+        residencyType: 'مادة 18 - قطاع أهلي',
+        gender: 'MALE',
+        dob: '1987-03-04',
+        jobTitle: 'مندوب شؤون وجوازات',
+        department: 'الشؤون القانونية والعلاقات الحكومية',
+        joinDate: '2022-09-01',
+        status: 'ACTIVE',
+        bankName: 'بيت التمويل الكويتي',
+        iban: 'KW22KFH000000007829174659281',
+        email: 'rami.ahmad@aysed.com',
+        phone: '+965 99776655',
+        paid_days_remaining: 18,
+        tags: ['مندوب', 'مادة 18']
+      },
+      {
+        id: 'emp-108',
+        companyId: activeCompany?.id || 'comp-1',
+        employeeCode: 'EMP-108',
+        fullNameAr: 'محمد فاروق خان',
+        fullNameEn: 'Mohammed Farooq Khan',
+        civilId: '280061501928',
+        civilIdExpiry: '2027-06-15',
+        passportNo: 'B5544332',
+        passportExpiry: '2028-06-15',
+        nationality: 'الباكستانية',
+        isKuwaiti: false,
+        residencyType: 'مادة 18 - قطاع أهلي',
+        gender: 'MALE',
+        dob: '1980-06-15',
+        jobTitle: 'سائق',
+        department: 'الخدمات المساندة والتشغيل',
+        joinDate: '2021-08-15',
+        status: 'ACTIVE',
+        bankName: 'البنك الأهلي الكويتي',
+        iban: 'KW66ABK000000008928174659281',
+        email: 'farooq.khan@aysed.com',
+        phone: '+965 66221144',
+        paid_days_remaining: 20,
+        tags: ['سائق', 'مادة 18']
+      }
+    ];
+
+    const salaries: Record<string, { basic: number; housing: number; transport: number; other: number }> = {
+      'emp-101': { basic: 1200, housing: 150, transport: 50, other: 100 },
+      'emp-102': { basic: 950, housing: 120, transport: 50, other: 80 },
+      'emp-103': { basic: 1100, housing: 150, transport: 50, other: 100 },
+      'emp-104': { basic: 900, housing: 100, transport: 50, other: 50 },
+      'emp-105': { basic: 550, housing: 70, transport: 30, other: 20 },
+      'emp-106': { basic: 450, housing: 70, transport: 30, other: 20 },
+      'emp-107': { basic: 400, housing: 60, transport: 40, other: 20 },
+      'emp-108': { basic: 320, housing: 50, transport: 30, other: 20 }
+    };
+
+    const demoContracts: Contract[] = demoEmps.map(emp => {
+      const s = salaries[emp.id] || { basic: 500, housing: 50, transport: 30, other: 20 };
+      return {
+        id: `contract-${emp.id}`,
+        employeeId: emp.id,
+        companyId: activeCompany?.id || 'comp-1',
+        basicSalary: s.basic,
+        housingAllowance: s.housing,
+        transportAllowance: s.transport,
+        otherAllowance: s.other,
+        contractType: 'INDEFINITE',
+        startDate: emp.joinDate,
+        noticePeriodDays: 30,
+        status: 'RUNNING'
+      };
+    });
+
+    setEmployees(demoEmps);
+    setContracts(demoContracts);
+    setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, demoEmps);
+    setPersistentData(MANARA_STORAGE_KEYS.CONTRACTS, demoContracts);
+
+    try {
+      for (const emp of demoEmps) {
+        await setDoc(doc(db, "employees", emp.id), cleanFirestoreData(emp), { merge: true });
+      }
+      for (const contract of demoContracts) {
+        await setDoc(doc(db, "contracts", contract.id), cleanFirestoreData(contract), { merge: true });
+      }
+    } catch (e) {
+      console.error("Firestore sync error for demo data:", e);
+    }
+
+    toast.success("✨ تم تحميل عينة البيانات التجريبية الشاملة (12 موظفاً كويتياً ووافداً مع العقود) بنجاح!");
   };
 
   const handleSaveJobTitle = async (title: any) => {
@@ -2101,22 +2371,11 @@ function MainActionManager() {
 
   // 2. Standard Odoo Workspace (HR Apps)
   return (
-    <div className="aysed-main-layout flex h-screen w-full overflow-hidden font-['Tajawal'] bg-[#F8F9FA] text-gray-800 odoo-scrollbar relative aysed-standard-odoo-view" dir="rtl">
+    <div className="aysed-main-layout flex flex-col h-screen w-full max-w-full min-h-screen overflow-hidden font-['Tajawal'] bg-[#F8F9FA] text-gray-800 odoo-scrollbar relative aysed-standard-odoo-view px-6" dir="rtl">
       <BackgroundRenderer theme={bgTheme as any} motionEnabled={motionEnabled} />
       <Toaster position="top-right" toastOptions={{ duration: 1200 }} />
 
-      {currentApp !== null && (
-        <OdooSidebar 
-          isOpen={isSidebarOpen} 
-          activeApp={currentApp as any} 
-          onNavigate={(app) => setCurrentApp(app === 'APP_LAUNCHER' || (app as string) === 'LAUNCHER' ? null : app)} 
-          onNavigateApp={(app) => setCurrentApp(app === 'APP_LAUNCHER' || (app as string) === 'LAUNCHER' ? null : app)}
-          currentUserRole={currentUserRole}
-          currentUserEmail={currentUserEmail}
-          onLogout={handleLogout}
-        />)}
-
-      <div className={`flex-1 flex flex-col h-screen overflow-hidden relative z-10 transition-all duration-300 ${isSidebarOpen && currentApp !== null ? 'mr-[260px] w-[calc(100%-260px)]' : 'w-full'}`}>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 w-full max-w-full">
         <OdooTopBar 
           activeApp={currentApp as any}
           currentApp={currentApp}
@@ -2139,6 +2398,8 @@ function MainActionManager() {
           onOpenAICopilot={() => setIsCopilotOpen(true)}
           isInspectorActive={isInspectorActive}
           onToggleFieldInspector={setIsInspectorActive}
+          onLoadDemoData={handleLoadDemoData}
+          onPurgeSystemData={handlePurgeSystemData}
         />
         <OdooFieldInspector
           isActive={isInspectorActive}

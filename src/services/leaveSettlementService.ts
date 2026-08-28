@@ -309,7 +309,8 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
 
   const carriedOver = cleanDayDecimals(input.carriedOverBalance || 0);
   const accrued = cleanDayDecimals(input.accruedBalance || 0);
-  const totalAvailableBefore = cleanDayDecimals(carriedOver + accrued);
+  const computedAvailable = cleanDayDecimals(carriedOver + accrued);
+  const totalAvailableBefore = cleanDayDecimals(input.totalAvailableBalance > 0 ? input.totalAvailableBalance : computedAvailable);
 
   // Statutory Days (e.g. Bereavement Art. 77 - 3 days paid, 0 deducted from annual balance)
   const statutoryDays = cleanDayDecimals(Math.max(0, input.statutoryLeaveDays));
@@ -320,7 +321,7 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
 
   if (mode === 'ENCASHMENT_LIQUIDATION') {
     // وضع تسييل وتصفية الرصيد الموحد: تُدمج كافة الأيام المصفاة في بند موحد غير مجزأ
-    const targetEncash = cleanDayDecimals(input.encashmentDays > 0 ? input.encashmentDays : input.consumedLeaveDays);
+    const targetEncash = cleanDayDecimals(input.encashmentDays > 0 ? input.encashmentDays : totalAvailableBefore);
     encashedDays = cleanDayDecimals(Math.min(totalAvailableBefore, Math.max(0, targetEncash)));
     consumedDays = 0; // منع توليد بند مستهلك مكرر
     balanceAfterConsumption = cleanDayDecimals(Math.max(0, totalAvailableBefore - encashedDays));

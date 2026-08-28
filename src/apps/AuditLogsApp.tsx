@@ -100,7 +100,7 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#714B67]" />
-            <span>سجل الرقابة واختبار الجاهزية التشغيلية (Audit & Diagnostic Center)</span>
+            <span>سجل الرقابة واختبار الجاهزية التشغيلية (<span className="whitespace-nowrap">Audit &amp; Diagnostic Center</span>)</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             متابعة كافة حركات النظام واختبار الربط والجاهزية الإنتاجية بنسبة 100%
@@ -215,7 +215,7 @@ export const AuditLogsApp: React.FC<AuditLogsAppProps> = ({
               <th className="p-3">المستخدم / المنفذ</th>
               <th className="p-3">نوع الإجراء</th>
               <th className="p-3">نوع الكيان</th>
-              <th className="p-3">تفاصيل العملية (Audit Details)</th>
+              <th className="p-3 whitespace-nowrap">تفاصيل العملية <span className="whitespace-nowrap">(Audit Details)</span></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

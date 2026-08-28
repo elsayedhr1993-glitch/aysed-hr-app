@@ -143,7 +143,7 @@ app.post("/api/ocr-scan", async (req, res) => {
     return res.status(400).json({ error: "يرجى اختيار ورفع صورة المستند الحقيقي أولاً قبل إجراء الماسح الضوئي OCR" });
   }
 
-  // 1. Check if OPENAI_API_KEY is available and use OpenAI Vision API (skip for PDF/BDF files which Gemini handles natively)
+  // 1. Check if OPENAI_API_KEY is available and use OpenAI Vision API (gpt-4o with detail: high and json_object response_format)
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const isPdfFile = mimeType === 'application/pdf' || mimeType?.includes('pdf');
   if (openaiApiKey && openaiApiKey.trim() !== "" && !openaiApiKey.includes("YOUR_") && !isPdfFile) {
@@ -161,18 +161,18 @@ app.post("/api/ocr-scan", async (req, res) => {
           messages: [
             {
               role: "system",
-               content: "أنت نظام خبير في القراءة الضوئية واستخراج بيانات المستندات الرسمية الكويتية بدقة مطلقة (OCR Vision Engine). مهمتك استخراج النصوص والأسماء الحقيقية الموجودة في المستند حصرياً بدقة 100%. تحذير صارم: ممنوع منعاً باتاً وضع أي أسماء وهمية أو افتراضية (مثل محمد العتيبي أو غيرها) إذا لم تكن مكتوبة صراحة في المستند. أرجِع النتيجة حصرياً بصيغة JSON مع هذه المفاتيح: civilId, fullNameAr, fullNameEn, nationality, dob, passportNo, jobTitle, expiryDate, gender, residencyType, mohLicenseNo, contractSalary."
+               content: "أنت نظام خبير في القراءة الضوئية واستخراج بيانات البطاقة المدنية والمستندات الرسمية الكويتية بدقة مطلقة (OCR Vision Engine). مهمتك استخراج النصوص والأسماء الحقيقية الموجودة في المستند حصرياً بدقة 100% بدون أي تخمين أو اختصار. أرجع النتيجة حصرياً بصيغة JSON مطابق تماماً للهيكل التالي:\n{\n  \"civilId\": \"الرقم المدني (12 رقماً)\",\n  \"fullNameAr\": \"الاسم الكامل بالعربية\",\n  \"fullNameEn\": \"الاسم الكامل بالإنجليزية\",\n  \"nationality\": \"الجنسية\",\n  \"gender\": \"ذكر أو أنثى / MALE أو FEMALE\",\n  \"birthDate\": \"YYYY-MM-DD\",\n  \"unifiedNo\": \"الرقم الموحد / الرقم المرجع\",\n  \"passportNo\": \"رقم جواز السفر إن وجد\",\n  \"profession\": \"المهنة أو المسمى الوظيفي المسجل\",\n  \"expiryDate\": \"تاريخ الانتهاء YYYY-MM-DD\",\n  \"issueDate\": \"تاريخ الإصدار YYYY-MM-DD\",\n  \"bloodGroup\": \"فصيلة الدم\",\n  \"address\": {\n    \"block\": \"القطعة\",\n    \"street\": \"الشارع\",\n    \"building\": \"المبنى / القسيمة\",\n    \"area\": \"المنطقة / المحافظة\"\n  }\n}"
             },
             {
               role: "user",
               content: [
-                { type: "text", text: `قم بتحليل هذه الصورة للمستند (${docType || 'بطاقة مدنية أو جواز أو عقد عمل'}) واستخراج البيانات المطلوبة بدقة شديدة دون أي تخمين.` },
-                { type: "image_url", image_url: { url: base64Data } }
+                { type: "text", text: `قم بتحليل صورة المستند (${docType || 'بطاقة مدنية'}) واستخراج كافة البيانات والحقول بدقة تامة باستخدام تفاصيل عالية الوضوح.` },
+                { type: "image_url", image_url: { url: base64Data, detail: "high" } }
               ]
             }
           ],
           response_format: { type: "json_object" },
-          max_tokens: 1000
+          max_tokens: 1500
         })
       });
 
@@ -184,23 +184,29 @@ app.post("/api/ocr-scan", async (req, res) => {
           success: true,
           data: {
             civilId: parsed.civilId || "",
-            fullNameAr: parsed.fullNameAr || "",
+            fullNameAr: parsed.fullNameAr || parsed.fullName || "",
             fullNameEn: parsed.fullNameEn || "",
             nationality: parsed.nationality || "",
-            dob: parsed.dob || "",
-            passportNo: parsed.passportNo || "",
-            jobTitle: parsed.jobTitle || "",
-            expiryDate: parsed.expiryDate || "",
             gender: parsed.gender || "MALE",
+            birthDate: parsed.birthDate || parsed.dob || "",
+            dob: parsed.birthDate || parsed.dob || "",
+            unifiedNo: parsed.unifiedNo || "",
+            passportNo: parsed.passportNo || "",
+            profession: parsed.profession || parsed.jobTitle || "",
+            jobTitle: parsed.profession || parsed.jobTitle || "",
+            expiryDate: parsed.expiryDate || "",
+            issueDate: parsed.issueDate || "",
+            bloodGroup: parsed.bloodGroup || "",
+            address: parsed.address || { block: "", street: "", building: "", area: "" },
             residencyType: parsed.residencyType || "",
             mohLicenseNo: parsed.mohLicenseNo || "",
             contractSalary: Number(parsed.contractSalary) || 0,
           },
-          source: "openai-vision"
+          source: "openai-vision-gpt4o"
         });
       }
     } catch (oaiErr) {
-      // Fallback to Gemini
+      console.error("OpenAI Vision error:", oaiErr);
     }
   }
 
@@ -217,22 +223,29 @@ app.post("/api/ocr-scan", async (req, res) => {
     resolvedMimeType = 'application/pdf';
   }
 
-  const prompt = `أنت نظام قارئ ومحلل مستندات رسمية ذكي دقيق للغاية (OCR Vision Engine) لدولة الكويت.
-مهمتك المطلوبة هي استخراج البيانات والحقول الحقيقية الموجودة في الصورة أو الملف المرفق حصرياً بدقة 100%.
-تحذير صارم: ممنوع منعاً باتاً وضع أي أسماء وهمية أو افتراضية (مثل محمد العتيبي أو غيرها) إذا لم تكن مكتوبة صراحة في المستند. استخرج النصوص كما هي تماماً.
-أرجع الناتج بصيغة JSON فقط يضم المفاتيح التالية:
-1. "civilId": الرقم المدني الكويتي (12 رقم تماماً) المكتوب في المستند أو نص فارغ ""
-2. "fullNameAr": الاسم الكامل تماماً كما هو مكتوب بالعربية في المستند أو نص فارغ ""
-3. "fullNameEn": الاسم الكامل بالإنجليزية أو نص فارغ ""
-4. "nationality": الجنسية المكتوبة أو نص فارغ ""
-5. "dob": تاريخ الميلاد (YYYY-MM-DD) أو نص فارغ ""
-6. "passportNo": رقم الجواز أو نص فارغ ""
-7. "jobTitle": المسمى الوظيفي أو التخصص المكتوب في المستند أو نص فارغ ""
-8. "expiryDate": تاريخ انتهاء الصلاحية (YYYY-MM-DD) أو نص فارغ ""
-9. "gender": MALE أو FEMALE
-10. "residencyType": نوع الإقامة أو نص فارغ ""
-11. "mohLicenseNo": رقم ترخيص وزارة الصحة (MOH License) إن وجد أو نص فارغ ""
-12. "contractSalary": الراتب كرقَم بالدينار الكويتي أو 0`;
+  const prompt = `أنت نظام خبير في القراءة الضوئية واستخراج بيانات البطاقة المدنية والمستندات الرسمية الكويتية بدقة مطلقة (OCR Vision Engine).
+مهمتك استخراج كافة حقول وبيانات المستند المرفق حصرياً بدقة 100% دون أي تخمين.
+أرجع الناتج بصيغة JSON فقط مطابق لهذا الهيكل بدقة:
+{
+  "civilId": "الرقم المدني (12 رقماً)",
+  "fullNameAr": "الاسم الكامل بالعربية",
+  "fullNameEn": "الاسم الكامل بالإنجليزية",
+  "nationality": "الجنسية",
+  "gender": "ذكر أو أنثى / MALE أو FEMALE",
+  "birthDate": "YYYY-MM-DD",
+  "unifiedNo": "الرقم الموحد / الرقم المرجع",
+  "passportNo": "رقم جواز السفر إن وجد",
+  "profession": "المهنة أو المسمى الوظيفي المسجل",
+  "expiryDate": "تاريخ الانتهاء YYYY-MM-DD",
+  "issueDate": "تاريخ الإصدار YYYY-MM-DD",
+  "bloodGroup": "فصيلة الدم",
+  "address": {
+    "block": "القطعة",
+    "street": "الشارع",
+    "building": "المبنى / القسيمة",
+    "area": "المنطقة / المحافظة"
+  }
+}`;
 
   const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.6-flash"];
   let lastError: any = null;
@@ -262,14 +275,23 @@ app.post("/api/ocr-scan", async (req, res) => {
               fullNameAr: { type: Type.STRING },
               fullNameEn: { type: Type.STRING },
               nationality: { type: Type.STRING },
-              dob: { type: Type.STRING },
-              passportNo: { type: Type.STRING },
-              jobTitle: { type: Type.STRING },
-              expiryDate: { type: Type.STRING },
               gender: { type: Type.STRING },
-              residencyType: { type: Type.STRING },
-              mohLicenseNo: { type: Type.STRING },
-              contractSalary: { type: Type.NUMBER },
+              birthDate: { type: Type.STRING },
+              unifiedNo: { type: Type.STRING },
+              passportNo: { type: Type.STRING },
+              profession: { type: Type.STRING },
+              expiryDate: { type: Type.STRING },
+              issueDate: { type: Type.STRING },
+              bloodGroup: { type: Type.STRING },
+              address: {
+                type: Type.OBJECT,
+                properties: {
+                  block: { type: Type.STRING },
+                  street: { type: Type.STRING },
+                  building: { type: Type.STRING },
+                  area: { type: Type.STRING },
+                }
+              },
             },
           },
         },
@@ -286,14 +308,17 @@ app.post("/api/ocr-scan", async (req, res) => {
           fullNameAr: parsedData.fullNameAr || "",
           fullNameEn: parsedData.fullNameEn || "",
           nationality: parsedData.nationality || "",
-          dob: parsedData.dob || "",
-          passportNo: parsedData.passportNo || "",
-          jobTitle: parsedData.jobTitle || "",
-          expiryDate: parsedData.expiryDate || "",
           gender: parsedData.gender || "MALE",
-          residencyType: parsedData.residencyType || "",
-          mohLicenseNo: parsedData.mohLicenseNo || "",
-          contractSalary: Number(parsedData.contractSalary) || 0,
+          birthDate: parsedData.birthDate || parsedData.dob || "",
+          dob: parsedData.birthDate || parsedData.dob || "",
+          unifiedNo: parsedData.unifiedNo || "",
+          passportNo: parsedData.passportNo || "",
+          profession: parsedData.profession || parsedData.jobTitle || "",
+          jobTitle: parsedData.profession || parsedData.jobTitle || "",
+          expiryDate: parsedData.expiryDate || "",
+          issueDate: parsedData.issueDate || "",
+          bloodGroup: parsedData.bloodGroup || "",
+          address: parsedData.address || { block: "", street: "", building: "", area: "" },
         },
         source: `gemini-vision-${modelName}`,
       });

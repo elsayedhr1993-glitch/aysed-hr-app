@@ -100,11 +100,8 @@ export const OdooSidebar: React.FC<OdooSidebarProps> = ({
       title: 'الأرشيف والنظام',
       icon: FolderKanban,
       apps: [
-        { id: 'EXCLUSIVE_INNOVATIONS', title: 'حزمة الابتكارات الحصرية', icon: Sparkles },
-        { id: 'NOTIFICATIONS', title: 'الإشعارات والواتساب', icon: MessageSquare },
         { id: 'DOCUMENTS', title: 'المستندات وOCR', icon: FolderKanban },
         { id: 'DOCUMENT_TEMPLATES', title: 'قوالب المستندات', icon: FileText },
-        { id: 'AUTOMATION', title: 'الأتمتة والذكاء', icon: Zap },
         { id: 'AUDIT_LOGS', title: 'سجل الرقابة', icon: ShieldCheck },
         { id: 'SETTINGS', title: isSuperAdmin ? 'إعدادات المنظومة والشركات' : 'بيانات المنشأة والإعدادات', icon: Building2 },
       ],
