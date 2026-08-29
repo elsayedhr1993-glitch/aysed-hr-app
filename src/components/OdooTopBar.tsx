@@ -532,10 +532,10 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               <button
                 type="button"
                 onClick={onLoadDemoData}
-                className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                title="توليد بيانات تجريبية (Load Demo Data)"
+                className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap animate-pulse"
+                title="استعادة كافة بيانات موظفي وعقود ورواتب المنار كلينك التجريبية فوراً"
               >
-                <span>⚡ توليد بيانات تجريبية</span>
+                <span>✨ استعادة بيانات المنار كلينك</span>
               </button>
             )}
             {onPurgeSystemData && (
