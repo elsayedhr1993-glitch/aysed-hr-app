@@ -391,23 +391,24 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                         type="file" 
                         accept="image/*,.pdf" 
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           if (e.target.files && e.target.files.length > 0) {
+                            const file = e.target.files[0];
                             handleFileUpload(e);
                             setIsScanning(true);
-                            setTimeout(() => {
+                            try {
+                              const result = await processAnyDocument(file);
                               setScanResult({
-                                docType: 'CIVIL_ID',
-                                extractedData: {
-                                  fullNameAr: 'موظف تم قراءته (محاكاة)',
-                                  fullNameEn: 'Scanned Employee',
-                                  civilId: '290010112345',
-                                  nationality: 'كويتي',
-                                  expiryDate: '2026-08-30'
-                                }
+                                docType: result.documentType || 'CIVIL_ID',
+                                extractedData: result
                               });
+                            } catch (error: any) {
+                              console.error("OCR Scan Error:", error);
+                              toast.error(error.message || 'فشل نظام القراءة الضوئية (OCR). يرجى التأكد من وضوح الملف أو إدخال البيانات يدوياً.');
+                              setScanResult(null);
+                            } finally {
                               setIsScanning(false);
-                            }, 2500);
+                            }
                           }
                         }}
                       />

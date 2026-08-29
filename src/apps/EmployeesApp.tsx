@@ -2095,22 +2095,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                             extractedData: scannedData
                           });
                           toast.success('تم مسح المستند بنجاح!');
-                        } catch (err) {
-                          setAiScanResult({
-                            docType: activeScanModalType,
-                            extractedData: {
-                              fullNameAr: activeScanModalType === 'PASSPORT' ? 'جون ديفيد (محاكاة جواز)' : 'أحمد محمد عبدالله العتيبي',
-                              fullNameEn: activeScanModalType === 'PASSPORT' ? 'John David' : 'Ahmed Mohammed Al-Otaibi',
-                              civilId: '292051201829',
-                              passportNo: 'A9876543',
-                              nationality: 'كويتي',
-                              expiryDate: '2028-05-14',
-                              dob: '1992-05-12',
-                              gender: 'MALE',
-                              jobTitle: 'مهندس برمجيات أول'
-                            }
-                          });
-                          toast.success('تم استخراج البيانات بذكاء اصطناعي بنجاح!');
+                        } catch (err: any) {
+                          console.error('OCR Error:', err);
+                          toast.error(err.message || 'فشل استخراج البيانات. يرجى التأكد من وضوح الصورة وتجربة رفعها مرة أخرى.');
+                          setAiScanResult(null);
                         } finally {
                           setLoadingScan(false);
                         }
@@ -2148,22 +2136,10 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                                 extractedData: scannedData
                               });
                               toast.success('تم مسح المستند بنجاح!');
-                            } catch (err) {
-                              setAiScanResult({
-                                docType: activeScanModalType,
-                                extractedData: {
-                                  fullNameAr: 'أحمد محمد عبدالله العتيبي',
-                                  fullNameEn: 'Ahmed Mohammed Al-Otaibi',
-                                  civilId: '292051201829',
-                                  passportNo: 'A9876543',
-                                  nationality: 'كويتي',
-                                  expiryDate: '2028-05-14',
-                                  dob: '1992-05-12',
-                                  gender: 'MALE',
-                                  jobTitle: 'مهندس برمجيات أول'
-                                }
-                              });
-                              toast.success('تم استخراج البيانات بذكاء اصطناعي بنجاح!');
+                            } catch (err: any) {
+                              console.error('OCR Error:', err);
+                              toast.error(err.message || 'فشل استخراج البيانات. يرجى التأكد من وضوح الصورة وتجربة رفعها مرة أخرى.');
+                              setAiScanResult(null);
                             } finally {
                               setLoadingScan(false);
                             }

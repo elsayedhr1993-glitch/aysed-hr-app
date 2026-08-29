@@ -330,7 +330,7 @@ app.all("/api/guards/nightly-audit", async (req, res) => {
 });
 
 // OCR Document Scanner via OpenAI Vision or Gemini Vision API
-app.post("/api/ocr-scan", async (req, res) => {
+app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
   const { imageBase64, mimeType, docType } = req.body;
   if (!imageBase64) {
     return res.status(400).json({ error: "يرجى اختيار ورفع صورة المستند الحقيقي أولاً قبل إجراء الماسح الضوئي OCR" });

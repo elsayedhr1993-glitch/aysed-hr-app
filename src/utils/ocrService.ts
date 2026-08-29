@@ -110,17 +110,22 @@ export async function processAnyDocument(file: File, apiKey?: string, docType?: 
   }
 
   // إرسال البيانات لمعالج الرؤية البصرية في السيرفر
-  const response = await fetch('/api/ocr-scan', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      imageBase64: docData.base64,
-      mimeType: docData.mimeType,
-      docType: docType || 'CIVIL_ID',
-    }),
-  });
+  let response;
+  try {
+    response = await fetch('/api/ocr-scan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageBase64: docData.base64,
+        mimeType: docData.mimeType,
+        docType: docType || 'CIVIL_ID',
+      }),
+    });
+  } catch (netErr: any) {
+    throw new Error('فشل الاتصال بالخادم. يرجى التأكد من اتصالك بالإنترنت أو تحديث الصفحة.');
+  }
 
   if (!response.ok) {
     const errJson = await response.json().catch(() => ({}));
