@@ -10,8 +10,17 @@ import { AysedAICopilot } from './components/AysedAICopilot';
 import { OdooFieldInspector } from './components/OdooFieldInspector';
 import { AppRouter } from './routes';
 import { QuickNotificationModal } from './components/QuickNotificationModal';
+import { GlobalIntegrityModal } from './components/GlobalIntegrityModal';
+import { UIElementsAuditModal } from './components/UIElementsAuditModal';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { SuperAdminPortal } from './pages/SuperAdminPortal';
+import {
+  validateEmployeeIntegrity,
+  validateContractIntegrity,
+  validateLeaveIntegrity,
+  validateAttendanceIntegrity,
+  validatePayslipIntegrity
+} from './services/globalIntegrityService';
 
 import { 
   Company, Employee, Contract, LeaveRequest, 
@@ -23,11 +32,12 @@ import {
 import { initialCompanies, initialDepartments, initialJobTitles, initialEmployees, initialContracts, initialSubscriptions, initialCandidates } from './data/initialData';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { generateSmartNotifications } from './utils/notificationsEngine';
+import { migrateJobTitlesWithPAM } from './utils/pam-dictionary';
 import toast, { Toaster } from 'react-hot-toast';
 import { auth, db, cleanFirestoreData, isTenantPurged, recordPurgedTenant } from './lib/firebase';
 import { doc, setDoc, deleteDoc, getDoc, getDocs, collection } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData } from './utils/persistentStorage';
+import { MANARA_STORAGE_KEYS, getPersistentData, setPersistentData, purgeLegacyMockData } from './utils/persistentStorage';
 import { calculateUnpaidLeaveDeductionRule, computeFinalPayslipSalary } from './services/salaryRulesService';
 import { ensureDefaultLeaveTypes } from './services/seedLeaveTypes';
 import { supabase } from './lib/supabase';
@@ -56,6 +66,8 @@ function MainActionManager() {
   const [currentUserRole, setCurrentUserRole] = useState('');
   const [userCompanyId, setUserCompanyId] = useState('');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isIntegrityModalOpen, setIsIntegrityModalOpen] = useState(false);
+  const [isUIAuditModalOpen, setIsUIAuditModalOpen] = useState(false);
   const [portalViewMode, setPortalViewMode] = useState<'superadmin' | 'apps'>('superadmin');
   
   useEffect(() => {
@@ -194,9 +206,10 @@ function MainActionManager() {
     }
     return initialEmployees;
   });
-  const [jobTitles, setJobTitles] = useState<JobTitle[]>(() => 
-    getPersistentData<JobTitle[]>(MANARA_STORAGE_KEYS.JOB_TITLES, initialJobTitles)
-  );
+  const [jobTitles, setJobTitles] = useState<JobTitle[]>(() => {
+    const loaded = getPersistentData<JobTitle[]>(MANARA_STORAGE_KEYS.JOB_TITLES, initialJobTitles);
+    return migrateJobTitlesWithPAM(loaded);
+  });
   const [departments, setDepartments] = useState<Department[]>(() => 
     getPersistentData<Department[]>(MANARA_STORAGE_KEYS.DEPARTMENTS, initialDepartments)
   );
@@ -294,6 +307,7 @@ function MainActionManager() {
   const [filterTab, setFilterTab] = useState('ALL');
   const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
   const [selectedEmpForForm, setSelectedEmpForForm] = useState<Employee | null>(null);
+  const [highlightField, setHighlightField] = useState<string | null>(null);
   const [selectedEmployeeForLeavesFilter, setSelectedEmployeeForLeavesFilter] = useState<string | null>(null);
   const [isInspectorActive, setIsInspectorActive] = useState<boolean>(false);
 
@@ -739,27 +753,19 @@ function MainActionManager() {
   };
 
   const handlePurgeSystemData = async () => {
-    // Only basic clean for UI preview
-    setEmployees([]);
-    setContracts([]);
-    setLeaves([]);
-    setAttendance([]);
-    setPayslips([]);
-    setDocuments([]);
-    setCustodies([]);
-    setLoans([]);
-    setWarnings([]);
-    setEmployeeNotes([]);
-    setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, []);
-    setPersistentData(MANARA_STORAGE_KEYS.CONTRACTS, []);
-    setPersistentData(MANARA_STORAGE_KEYS.LEAVES, []);
-    setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, []);
-    setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, []);
-    setPersistentData(MANARA_STORAGE_KEYS.DOCUMENTS, []);
-    setPersistentData(MANARA_STORAGE_KEYS.CUSTODIES, []);
-    setPersistentData(MANARA_STORAGE_KEYS.LOANS, []);
-    setPersistentData(MANARA_STORAGE_KEYS.WARNINGS, []);
-    setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEE_NOTES, []);
+    purgeLegacyMockData();
+    setCompanies(prev => prev.filter(c => c.id !== 'comp-1' && !c.nameAr?.includes('مجموعة العيادات')));
+    setEmployees(prev => prev.filter(e => e.companyId !== 'comp-1' && !e.id?.startsWith('emp-20')));
+    setContracts(prev => prev.filter(c => c.companyId !== 'comp-1' && !c.id?.startsWith('cnt-20')));
+    setLeaves(prev => prev.filter(l => l.companyId !== 'comp-1'));
+    setAttendance(prev => prev.filter(a => a.companyId !== 'comp-1'));
+    setPayslips(prev => prev.filter(p => p.companyId !== 'comp-1'));
+    setDocuments(prev => prev.filter(d => d.companyId !== 'comp-1'));
+    setCustodies(prev => prev.filter(c => c.companyId !== 'comp-1'));
+    setLoans(prev => prev.filter(l => l.companyId !== 'comp-1'));
+    setWarnings(prev => prev.filter(w => w.companyId !== 'comp-1'));
+    setEmployeeNotes(prev => prev.filter(n => n.companyId !== 'comp-1'));
+    toast.success('🗑️ تم حذف الشركات والبيانات التجريبية فقط بنجاح، وتم الاحتفاظ ببيانات الشركات الأخرى.');
   };
 
   const handleLoadDemoData = async () => {
@@ -1154,6 +1160,13 @@ function MainActionManager() {
   };
 
   const handleSaveEmployee = async (emp: Employee) => {
+    // Global Integrity Middleware Guard
+    const integrityResult = validateEmployeeIntegrity(emp, employees);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (HR Core): ${integrityResult.errors[0]}`);
+      return;
+    }
+
     // Strict Unique Data Validation: Civil ID, Employee Code (Badge ID), IBAN
     const duplicateCivilId = employees.find(e => e.civilId && e.civilId.trim() === emp.civilId?.trim() && e.id !== emp.id);
     if (duplicateCivilId) {
@@ -1242,6 +1255,13 @@ function MainActionManager() {
   };
 
   const handleSaveContract = async (cnt: Contract) => {
+    // Global Integrity Middleware Guard
+    const integrityResult = validateContractIntegrity(cnt, contracts);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (العقود): ${integrityResult.errors[0]}`);
+      return;
+    }
+
     const targetCompId = cnt.companyId || activeCompany?.id || 'comp-1';
     const completeContract = { ...cnt, companyId: targetCompId };
 
@@ -1288,6 +1308,13 @@ function MainActionManager() {
   };
 
   const handleSaveLeave = async (lv: LeaveRequest) => {
+    // Global Integrity Middleware Guard
+    const integrityResult = validateLeaveIntegrity(lv, employees, leaves);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (الإجازات): ${integrityResult.errors[0]}`);
+      return;
+    }
+
     // Prevent duplicate/overlapping leave requests for the same employee
     const overlapping = leaves.some(l => 
       l.employeeId === lv.employeeId &&
@@ -1518,6 +1545,13 @@ function MainActionManager() {
   };
 
   const handleSaveAttendance = async (rec: AttendanceRecord) => {
+    // Global Integrity Middleware Guard
+    const integrityResult = validateAttendanceIntegrity(rec, attendance);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (البصمة والحضور): ${integrityResult.errors[0]}`);
+      return;
+    }
+
     const targetCompId = rec.companyId || activeCompany?.id || 'comp-1';
     const completeRec = { ...rec, companyId: targetCompId };
 
@@ -1551,9 +1585,23 @@ function MainActionManager() {
 
   const handleSaveAttendanceBatch = async (records: AttendanceRecord[]) => {
     const targetCompId = activeCompany?.id || 'comp-1';
+    // Validate each record in batch
+    const validRecords: AttendanceRecord[] = [];
+    for (const rec of records) {
+      const v = validateAttendanceIntegrity(rec, attendance);
+      if (v.isValid) {
+        validRecords.push(rec);
+      }
+    }
+
+    if (validRecords.length === 0 && records.length > 0) {
+      toast.error('حارس النزاهة: لم يتم حفظ السجلات لوجود أخطاء في تسلسل التواريخ أو بيانات الحضور');
+      return;
+    }
+
     setAttendance(prev => {
       const copy = [...prev];
-      records.forEach(rec => {
+      validRecords.forEach(rec => {
         const fullRec = { ...rec, companyId: rec.companyId || targetCompId };
         const idx = copy.findIndex(a => a.id === fullRec.id);
         if (idx >= 0) copy[idx] = fullRec;
@@ -1563,16 +1611,23 @@ function MainActionManager() {
       return copy;
     });
     try {
-      for (const rec of records) {
+      for (const rec of validRecords) {
         await TenantDatabaseService.saveAttendance({ ...rec, companyId: rec.companyId || targetCompId }, targetCompId);
       }
-      toast.success(`تم حفظ ومعالجة ${records.length} سجل حضور بنجاح`);
+      toast.success(`تم حفظ ومعالجة ${validRecords.length} سجل حضور بنجاح`);
     } catch (e) {
       console.error(e);
     }
   };
 
   const handleSavePayslip = async (p: Payslip) => {
+    // Global Integrity Middleware Guard
+    const integrityResult = validatePayslipIntegrity(p, payslips);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (مسير الرواتب): ${integrityResult.errors[0]}`);
+      return;
+    }
+
     const targetCompId = p.companyId || activeCompany?.id || 'comp-1';
     const completePayslip = { ...p, companyId: targetCompId };
     setPayslips(prev => {
@@ -2400,6 +2455,22 @@ function MainActionManager() {
           onToggleFieldInspector={setIsInspectorActive}
           onLoadDemoData={handleLoadDemoData}
           onPurgeSystemData={handlePurgeSystemData}
+          onOpenIntegrityModal={() => setIsIntegrityModalOpen(true)}
+          onOpenUIAudit={() => setIsUIAuditModalOpen(true)}
+          onSelectPrintTemplate={(moduleType, templateId) => {
+            if (templateId === 'manage_templates') {
+              toast.success('تم الانتقال إلى لوحة إدارة وتخصيص قوالب المستندات');
+            } else {
+              toast.success(`جاري فتح قالب الطباعة والمعاينة (${templateId})`);
+            }
+            setCurrentApp('DOCUMENT_TEMPLATES');
+          }}
+        />
+        <UIElementsAuditModal 
+          isOpen={isUIAuditModalOpen}
+          onClose={() => setIsUIAuditModalOpen(false)}
+          currentUserRole={currentUserRole}
+          onToggleSuperAdminView={() => setPortalViewMode('superadmin')}
         />
         <OdooFieldInspector
           isActive={isInspectorActive}
@@ -2465,6 +2536,8 @@ function MainActionManager() {
               setFilterTab={setFilterTab}
               selectedEmpForForm={selectedEmpForForm}
               setSelectedEmpForForm={setSelectedEmpForForm}
+              highlightField={highlightField}
+              onClearHighlightField={() => setHighlightField(null)}
               selectedEmployeeForLeavesFilter={selectedEmployeeForLeavesFilter}
               setSelectedEmployeeForLeavesFilter={setSelectedEmployeeForLeavesFilter}
               isOCRModalOpen={isOCRModalOpen}
@@ -2673,6 +2746,60 @@ function MainActionManager() {
       <UserProfileModal 
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Global System Integrity & Health Guard Modal */}
+      <GlobalIntegrityModal
+        isOpen={isIntegrityModalOpen}
+        onClose={() => setIsIntegrityModalOpen(false)}
+        employees={employees.filter(e => !e.isDeleted)}
+        contracts={contracts}
+        attendance={attendance}
+        leaves={leaves}
+        payslips={payslips}
+        onOpenIssueEntity={(issue) => {
+          setIsIntegrityModalOpen(false);
+          if (issue.module === 'HR_CORE') {
+            const emp = employees.find(e => e.id === issue.entityId || (issue.entityName && e.fullNameAr?.includes(issue.entityName)));
+            if (emp) {
+              setSelectedEmpForForm(emp);
+              setHighlightField(issue.field || null);
+            }
+            setCurrentApp('employees');
+          } else if (issue.module === 'ATTENDANCE') {
+            setCurrentApp('attendance');
+          } else if (issue.module === 'LEAVES') {
+            setCurrentApp('leaves');
+          } else if (issue.module === 'PAYROLL') {
+            setCurrentApp('payroll');
+          }
+        }}
+        onNavigateToApp={(app) => {
+          setIsIntegrityModalOpen(false);
+          setCurrentApp(app);
+        }}
+        onAutoFixAll={async (fixedData) => {
+          if (fixedData.employees) {
+            setEmployees(fixedData.employees);
+            setPersistentData(MANARA_STORAGE_KEYS.EMPLOYEES, fixedData.employees);
+          }
+          if (fixedData.attendance) {
+            setAttendance(fixedData.attendance);
+            setPersistentData(MANARA_STORAGE_KEYS.ATTENDANCE, fixedData.attendance);
+          }
+          if (fixedData.contracts) {
+            setContracts(fixedData.contracts);
+            setPersistentData(MANARA_STORAGE_KEYS.CONTRACTS, fixedData.contracts);
+          }
+          if (fixedData.leaves) {
+            setLeaves(fixedData.leaves);
+            setPersistentData(MANARA_STORAGE_KEYS.LEAVES, fixedData.leaves);
+          }
+          if (fixedData.payslips) {
+            setPayslips(fixedData.payslips);
+            setPersistentData(MANARA_STORAGE_KEYS.PAYSLIPS, fixedData.payslips);
+          }
+        }}
       />
     </div>);
 }

@@ -55,6 +55,16 @@ export const LeaveClearanceDocument: React.FC<Props> = ({
   const vNum = voucherNumber || (settlement as any).voucherNumber || `LST-${new Date().getFullYear()}-001`;
   const sDate = settlementDate || (settlement as any).settlementDate || new Date().toISOString().split('T')[0];
 
+  // Core 4 Leave Variables (Single Source of Truth)
+  const carriedOver = Number(((settlement as any).carriedOverBalance ?? settlement.aysed_carried_over ?? 0).toFixed(2));
+  const accrued = Number(((settlement as any).accruedBalance ?? settlement.aysed_accrued_2026 ?? 0).toFixed(2));
+  const totalAvailable = Number(((settlement as any).totalAvailableBefore ?? (carriedOver + accrued) ?? settlement.aysed_total_available ?? 0).toFixed(2));
+  const paidLeaveDays = Number(((settlement as any).consumedLeaveDays ?? numberOfDays ?? settlement.aysed_paid_days ?? 0).toFixed(2));
+  const statutoryDays = Number(((settlement as any).statutoryLeaveDays ?? 0).toFixed(2));
+  const encashedDays = Number(((settlement as any).encashedLeaveDays ?? 0).toFixed(2));
+  const unpaidDays = Number(((settlement as any).unpaidLeaveDays ?? settlement.aysed_unpaid_days ?? 0).toFixed(2));
+  const remainingBalance = Number(((settlement as any).remainingBalanceAfter ?? Math.max(0, totalAvailable - paidLeaveDays - encashedDays)).toFixed(2));
+
   return (
     <div className="w-full max-w-4xl mx-auto bg-white p-8 sm:p-10 border border-gray-300 shadow-sm print:shadow-none print:border-none print:p-0 font-['Tajawal','Cairo',sans-serif] text-slate-800 text-right leading-normal" dir="rtl">
       
@@ -117,7 +127,7 @@ export const LeaveClearanceDocument: React.FC<Props> = ({
               <td className="p-2 bg-slate-50 font-bold text-slate-700">المسمى / القسم:</td>
               <td className="p-2">{employee.jobTitle || 'موظف'} - {employee.department || 'عام'}</td>
               <td className="p-2 bg-slate-50 font-bold text-slate-700">أجر اليوم القانوني:</td>
-              <td className="p-2 font-mono font-bold text-teal-800">{dailyWage.toFixed(3)} د.ك (الراتب ÷ 26)</td>
+              <td className="p-2 font-mono font-bold text-teal-800">{dailyWage.toFixed(3)} د.ك (الراتب الأساسي ÷ 26)</td>
             </tr>
           </tbody>
         </table>
@@ -134,8 +144,8 @@ export const LeaveClearanceDocument: React.FC<Props> = ({
               <tr className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
                 <th className="p-2 border-l border-slate-300">الرصيد المرحل</th>
                 <th className="p-2 border-l border-slate-300">المكتسب 2026</th>
-                <th className="p-2 border-l border-slate-300 bg-purple-50 text-[#71639e]">إجمالي المتاح</th>
-                <th className="p-2 border-l border-slate-300 text-blue-800">مستهلك سنوي</th>
+                <th className="p-2 border-l border-slate-300 bg-purple-50 text-[#71639e]">إجمالي الرصيد المتاح</th>
+                <th className="p-2 border-l border-slate-300 text-blue-800">أيام الإجازة المصروفة مقدماً / Paid Leave Days</th>
                 <th className="p-2 border-l border-slate-300 text-emerald-800">إجازة عزاء (م77)</th>
                 <th className="p-2 border-l border-slate-300 text-amber-800">تصفية نقدية</th>
                 <th className="p-2 border-l border-slate-300 text-rose-700">بدون راتب</th>
@@ -145,28 +155,28 @@ export const LeaveClearanceDocument: React.FC<Props> = ({
             <tbody className="divide-y divide-slate-200 bg-white font-mono">
               <tr>
                 <td className="p-2 border-l border-slate-200">
-                  {((settlement as any).carriedOverBalance ?? settlement.aysed_carried_over ?? 0).toFixed(2)} يوم
+                  {carriedOver.toFixed(2)} يوم
                 </td>
                 <td className="p-2 border-l border-slate-200">
-                  {((settlement as any).accruedBalance ?? settlement.aysed_accrued_2026 ?? 0).toFixed(2)} يوم
+                  {accrued.toFixed(2)} يوم
                 </td>
                 <td className="p-2 border-l border-slate-200 font-bold bg-purple-50/50 text-[#71639e]">
-                  {((settlement as any).totalAvailableBefore ?? settlement.aysed_total_available ?? 0).toFixed(2)} يوم
+                  {totalAvailable.toFixed(2)} يوم
                 </td>
                 <td className="p-2 border-l border-slate-200 font-bold text-blue-900">
-                  {((settlement as any).consumedLeaveDays ?? numberOfDays ?? settlement.aysed_paid_days ?? 0).toFixed(2)} يوم
+                  {paidLeaveDays.toFixed(2)} يوم
                 </td>
                 <td className="p-2 border-l border-slate-200 font-bold text-emerald-700">
-                  {((settlement as any).statutoryLeaveDays ?? 0).toFixed(1)} يوم
+                  {statutoryDays.toFixed(2)} يوم
                 </td>
                 <td className="p-2 border-l border-slate-200 font-bold text-amber-700">
-                  {((settlement as any).encashedLeaveDays ?? 0).toFixed(2)} يوم
+                  {encashedDays.toFixed(2)} يوم
                 </td>
                 <td className="p-2 border-l border-slate-200 font-bold text-rose-600">
-                  {(settlement.aysed_unpaid_days ?? 0).toFixed(2)} يوم
+                  {unpaidDays.toFixed(2)} يوم
                 </td>
                 <td className="p-2 font-black bg-teal-50 text-teal-900">
-                  {((settlement as any).remainingBalanceAfter ?? 0).toFixed(2)} يوم
+                  {remainingBalance.toFixed(2)} يوم
                 </td>
               </tr>
             </tbody>
@@ -256,7 +266,7 @@ export const LeaveClearanceDocument: React.FC<Props> = ({
               <tbody>
                 <tr className="border-b border-slate-200 pb-2">
                   <td className="py-2 text-slate-800 font-bold">
-                    بدل رصيد الإجازات ({settlement.aysed_paid_days.toFixed(1)} يوم مدفوع × {settlement.aysed_daily_wage.toFixed(3)} د.ك)
+                    بدل رصيد الإجازات السنوية المستحقة / Leave Balance Cash-out ({settlement.aysed_paid_days.toFixed(1)} يوم مدفوع × {settlement.aysed_daily_wage.toFixed(3)} د.ك)
                   </td>
                   <td className="py-2 text-left font-bold font-mono">{settlement.aysed_leave_cash.toFixed(3)} د.ك</td>
                 </tr>

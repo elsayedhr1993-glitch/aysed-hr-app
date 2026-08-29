@@ -1,5 +1,6 @@
 import { printDocument } from '../utils/printUtils';
 import { tafqeet } from '../utils/tafqeet';
+import { formatContractData } from '../utils/pam-dictionary';
 import React, { useState } from 'react';
 import { 
   DocumentTemplate, GeneratedDocument, Employee, Company, DocumentItem, Contract, AuditLog 
@@ -25,35 +26,572 @@ interface DocumentTemplatesAppProps {
 
 export const DEFAULT_TEMPLATES_SEED: DocumentTemplate[] = [
   {
+    id: 'salary_cert_ar',
+    companyId: 'a0000000-0000-0000-0000-000000000001',
+    templateCode: 'SALARY_CERTIFICATE_AR',
+    titleAr: 'شهادة راتب واستمرارية (عربي)',
+    titleEn: 'Salary Certificate (Arabic)',
+    category: 'الشهادات والخطابات',
+    contentHtml: `<div class="salary-cert-wrapper" dir="rtl">
+  <div class="cert-date">
+    التاريخ: {{issue_date}}
+  </div>
+
+  <div class="cert-title">
+    شهادة راتب وإستمرارية راتب
+  </div>
+
+  <div class="cert-recipient">
+    السادة / إلى من يهمه الأمر
+  </div>
+
+  <div class="cert-body">
+    <p>
+      نحيط سيادتكم علماً بأن/ <strong>{{employee_name_ar}}</strong> (الجنسية: <strong>{{nationality_ar}}</strong>) بموجب بطاقة مدنية رقم/ <code>{{civil_id}}</code>، {{work_status_verb_ar}} لدينا بـ <strong>{{company_name_ar}}</strong>، بوظيفة/ <strong>{{job_title_ar}}</strong> وذلك إعتباراً من <strong>{{hire_date}}</strong> براتب شهري وقدره <strong>({{salary_amount}} د.ك) فقط {{salary_in_words_ar}} لا غير</strong>، ويتم تحويل راتب{{pronoun_object_ar}} إلى حساب{{pronoun_object_ar}} لدى <strong>{{bank_name_ar}}</strong> رقم الآيبان (<code>{{iban_number}}</code>) ومستمر{{gender_suffix_ar}} بالعمل حتى تاريخه.
+    </p>
+
+    <p>
+      وقد أُعطيت لـ{{pronoun_prep_ar}} هذه الشهادة بناءً على طلبـ{{pronoun_object_ar}} دون أدنى مسؤولية على المؤسسة تجاه حقوق الغير.
+    </p>
+
+    <div class="closing-phrase">
+      وتفضلوا بقبول فائق التحية والاحترام ،,,
+    </div>
+  </div>
+
+  <div class="signature-section">
+    <p class="sig-title">المفوض بالتوقيع</p>
+    <div class="sig-line">...................................................</div>
+  </div>
+</div>
+
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 20mm;
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .salary-cert-wrapper {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 15mm 20mm;
+    font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+    color: #111827;
+    font-size: 13.5px;
+    line-height: 1.9;
+  }
+  .cert-date {
+    font-size: 12.5px;
+    font-weight: bold;
+    color: #374151;
+    margin-bottom: 25px;
+  }
+  .cert-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 25px;
+    color: #0f172a;
+  }
+  .cert-recipient {
+    font-size: 14.5px;
+    font-weight: 800;
+    margin-bottom: 20px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .cert-body {
+    text-align: justify;
+    margin-bottom: 20px;
+  }
+  .cert-body p {
+    margin-bottom: 16px;
+  }
+  .closing-phrase {
+    margin-top: 25px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .signature-section {
+    margin-top: 45px;
+    width: 250px;
+  }
+  .sig-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    margin: 0 0 40px 0;
+  }
+  .sig-line {
+    color: #6b7280;
+    letter-spacing: 1px;
+    margin: 0;
+  }
+
+  @media print {
+    body {
+      background: none;
+    }
+    .salary-cert-wrapper {
+      width: 100%;
+      padding: 5mm 10mm;
+      box-shadow: none;
+    }
+  }
+</style>`,
+    variables: ['issue_date', 'employee_name_ar', 'nationality_ar', 'civil_id', 'work_status_verb_ar', 'company_name_ar', 'job_title_ar', 'hire_date', 'salary_amount', 'salary_in_words_ar', 'pronoun_object_ar', 'bank_name_ar', 'iban_number', 'gender_suffix_ar', 'pronoun_prep_ar'],
+    isDefault: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+  },
+  {
+    id: 'salary_cert_en',
+    companyId: 'a0000000-0000-0000-0000-000000000001',
+    templateCode: 'SALARY_CERTIFICATE_EN',
+    titleAr: 'Salary Certificate (English)',
+    titleEn: 'Salary Certificate (English)',
+    category: 'الشهادات والخطابات',
+    contentHtml: `<div class="salary-cert-wrapper" dir="ltr">
+  <div class="cert-date" style="text-align: right;">
+    Date: {{issue_date}}
+  </div>
+
+  <div class="cert-title">
+    Salary and Salary Continuation Certificate
+  </div>
+
+  <div class="cert-recipient">
+    To Whom It May Concern
+  </div>
+
+  <div class="cert-body">
+    <p>
+      We hereby certify that <strong>{{title_en}} {{employee_name_en}}</strong>, a <strong>{{nationality_en}}</strong> national, holding Civil ID No. <code>{{civil_id}}</code>, is employed with us at <strong>{{company_name_en}}</strong> in the position of <strong>{{job_title_en}}</strong>, effective from <strong>{{hire_date}}</strong>. {{pronoun_subject_en}} receives a monthly salary of <strong>KWD {{salary_amount}} ({{salary_in_words_en}})</strong> and is still continuously holding {{pronoun_possessive_en}} position to date.
+    </p>
+
+    <p>
+      Please be informed that the clinic will continue to transfer {{pronoun_possessive_en}} monthly salary, as well as {{pronoun_possessive_en}} end-of-service indemnity benefits when due, to {{pronoun_possessive_en}} personal bank account held at <strong>{{bank_name_en}}</strong> under IBAN: <code>{{iban_number}}</code>.
+    </p>
+
+    <p>
+      This certificate has been issued upon {{pronoun_possessive_en}} personal request without any liability or responsibility on the institution towards third-party rights.
+    </p>
+
+    <div class="closing-phrase">
+      Please accept our highest respect and appreciation.
+    </div>
+  </div>
+
+  <div class="signature-section" style="text-align: right;">
+    <p class="sig-title">Authorized Signatory</p>
+    <div class="sig-line">...................................................</div>
+  </div>
+</div>
+
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 20mm;
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .salary-cert-wrapper {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 15mm 20mm;
+    font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+    color: #111827;
+    font-size: 13.5px;
+    line-height: 1.9;
+  }
+  .cert-date {
+    font-size: 12.5px;
+    font-weight: bold;
+    color: #374151;
+    margin-bottom: 25px;
+  }
+  .cert-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 25px;
+    color: #0f172a;
+  }
+  .cert-recipient {
+    font-size: 14.5px;
+    font-weight: 800;
+    margin-bottom: 20px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .cert-body {
+    text-align: justify;
+    margin-bottom: 20px;
+  }
+  .cert-body p {
+    margin-bottom: 16px;
+  }
+  .closing-phrase {
+    margin-top: 25px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .signature-section {
+    margin-top: 45px;
+    width: 250px;
+  }
+  .sig-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    margin: 0 0 40px 0;
+  }
+  .sig-line {
+    color: #6b7280;
+    letter-spacing: 1px;
+    margin: 0;
+  }
+
+  @media print {
+    body {
+      background: none;
+    }
+    .salary-cert-wrapper {
+      width: 100%;
+      padding: 5mm 10mm;
+      box-shadow: none;
+    }
+  }
+</style>`,
+    variables: ['issue_date', 'title_en', 'employee_name_en', 'nationality_en', 'civil_id', 'company_name_en', 'job_title_en', 'hire_date', 'salary_amount', 'salary_in_words_en', 'pronoun_subject_en', 'pronoun_possessive_en', 'bank_name_en', 'iban_number'],
+    isDefault: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+  },
+  {
     id: 'tpl-salary-certificate-almanar',
     companyId: 'a0000000-0000-0000-0000-000000000001',
     templateCode: 'SALARY_CERTIFICATE',
-    titleAr: 'شهادة راتب واستمرارية عمل (almanar222222)',
+    titleAr: 'شهادة راتب واستمرارية عمل رسمية',
     titleEn: 'Salary & Continuity Certificate',
     category: 'الشهادات والخطابات',
-    contentHtml: `<div class="official-document" style="font-family: 'Amiri', serif; padding: 40px; font-size: 18px; line-height: 2; color: #000; direction: rtl; text-align: right;">
-        <p style="text-align: right; margin-bottom: 30px; font-weight: bold; font-family: 'Inter', 'Cairo', sans-serif;">التاريخ {{today_date}}</p>
-        <p style="text-align: right; margin-bottom: 30px; font-weight: bold; font-family: 'Inter', 'Cairo', sans-serif;">السادة / إلى من يهمه الأمر</p>
-        <h2 style="text-align: center; margin-bottom: 40px; font-weight: bold; font-family: 'Inter', 'Cairo', sans-serif;">شهادة راتب وإستمرارية راتب</h2>
-        
-        <p style="text-align: justify; text-justify: inter-word; margin-bottom: 30px; font-family: 'Inter', 'Cairo', sans-serif;">
-            نحيط سيادتكم علماً بأن/ <strong>{{emp_name}}</strong> - <strong>{{nationality}}</strong> الجنسية بموجب بطاقة مدنية رقم/ <strong>{{civil_id}}</strong> وتعمل لدينا بـ <strong>{{company_name_ar}}</strong>، بوظيفة/ <strong>{{job_title}}</strong> وذلك إعتباراً من <strong>{{joining_date}}</strong> م براتب شهري وقدره (<strong>{{salary_total}} د.ك</strong>) <strong>فقط {{salary_in_words}}</strong>، ويتم تحويل راتبها الى حسابها لدى <strong>{{bank_name}}</strong> رقم الآيبان (<strong>{{iban}}</strong>) ومستمره بالعمل حتى تاريخه.
-        </p>
-        
-        <p style="text-align: justify; text-justify: inter-word; margin-bottom: 60px; font-family: 'Inter', 'Cairo', sans-serif;">
-            وقد أعطيت لها هذه الشهادة بناءاً على طلبها دون أدنى مسئولية على المؤسسة تجاه حقوق الغير.
-        </p>
-        
-        <p style="text-align: center; margin-bottom: 60px; font-weight: bold; font-family: 'Inter', 'Cairo', sans-serif;">وتفضلوا بقبول فائق التحية والاحترام ،،،</p>
-        
-        <div style="text-align: left; margin-left: 50px;">
-            <p style="text-align: center; display: inline-block; font-weight: bold; font-family: 'Inter', 'Cairo', sans-serif;">
-                المفوض بالتوقيع<br>
-                <img src="https://api.dicebear.com/7.x/initials/svg?seed=Manager" width="80" style="opacity: 0.3; margin-top: 10px;" />
-            </p>
+    contentHtml: `<div class="page" dir="rtl" style="font-family: 'Cairo', Tahoma, sans-serif; padding: 30px; font-size: 14px; line-height: 1.8; background: #fff;">
+      <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 25px;">
+        <div>
+          <h4 style="font-weight: bold; margin: 0 0 5px 0;">{{company_name_ar}}</h4>
+          <p style="color: #666; margin: 0; font-size: 12px;">الرقم الآلي للجهة: <span>{{commercial_reg_no}}</span></p>
         </div>
+        <div style="text-align: left;">
+          <p style="margin: 0 0 5px 0;">التاريخ: <span>{{today_date}}</span></p>
+          <p style="margin: 0; font-size: 12px;">الرقم المرجعي: HR-CERT-{{civil_id}}</p>
+        </div>
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        <h3 style="font-weight: bold; text-decoration: underline; margin-bottom: 10px;">شهادة راتب ومباشرة عمل</h3>
+        <p style="font-weight: bold;">إلى من يهمه الأمر</p>
+      </div>
+      <div style="margin: 30px 0; text-align: justify;">
+        <p style="margin-bottom: 20px;">
+          تشهد شركة/مؤسسة <strong>{{company_name_ar}}</strong> بأن السيد/السيدة: 
+          <strong>{{emp_name}}</strong>، 
+          يحمل جنسية: <strong>{{nationality}}</strong>، 
+          والرقم المدني: <strong>{{civil_id}}</strong>، 
+          يعمل لدينا بموجب عقد عمل أهلي بمهنة: <strong>{{job_title}}</strong>، 
+          وذلك منذ تاريخ مباشرته للعمل في <strong>{{joining_date}}</strong> وما زال على رأس عمله حتى تاريخه.
+        </p>
+        <p style="margin-bottom: 20px;">ويتقاضى بموجب العقد راتباً شهرياً إجمالياً مفصلاً كالتالي:</p>
+        <table style="width: 85%; margin: 20px auto; border-collapse: collapse; text-align: center;">
+          <thead>
+            <tr style="background-color: #f8fafc;">
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">الراتب الأساسي</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">بدل السكن / الانتقال</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px;">بدلات أخرى</th>
+              <th style="border: 1px solid #cbd5e1; padding: 8px; font-weight: bold;">إجمالي الراتب الشهري</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="border: 1px solid #cbd5e1; padding: 8px;">{{basic_salary}} د.ك</td>
+              <td style="border: 1px solid #cbd5e1; padding: 8px;">{{allowances}} د.ك</td>
+              <td style="border: 1px solid #cbd5e1; padding: 8px;">0.000 د.ك</td>
+              <td style="border: 1px solid #cbd5e1; padding: 8px; font-weight: bold;">{{salary_total}} د.ك</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top: 20px;">
+          وقد أُعطيت له هذه الشهادة بناءً على طلبه لتقديمها إلى الجهات المعنية دون أدنى مسؤولية مالية أو قانونية على الشركة تجاه حقوق الغير.
+        </p>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 60px; text-align: center;">
+        <div style="width: 45%;">
+          <p><strong>إدارة الموارد البشرية والشؤون الإدارية</strong></p>
+          <br/><br/>
+          <p>التوقيع: .......................................</p>
+        </div>
+        <div style="width: 45%;">
+          <p><strong>ختم المنشأة الرسمي</strong></p>
+          <br/><br/>
+          <p>.......................................</p>
+        </div>
+      </div>
     </div>`,
-    variables: ['today_date', 'emp_name', 'nationality', 'civil_id', 'company_name_ar', 'job_title', 'joining_date', 'salary_total', 'salary_in_words', 'bank_name', 'iban'],
+    variables: ['today_date', 'emp_name', 'nationality', 'civil_id', 'company_name_ar', 'job_title', 'joining_date', 'basic_salary', 'allowances', 'salary_total', 'commercial_reg_no'],
+    isDefault: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+  },
+  {
+    id: 'tpl-kuwait-payslip',
+    companyId: 'a0000000-0000-0000-0000-000000000001',
+    templateCode: 'KUWAIT_PAYSLIP',
+    titleAr: 'قسيمة الراتب المعتمدة (WPS Slip)',
+    titleEn: 'Kuwait Official Payslip',
+    category: 'الرواتب والأجور',
+    contentHtml: `<div class="page" dir="rtl" style="font-family: 'Cairo', Tahoma, sans-serif; padding: 25px; font-size: 13px; background: #fff;">
+      <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px;">
+        <div>
+          <h4 style="font-weight: bold; margin: 0 0 5px 0;">{{company_name_ar}}</h4>
+          <p style="margin: 0; color: #555;">كشف مسير راتب شهر: <strong>{{current_date}}</strong></p>
+        </div>
+        <div style="text-align: left;">
+          <p style="margin: 0 0 5px 0;">رقم القسيمة: SLP-{{civil_id}}</p>
+          <p style="margin: 0; color: #555;">تاريخ الإصدار: {{today_date}}</p>
+        </div>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tbody>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px; width: 20%;"><strong>اسم الموظف:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; width: 30%;">{{emp_name}}</td>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px; width: 20%;"><strong>الرقم المدني:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; width: 30%;">{{civil_id}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>المسمى الوظيفي:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{job_title}}</td>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>القسم:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{department}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>البنك المحول له:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{bank_name}}</td>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>رقم الآيبان (IBAN):</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;"><code>{{iban}}</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <div style="flex: 1;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f8fafc; text-align: center;">
+                <th colspan="2" style="border: 1px solid #cbd5e1; padding: 8px;">الاستحقاقات والبدلات (Earnings)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">الراتب الأساسي</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">{{basic_salary}} د.ك</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">بدل سكن وانتقال</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">{{allowances}} د.ك</td>
+              </tr>
+              <tr style="background: #f0fdf4; font-weight: bold;">
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">إجمالي الاستحقاقات</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">{{salary_total}} د.ك</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="flex: 1;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f8fafc; text-align: center;">
+                <th colspan="2" style="border: 1px solid #cbd5e1; padding: 8px;">الاستقطاعات والخصومات (Deductions)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">التأمينات الاجتماعية (PIFSS)</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">0.000 د.ك</td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">سلف وأقساط وقروض</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">0.000 د.ك</td>
+              </tr>
+              <tr style="background: #fef2f2; font-weight: bold;">
+                <td style="border: 1px solid #cbd5e1; padding: 8px;">إجمالي الخصومات</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">0.000 د.ك</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="background: #e2e8f0; text-align: center; padding: 12px; border-radius: 6px; margin-bottom: 25px;">
+        <h5 style="margin: 0; font-weight: bold; color: #0f172a;">
+          صافي الراتب المستحق للتحويل (Net Payable): 
+          <span style="color: #047857;">{{salary_total}} د.ك</span>
+        </h5>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 30px; text-align: center;">
+        <div><p>إعداد المحاسب / الموارد البشرية: .....................</p></div>
+        <div><p>توقيع الموظف بالاستلام / إشعار تحويل بنكي</p></div>
+      </div>
+    </div>`,
+    variables: ['current_date', 'today_date', 'company_name_ar', 'emp_name', 'civil_id', 'job_title', 'department', 'bank_name', 'iban', 'basic_salary', 'allowances', 'salary_total'],
+    isDefault: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+  },
+  {
+    id: 'tpl-kuwait-eos-clearance',
+    companyId: 'a0000000-0000-0000-0000-000000000001',
+    templateCode: 'EOS_CLEARANCE',
+    titleAr: 'استمارة تسوية ونهاية الخدمة (المادة 51)',
+    titleEn: 'EOS Settlement & Clearance',
+    category: 'نهاية الخدمة',
+    contentHtml: `<div class="page" dir="rtl" style="font-family: 'Cairo', Tahoma, sans-serif; padding: 25px; font-size: 13px; line-height: 1.7; background: #fff;">
+      <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px;">
+        <h4 style="font-weight: bold; margin: 0 0 5px 0;">{{company_name_ar}}</h4>
+        <h3 style="font-weight: bold; margin: 5px 0 0 0;">استمارة تسوية مستحقات نهاية الخدمة وبراءة ذمة شاملة</h3>
+        <p style="color: #666; font-size: 11px; margin: 3px 0 0 0;">وفقاً لقانون العمل الكويتي رقم 6 لسنة 2010 (المادة 51)</p>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tbody>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px; width: 20%;"><strong>اسم الموظف:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; width: 30%;">{{emp_name}}</td>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px; width: 20%;"><strong>الرقم المدني:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; width: 30%;">{{civil_id}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>تاريخ التعيين:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{joining_date}}</td>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>تاريخ انتهاء الخدمة:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{current_date}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>سبب انتهاء الخدمة:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">استقالة / انتهاء عقد</td>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>إجمالي مدة الخدمة:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;"><strong>3 سنوات</strong></td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px;"><strong>آخر راتب شامل محتسب:</strong></td>
+            <td colspan="3" style="border: 1px solid #cbd5e1; padding: 8px;"><strong>{{salary_total}} د.ك</strong> (أساس احتساب الأجر اليومي = الراتب ÷ 26 يوم)</td>
+          </tr>
+        </tbody>
+      </table>
+      <table style="width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 20px;">
+        <thead>
+          <tr style="background: #f8fafc;">
+            <th style="border: 1px solid #cbd5e1; padding: 8px;">بيان المستحقات القانونية</th>
+            <th style="border: 1px solid #cbd5e1; padding: 8px;">طريقة الاحتساب وفق قانون العمل الكويتي</th>
+            <th style="border: 1px solid #cbd5e1; padding: 8px;">المبلغ المستحق (د.ك)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">مكافأة نهاية الخدمة عن السنوات الأولى</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">15 يوماً عن كل سنة عمل</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{salary_total}} د.ك</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">بدل رصيد الإجازات السنوية المتبقية</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">30 يوم × الأجر اليومي</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">0.000 د.ك</td>
+          </tr>
+          <tr style="background: #f0fdf4; font-weight: bold;">
+            <td colspan="2" style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">إجمالي المستحقات الإجمالية</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">{{salary_total}} د.ك</td>
+          </tr>
+          <tr style="background: #fef2f2;">
+            <td colspan="2" style="border: 1px solid #cbd5e1; padding: 8px; text-align: right;">يخصم: السلف، المديونيات، أو التلفيات والعهد</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px;">(0.000) د.ك</td>
+          </tr>
+          <tr style="background: #dcfce7; font-weight: bold; font-size: 14px;">
+            <td colspan="2" style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">صافي المبلغ النهائي المستحق للصرف</td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px; color: #166534;">{{salary_total}} د.ك</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="border: 1px solid #cbd5e1; padding: 12px; background: #f8fafc; margin-bottom: 20px; font-size: 12px;">
+        <p style="margin: 0 0 5px 0; font-weight: bold; text-align: center;">إقرار استلام ومخالصة تامة وإبراء ذمة نهائي</p>
+        <p style="margin: 0; text-align: justify;">
+          أقر أنا الموقع أدناه <strong>{{emp_name}}</strong> بأنني استلمت كامل مستحقاتي العمالية ونهاية الخدمة وبدل الإجازات وكافة حقوقي الناتجة عن عقد العمل المبرم مع الشركة المذكورة أعلاه، وأبرئ ذمة المنشأة إبراءً شاملاً ومانعاً من أي حق أو مطالبة حالية أو مستقبلية.
+        </p>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 30px; text-align: center;">
+        <div><p><strong>مسؤول الموارد البشرية</strong><br/>..................................</p></div>
+        <div><p><strong>الإدارة المالية</strong><br/>..................................</p></div>
+        <div><p><strong>توقيع الموظف (المقر بما فيه)</strong><br/>..................................</p></div>
+      </div>
+    </div>`,
+    variables: ['company_name_ar', 'emp_name', 'civil_id', 'joining_date', 'current_date', 'salary_total'],
+    isDefault: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+  },
+  {
+    id: 'tpl-kuwait-joining-duty',
+    companyId: 'a0000000-0000-0000-0000-000000000001',
+    templateCode: 'JOINING_DUTY',
+    titleAr: 'إشعار استلام ومباشرة عمل',
+    titleEn: 'Work Commencement Notice',
+    category: 'التعيين والتعاقد',
+    contentHtml: `<div class="page" dir="rtl" style="font-family: 'Cairo', Tahoma, sans-serif; padding: 30px; font-size: 14px; background: #fff;">
+      <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 25px;">
+        <h4 style="font-weight: bold; margin: 0 0 5px 0;">{{company_name_ar}}</h4>
+        <h3 style="font-weight: bold; margin: 5px 0 0 0;">إشعار استلام ومباشرة عمل</h3>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+        <tbody>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; width: 25%;"><strong>اسم الموظف:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px;">{{emp_name}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px;"><strong>الرقم المدني / الجنسية:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px;">{{civil_id}} - ({{nationality}})</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px;"><strong>الوظيفة المعين عليها:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px;">{{job_title}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px;"><strong>القسم / الفرع:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px;">{{department}}</td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px;"><strong>تاريخ المباشرة الفعلية:</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px;"><strong>{{joining_date}}</strong></td>
+          </tr>
+          <tr>
+            <td style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px;"><strong>فترة التجربة (Probation):</strong></td>
+            <td style="border: 1px solid #cbd5e1; padding: 10px;">100 يوم عمل فعلي (وفقاً للمادة 32 من قانون العمل الكويتي)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="line-height: 1.8; margin-bottom: 40px; text-align: justify;">
+        بهذا تم تسجيل حضور الموظف المذكور وبدء مهامه الوظيفية رسمياً، ويُرجى من الشؤون المالية وإدارة تكنولوجيا المعلومات تفعيل حساباته وصرف العهد اللازمة وفق اللائحة الداخلية.
+      </p>
+      <div style="display: flex; justify-content: space-between; margin-top: 50px; text-align: center;">
+        <div><p><strong>توقيع الموظف</strong><br/>............................</p></div>
+        <div><p><strong>المسؤول المباشر</strong><br/>............................</p></div>
+        <div><p><strong>اعتماد الموارد البشرية</strong><br/>............................</p></div>
+      </div>
+    </div>`,
+    variables: ['company_name_ar', 'emp_name', 'civil_id', 'nationality', 'job_title', 'department', 'joining_date'],
     isDefault: true,
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
@@ -62,123 +600,509 @@ export const DEFAULT_TEMPLATES_SEED: DocumentTemplate[] = [
     id: 'tpl-kuwait-contract-pam',
     companyId: 'a0000000-0000-0000-0000-000000000001',
     templateCode: 'EMPLOYMENT_CONTRACT_PAM',
-    titleAr: 'عقد عمل كويتي (نموذج الهيئة العامة للقوى العاملة)',
+    titleAr: 'عقد العمل الموحد (نموذج 2 - القوى العاملة)',
     titleEn: 'Kuwait Employment Contract (PAM Form)',
     category: 'التعيين والتعاقد',
-    contentHtml: `<div class="official-document" style="font-family: 'Amiri', serif; padding: 20px; font-size: 14px; line-height: 1.6; color: #000;">
-    <h2 style="text-align: center; margin-bottom: 20px;">
-        <span style="font-weight: bold; background: #ccc; padding: 2px 10px;">نموذج عقد عمل استرشادي في القطاع الأهلي</span><br>
-        <span style="font-size: 16px; font-family: 'Arial', sans-serif;">Sample Form of an Employment Contract in the Civil Sector</span>
-    </h2>
-    <div style="display: flex; justify-content: space-between; border: 3px solid #000; min-height: 800px;">
-        
-        <!-- English Column (Left) -->
-        <div style="width: 50%; padding: 15px; direction: ltr; font-family: 'Arial', sans-serif; font-size: 12px; border-right: 3px solid #000;">
-            <p><strong>State of Kuwait</strong><br>
-               <strong>Public Authority for Manpower:</strong> {{labor_department_en}} Labour Department.<br>
-               On <strong>{{contract_day_en}}</strong> corresponding to <strong>{{contract_date}}</strong> the present contract was concluded by and between:</p>
-            <p>1. Company/institution: <strong>{{company_name}}</strong><br>
-               2. represented in signature in the present contract by:<br>
-               Name: <strong>{{manager_name}}</strong><br>
-               Civil card: <strong>{{manager_civil_id}}</strong><br>
-               <span style="display: block; text-align: center;"><strong>(First party)</strong></span>
-            </p>
-            <p>2. Name: <strong>{{emp_name}}</strong><br>
-               Nationality: <strong>{{nationality}}</strong><br>
-               Civil card: <strong>{{civil_id}}</strong><br>
-               <span style="display: block; text-align: center;"><strong>(Second party)</strong></span>
-            </p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 15px; margin-bottom: 5px;">Preamble</h4>
-            <p style="text-align: justify; margin-top: 0;">The first party owns the facility entitled <strong>{{company_name}}</strong> working in the field of <strong>{{business_activity}}</strong> whereas it wishes to conclude a contract with the second party to work for it in the profession of <strong>{{job_title}}</strong> whereas the parties acknowledged their capacity to conclude this contract, they agreed upon the following:</p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 10px; margin-bottom: 5px;">Article One</h4>
-            <p style="text-align: justify; margin-top: 0;">The preamble above shall constitute an integral part of the present contract.</p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 10px; margin-bottom: 5px;">Article Two</h4>
-            <p style="text-align: center; margin-top: 0;"><strong>"Nature of the Work"</strong></p>
-            <p style="text-align: justify;">The first party concluded a contract with the second party to work for it in the profession of <strong>{{job_title}}</strong> in the State of Kuwait.</p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 10px; margin-bottom: 5px;">Article Three</h4>
-            <p style="text-align: center; margin-top: 0;"><strong>"Probation Period"</strong></p>
-            <p style="text-align: justify;">The second party shall be subject to a probation period for a term not exceeding 100 work days. Each party shall have the right to terminate the contract during the said term without notification.</p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 10px; margin-bottom: 5px;">Article Four</h4>
-            <p style="text-align: center; margin-top: 0;"><strong>"Lease Value"</strong></p>
-            <p style="text-align: justify;">For executing the present contract, the second party shall receive the wage of <strong>{{salary_total}}</strong> to be paid at the end of every MONTH. The first party may not decrease the wage during the term of the contract. It may not transfer the second party to daily wage without his approval.</p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 10px; margin-bottom: 5px;">Article Five</h4>
-            <p style="text-align: center; margin-top: 0;"><strong>"Contract Term"</strong></p>
-            <p style="text-align: justify;">The contract shall come into force ON <strong>{{joining_date}}</strong> The second party shall execute his work during the entire execution term thereof.</p>
-            <h4 style="text-align: center; text-decoration: underline; margin-top: 10px; margin-bottom: 5px;">Article Six</h4>
-            <p style="text-align: center; margin-top: 0;"><strong>"Contract Term"</strong></p>
-            <p style="text-align: justify;">The present contract has a <strong>{{contract_type_ar}}</strong> term. It shall come into force on <strong>{{joining_date}}</strong> for a term of ONE years. The contract may be renewed with the approval of the parties for similar terms not exceeding five years.</p>
-            
-            <div style="margin-top: 80px; display: flex; justify-content: space-between;">
-                <div>
-                  <p><strong>First Party:</strong></p>
-                  <div style="height: 60px; width: 120px; border-bottom: 1px dashed #000; display: flex; align-items: flex-end; justify-content: center;">
-                    <img src="https://api.dicebear.com/7.x/initials/svg?seed=Manager" width="40" style="opacity: 0.3;" />
-                  </div>
-                </div>
-                <div>
-                  <p><strong>Second Party:</strong></p>
-                  <div style="height: 60px; width: 120px; border-bottom: 1px dashed #000; display: flex; align-items: flex-end; justify-content: center;">
-                    <img src="https://api.dicebear.com/7.x/initials/svg?seed={{emp_name}}" width="40" style="opacity: 0.3;" />
-                  </div>
-                </div>
-            </div>
-        </div>
+    contentHtml: `<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>نموذج عقد عمل استرشادي - الهيئة العامة للقوى العاملة</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #000000;
+      font-weight: 500;
+    }
 
-        <!-- Arabic Column (Right) -->
-        <div style="width: 50%; padding: 15px; direction: rtl;">
-            <p><strong>دولة الكويت</strong><br>
-               <strong>الهيئة العامة للقوى العاملة / إدارة عمل:</strong> {{labor_department}}<br>
-               إنه في يوم <strong>{{contract_day_ar}}</strong> الموافق <strong>{{contract_date}}</strong><br>
-               تحرر هذا العقد بين كل من :</p>
-            <p>1. <strong>{{company_name_ar}}</strong><br>
-               ويمثلها في التوقيع على العقد:<br>
-               الاسم: <strong>{{manager_name}}</strong><br>
-               رقم مدني: <strong>{{manager_civil_id}}</strong><br>
-               <span style="display: block; text-align: center;"><strong>"طرف أول"</strong></span>
-            </p>
-            <p>2. الاسم: <strong>{{emp_name}}</strong><br>
-               الجنسية: <strong>{{nationality}}</strong><br>
-               الرقم المدني: <strong>{{civil_id}}</strong><br>
-               <span style="display: block; text-align: center;"><strong>"طرف ثان"</strong></span>
-            </p>
-            <h4 style="text-align: center; margin-top: 15px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">تمهيد</span></h4>
-            <p style="text-align: justify; margin-top: 0;">يمتلك الطرف الأول منشأة باسم <strong>{{company_name_ar}}</strong> تعمل في مجال (<strong>{{business_activity}}</strong>) ويرغب في التعاقد مع الطرف الثاني للعمل لديه بمهنة (<strong>{{job_title}}</strong>).</p>
-            <h4 style="text-align: center; margin-top: 10px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">البند الأول</span></h4>
-            <p style="text-align: justify; margin-top: 0;">يعتبر التمهيد السابق جزءا لا يتجزأ من هذا العقد.</p>
-            <h4 style="text-align: center; margin-top: 10px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">البند الثاني</span></h4>
-            <p style="text-align: center; margin-top: 0;"><strong>" طبيعة العمل "</strong></p>
-            <p style="text-align: justify;">تعاقد الطرف الأول مع الطرف الثاني للعمل لديه بمهنة (<strong>{{job_title}}</strong>) داخل دولة الكويت.</p>
-            <h4 style="text-align: center; margin-top: 10px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">البند الثالث</span></h4>
-            <p style="text-align: center; margin-top: 0;"><strong>" فترة التجربة "</strong></p>
-            <p style="text-align: justify;">يخضع الطرف الثاني لفترة تجربة لمدة لا تزيد عن 100 يوم عمل، ويحق لكل طرف إنهاء العقد خلال تلك الفترة دون إخطار.</p>
-            <h4 style="text-align: center; margin-top: 10px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">البند الرابع</span></h4>
-            <p style="text-align: center; margin-top: 0;"><strong>" قيمة الأجر "</strong></p>
-            <p style="text-align: justify;">يتقاضى الطرف الثاني عن تنفيذ هذا العقد أجرا مقداره (<strong>{{salary_total}}</strong>) يدفع في نهاية كل شهر ولا يجوز للطرف الأول تخفيض الأجر أثناء سريان هذا العقد. ولا يجوز نقل الطرف الثاني إلى الأجر اليومي دون موافقته.</p>
-            <h4 style="text-align: center; margin-top: 10px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">البند الخامس</span></h4>
-            <p style="text-align: center; margin-top: 0;"><strong>" نفاذ العقد "</strong></p>
-            <p style="text-align: justify;">يبدأ نفاذ العقد اعتبارا من <strong>{{joining_date}}</strong> ويلتزم الطرف الثاني بالقيام بأداء عمله طوال مدة نفاذه.</p>
-            <h4 style="text-align: center; margin-top: 10px; margin-bottom: 5px;"><span style="background: #ccc; padding: 2px 15px; font-weight: bold;">البند السادس</span></h4>
-            <p style="text-align: center; margin-top: 0;"><strong>" مدة العقد "</strong></p>
-            <p style="text-align: justify;">العقد <strong>{{contract_type_ar}}</strong> ويبدأ اعتبارا من <strong>{{joining_date}}</strong> وينتهي في <strong>{{end_date}}</strong>، ويجوز تجديد العقد بموافقة الطرفين لمدد مماثلة.</p>
-            
-            <div style="margin-top: 80px; display: flex; justify-content: space-between;">
-                <div>
-                  <p><strong>توقيع الطرف الأول:</strong></p>
-                  <div style="height: 60px; width: 120px; border-bottom: 1px dashed #000; display: flex; align-items: flex-end; justify-content: center;">
-                    <img src="https://api.dicebear.com/7.x/initials/svg?seed=Manager" width="40" style="opacity: 0.3;" />
-                  </div>
-                </div>
-                <div>
-                  <p><strong>توقيع الطرف الثاني:</strong></p>
-                  <div style="height: 60px; width: 120px; border-bottom: 1px dashed #000; display: flex; align-items: flex-end; justify-content: center;">
-                    <img src="https://api.dicebear.com/7.x/initials/svg?seed={{emp_name}}" width="40" style="opacity: 0.3;" />
-                  </div>
-                </div>
-            </div>
-        </div>
+    /* صفحة A4 مستقلة */
+    .contract-page {
+      width: 180mm;
+      min-height: 260mm;
+      max-height: 265mm;
+      overflow: hidden;
+      margin: 0 auto;
+      background: #ffffff;
+      font-size: 10px;
+      line-height: 1.36;
+      position: relative;
+    }
+
+    .page-break {
+      page-break-before: always;
+      margin-top: 10mm;
+    }
+
+    /* الترويسة الحكومية الرسمية مع الشعار في المنتصف */
+    .gov-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #000;
+      padding-bottom: 6px;
+    }
+    .hdr-en {
+      width: 38%;
+      text-align: left;
+      direction: ltr;
+    }
+    .hdr-logo {
+      width: 24%;
+      text-align: center;
+    }
+    .hdr-ar {
+      width: 38%;
+      text-align: right;
+      direction: rtl;
+    }
+    .hdr-ar p, .hdr-en p {
+      margin: 1px 0;
+      font-size: 9.5px;
+    }
+    .hdr-title-bold {
+      font-size: 11px;
+      font-weight: 900;
+    }
+    .pam-logo-img {
+      max-width: 60px;
+      max-height: 60px;
+      object-fit: contain;
+    }
+
+    /* تقسيم العمودين */
+    .columns-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .col-en {
+      width: 49%;
+      direction: ltr;
+      text-align: justify;
+    }
+    .col-ar {
+      width: 49%;
+      direction: rtl;
+      text-align: justify;
+    }
+
+    /* مربعات الأطراف */
+    .party-block {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      margin-bottom: 6px;
+      background-color: #fff;
+    }
+    .party-block p {
+      margin: 2px 0;
+    }
+    .party-badge {
+      text-align: center;
+      font-weight: 900;
+      margin-top: 3px;
+      border-top: 1px dashed #666;
+      padding-top: 2px;
+    }
+
+    .sec-title {
+      font-weight: 900;
+      text-align: center !important;
+      text-decoration: underline;
+      margin: 6px 0 4px 0;
+      font-size: 11px;
+    }
+    .preamble-body {
+      margin: 0 0 6px 0;
+    }
+
+    /* تنسيق البنود وعناوينها في المنتصف */
+    .clause-block {
+      margin-bottom: 5px;
+    }
+    .clause-title {
+      font-weight: 900;
+      display: block;
+      text-align: center !important;
+      font-size: 10.5px;
+      margin-bottom: 1px;
+    }
+    .clause-subtitle {
+      font-weight: 900;
+      display: block;
+      text-align: center !important;
+      font-size: 10.5px;
+      margin-bottom: 2px;
+    }
+
+    /* التوقيعات الرسمية أسفل الصفحة 2 */
+    .signatures-block {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 25px;
+      padding-top: 10px;
+      border-top: 1.5px solid #000;
+    }
+    .sig-col {
+      width: 45%;
+      text-align: center;
+    }
+    .sig-col .main-title {
+      font-weight: 900;
+      font-size: 11px;
+      margin: 0;
+    }
+    .sig-col .sub-title {
+      font-size: 10px;
+      color: #000;
+      margin: 2px 0 0 0;
+      font-weight: 800;
+    }
+    .sig-empty {
+      height: 35px;
+    }
+    .sig-dots {
+      color: #444;
+      margin: 0;
+      letter-spacing: 1px;
+    }
+
+    @media print {
+      body {
+        background: none;
+      }
+      .contract-page {
+        width: 100%;
+        margin: 0;
+        page-break-after: always;
+      }
+      .page-break {
+        page-break-before: always;
+        margin-top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- =================================================================== -->
+<!-- الصفحة الأولى (من التمهيد حتى البند السادس) -->
+<!-- =================================================================== -->
+<div class="contract-page">
+  <div class="gov-header">
+    <div class="hdr-ar">
+      <p class="hdr-title-bold">دولة الكويت</p>
+      <p class="hdr-title-bold">الهيئة العامة للقوي العاملة</p>
+      <p>الهيئة العامة للقوي العاملة إدارة عمل حولى</p>
+      <p class="hdr-title-bold" style="margin-top: 3px;">نموذج عقد عمل استرشادي<br>في القطاع الأهلي</p>
     </div>
-</div>`,
-    variables: ['emp_name', 'salary_total', 'civil_id', 'nationality', 'job_title', 'joining_date', 'contract_date', 'contract_day_ar', 'contract_day_en', 'company_name_ar', 'manager_name', 'manager_civil_id', 'labor_department', 'business_activity'],
+
+    <!-- الشعار الحكومي الرسمي لدولة الكويت في المنتصف -->
+    <div class="hdr-logo">
+      <img src="https://media.alanba.com.kw/articlefiles/2017/03/731678-1.jpg?height=500" alt="Kuwait Government Emblem" class="pam-logo-img" style="width: 72px; height: 72px; object-fit: contain;" />
+    </div>
+
+    <div class="hdr-en">
+      <p class="hdr-title-bold">State of Kuwait</p>
+      <p class="hdr-title-bold">The Public Authority for Manpower</p>
+      <p>Public Authority for Manpower, Hawalli Work Department</p>
+      <p class="hdr-title-bold" style="margin-top: 3px;">Sample Form of an Employment Contract<br>In the Civil Sector</p>
+    </div>
+  </div>
+
+  <div class="columns-container">
+    <!-- عمود يسار (عربي) - صفحة 1 -->
+    <div class="col-ar">
+      <div class="party-block">
+        <p>إنه في يوم <strong>{{contract_day_ar}}</strong> الموافق <strong>{{contract_date}}</strong> تحرر هذا العقد بين كل من:</p>
+        <p><strong>شركة / مؤسسة:</strong> {{company_name_ar}} ويمثلها في التوقيع على العقد:</p>
+        <p>الاسم: <strong>{{manager_name_ar}}</strong></p>
+        <p>الرقم المدني: <strong>{{manager_civil_id}}</strong></p>
+        <div class="party-badge">" طرف أول "</div>
+      </div>
+
+      <div class="party-block">
+        <p>الاسم: <strong>{{employee_name_ar}}</strong></p>
+        <p>الجنسية: <strong>{{nationality_ar}}</strong></p>
+        <p>الرقم المدني: <strong>{{civil_id}}</strong></p>
+
+        <div class="party-badge">" طرف ثان "</div>
+      </div>
+
+      <div class="sec-title">تمهيد</div>
+      <p class="preamble-body">
+        يمتلك الطرف الأول منشأة باسم <strong>{{company_name_ar}}</strong> تعمل بمجال <strong>({{business_activity}})</strong> ويرغب في التعاقد مع الطرف الثاني للعمل لديه بمهنة <strong>{{job_title_ar}}</strong> وبعد أن أقر الطرفان بأهليتهما في إبرام هذا العقد تم الاتفاق على ما يلي:
+      </p>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الأول</span>
+        يعتبر التمهيد السابق جزءاً لا يتجزأ من هذا العقد.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الثاني</span>
+        <span class="clause-subtitle">"طبيعة العمل"</span>
+        تعاقد الطرف الأول مع الطرف الثاني للعمل لديه بمهنة: <strong>{{job_title_ar}}</strong> داخل دولة الكويت.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الثالث</span>
+        <span class="clause-subtitle">"فترة التجربة"</span>
+        يخضع الطرف الثاني لفترة تجربة لمدة لا تزيد عن 100 يوم عمل ويحق لكل طرف إنهاء العقد خلال تلك الفترة دون إخطار.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الرابع</span>
+        <span class="clause-subtitle">"قيمة الأجر"</span>
+        يتقاضى الطرف الثاني عن تنفيذ هذا العقد أجراً مبلغ وقدره <strong>{{salary_amount}} دينار كويتي</strong> يدفع في نهاية كل شهر. ولا يجوز للطرف الأول تخفيض الأجر أثناء سريان هذا العقد. ولا يجوز نقل الطرف الثاني إلى الأجر اليومي دون موافقته.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الخامس</span>
+        <span class="clause-subtitle">"نفاذ العقد"</span>
+        يبدأ نفاذ العقد اعتباراً من <strong>{{contract_start_date}}</strong> ويلتزم الطرف الثاني بالقيام بأداء عمله طوال مدة نفاذه.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند السادس</span>
+        <span class="clause-subtitle">"مدة العقد"</span>
+        هذا العقد <strong>{{contract_term_ar}}</strong> ويبدأ اعتباراً من <strong>{{contract_start_date}}</strong>. اعتبار العقد محدد المدة أو غير محدد المدة يخضع لاختيار وإرادة الطرفين.
+      </div>
+    </div>
+
+    <!-- عمود يمين (إنجليزي) - صفحة 1 -->
+    <div class="col-en">
+      <div class="party-block">
+        <p>On <strong>{{contract_day_en}}</strong> corresponding to <strong>{{contract_date}}</strong> present contract was concluded by between: <strong>{{company_name_en}}</strong></p>
+        <p>represented in signature in the present contract by:</p>
+        <p>Name: <strong>{{manager_name_en}}</strong></p>
+        <p>Civil Card: <strong>{{manager_civil_id}}</strong></p>
+        <div class="party-badge">(First Party)</div>
+      </div>
+
+      <div class="party-block">
+        <p>Name: <strong>{{employee_name_en}}</strong></p>
+        <p>Nationality: <strong>{{nationality_en}}</strong></p>
+        <p>Civil Card: <strong>{{civil_id}}</strong></p>
+
+        <div class="party-badge">(Second Party)</div>
+      </div>
+
+      <div class="sec-title">Preamble</div>
+      <p class="preamble-body">
+        The first party owns the facility entitled <strong>{{company_name_en}}</strong> working in the field of <strong>{{business_activity_en}}</strong>, Whereas it wishes to conclude a contract with second party to work for it in the profession of <strong>{{job_title_en}}</strong>. Whereas the parties acknowledged their capacity to conclude this contract, They agreed as follow:
+      </p>
+
+      <div class="clause-block">
+        <span class="clause-title">Article One</span>
+        The preamble above shall constitute an integral part of the present contract.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Two</span>
+        <span class="clause-subtitle">"Nature of the Work"</span>
+        The first party concluded a contract with the second party to work for it in the profession of: <strong>{{job_title_en}}</strong> in the state of Kuwait.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Three</span>
+        <span class="clause-subtitle">"Probation Period"</span>
+        The second party shall be subject to a probation period for a term not exceeding 100 work days. Each party shall have the right to terminate the contract during the said term without notification.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Four</span>
+        <span class="clause-subtitle">"Lease Value"</span>
+        For executing the present contract, the second party shall receive the wage of <strong>{{salary_amount}} Kuwaiti Dinars</strong> to be paid at the end of every month. The first party may not decrease the wage during the term of the contract. It may not transfer the second party to daily wage without his approval.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Five</span>
+        <span class="clause-subtitle">"Contract Term"</span>
+        The contract shall come into force on <strong>{{contract_start_date}}</strong>. The second party shall execute his work during the entire execution term therefore.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Six</span>
+        <span class="clause-subtitle">"Contract Term"</span>
+        The present contract has an <strong>{{contract_term_en}}</strong> and it shall come into force on <strong>{{contract_start_date}}</strong>. Considering the contract as having a definite or indefinite term shall be subject to the will of the two parties.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =================================================================== -->
+<!-- الصفحة الثانية (من البند السابع حتى السادس عشر والتوقيعات) -->
+<!-- =================================================================== -->
+<div class="contract-page page-break">
+  <div class="columns-container">
+    <!-- عمود يسار (عربي) - صفحة 2 -->
+    <div class="col-ar">
+      <div class="clause-block">
+        <span class="clause-title">البند السابع</span>
+        <span class="clause-subtitle">"الإجازة السنوية"</span>
+        للطرف الثاني الحق في إجازة سنوية مدفوعة الأجر مدتها 30 يوماً، ولا يستحقها عن السنة الأولى إلا بعد انقضاء مدة تسعة أشهر تحسب من تاريخ نفاذ العقد.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الثامن</span>
+        <span class="clause-subtitle">"عدد ساعات العمل"</span>
+        لا يجوز للطرف الأول تشغيل الطرف الثاني لمدة تزيد عن ثماني ساعات عمل يومياً تتخللها فترة راحة لا تقل عن ساعة باستثناء الحالات المقررة قانوناً.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند التاسع</span>
+        <span class="clause-subtitle">"قيمة تذكرة السفر"</span>
+        يتحمل الطرف الأول مصاريف عودة الطرف الثاني إلى بلده عند انتهاء علاقة العمل ومغادرته نهائياً للبلاد.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند العاشر</span>
+        <span class="clause-subtitle">"التأمين ضد إصابات وأمراض العمل"</span>
+        يلتزم الطرف الأول بالتأمين على الطرف الثاني ضد إصابات وأمراض العمل، كما يلتزم بقيمة التأمين الصحي طبقاً للقانون رقم (1) لسنة 1999.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الحادي عشر</span>
+        <span class="clause-subtitle">"مكافأة نهاية الخدمة"</span>
+        يستحق الطرف الثاني مكافأة نهاية الخدمة المنصوص عليها بالقوانين المنظمة.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الثاني عشر</span>
+        <span class="clause-subtitle">"القانون الواجب التطبيق"</span>
+        تسري أحكام قانون العمل في القطاع الأهلي رقم 6 لسنة 2010 والقرارات المنفذة له فيما لم يرد بشأنه نص في هذا العقد، ويقع باطلاً كل شرط تم الاتفاق عليه بالمخالفة لأحكام القانون، ما لم يكن فيه ميزة أفضل للعامل.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الثالث عشر</span>
+        <span class="clause-subtitle">"شروط خاصة"</span>
+        1. يخضع هذا العقد لقانون العمل بالقطاع الأهلي والقوانين الكويتية المنظمة لممارسة المهنة.<br>
+        2. وعند رفض السلطات إصدار أو تجديد تراخيص العمل أو مزاولة المهنة للطرف الثاني فيعتبر هذا إنهاء للعقد دون إخطار أو حكم قضائي أو سداد أي تعويض.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الرابع عشر</span>
+        <span class="clause-subtitle">"المحكمة المختصة"</span>
+        تختص المحكمة الكلية ودوائرها العمالية طبقاً لأحكام القانون رقم 46 لسنة 1987 بنظر كافة المنازعات الناشئة عن تطبيق أو تفسير هذا العقد.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند الخامس عشر</span>
+        <span class="clause-subtitle">"لغة العقد"</span>
+        حرر هذا العقد باللغتين العربية والإنجليزية، ويعتمد بنصوص اللغة العربية عند وقوع أي تعارض بينهما.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">البند السادس عشر</span>
+        <span class="clause-subtitle">"نسخ العقد"</span>
+        حرر هذا العقد من ثلاث نسخ بيد كل طرف نسخة للعمل بموجبها والثالثة تودع لدى الهيئة العامة للقوى العاملة.
+      </div>
+    </div>
+
+    <!-- عمود يمين (إنجليزي) - صفحة 2 -->
+    <div class="col-en">
+      <div class="clause-block">
+        <span class="clause-title">Article Seven</span>
+        <span class="clause-subtitle">"Annual Leave"</span>
+        The second party shall have the right to a paid annual leave with a term of 30 days. It shall not be due on the first year save after the expiration of nine months to be calculated from the date of the contract coming into force.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Eight</span>
+        <span class="clause-subtitle">"Number of Work Hours"</span>
+        The first party may not require that the second party work for a term exceeding eight daily work hours with rest period not less than one hour except for the cases set forth in the law.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Nine</span>
+        <span class="clause-subtitle">"Ticket Value"</span>
+        The first party shall bear the expenses of the return of the second party to his country after the expiration of the work relationship and his final departure from the country.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Ten</span>
+        <span class="clause-subtitle">"Insurance against Injuries and Work Maladies"</span>
+        The first party shall insure the second party against injuries and work maladies. It shall also commit to the health insurance value in accordance with the law No. (1) of the year 1999.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Eleven</span>
+        <span class="clause-subtitle">"End of Service Benefit"</span>
+        The second party shall be due the end of the service benefit as set forth in the regulating laws.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Twelve</span>
+        <span class="clause-subtitle">"Applicable Law"</span>
+        The provisions of the Labour code in the civil sector No. 6 of 2010 and the decisions executing the same shall apply for all matters not provided for in the present contract. Shall be considered null every condition agreed upon in violation of the provisions of the law, unless the same has a better benefit for the worker.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Thirteen</span>
+        <span class="clause-subtitle">"Special Conditions"</span>
+        1. This contract is subject to the Labor Law No. 6/2010 and the Kuwaiti laws regulating the practice of the profession.<br>
+        2. In case the Kuwaiti Authorities refuse to issue or renew the second party's work permits or License, your contract shall be terminating without right for any claim of whatsoever kind.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Fourteen</span>
+        <span class="clause-subtitle">"Specialized Court"</span>
+        The court of first instance and its Labour departments, in accordance with the provisions of the law No. 46 of the year 1987, shall be competent to peruse conflicts resulting from the execution or interpretation of the present contract.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Fifteen</span>
+        <span class="clause-subtitle">"Contract Language"</span>
+        The present contract was made in Arabic and English. The Arabic texts shall prevail in the case of conflict between them.
+      </div>
+
+      <div class="clause-block">
+        <span class="clause-title">Article Sixteen</span>
+        <span class="clause-subtitle">"Contract Copies"</span>
+        The present contract was made in three copies, one for each party to work in accordance therewith. The third copy shall be deposited with the Public Authority for Manpower.
+      </div>
+    </div>
+  </div>
+
+  <!-- التوقيعات فقط في الأسفل -->
+  <div class="signatures-block">
+    <div class="sig-col" dir="ltr">
+      <p class="main-title">Second Party</p>
+      <p class="sub-title">الطرف الثاني</p>
+      <div class="sig-empty"></div>
+      <p class="sig-dots">...................................................</p>
+    </div>
+
+    <div class="sig-col" dir="rtl">
+      <p class="main-title">الطرف الأول</p>
+      <p class="sub-title">First Party</p>
+      <div class="sig-empty"></div>
+      <p class="sig-dots">...................................................</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>`,
+    variables: [
+      'employee_name_ar', 'employee_name_en', 'manager_name_ar', 'manager_name_en', 'manager_civil_id',
+      'civil_id', 'nationality_ar', 'nationality_en', 'residence_type_ar', 'residence_type_en',
+      'job_title_ar', 'job_title_en', 'salary_amount', 'contract_start_date', 'contract_term_ar',
+      'contract_term_en', 'contract_date', 'contract_day_ar', 'contract_day_en', 'business_activity', 'business_activity_en', 'company_name_ar', 'company_name_en'
+    ],
     isDefault: true,
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
@@ -370,23 +1294,78 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
       : (emp?.fullNameAr || 'أحمد محمود الكويتي');
     const companyName = lang === 'EN' ? (activeCompany?.nameEn || activeCompany?.nameAr || '') : (activeCompany?.nameAr || '');
     const civilId = emp ? emp.civilId : '293041501234';
-    const nationality = emp ? emp.nationality : (lang === 'EN' ? 'Kuwaiti' : 'كويتي');
+
+    const isFemale = emp?.gender === 'FEMALE';
+    const genderVerb = isFemale ? 'تعمل لدينا' : 'يعمل لدينا';
+    const genderPronoun = isFemale ? 'حسابها' : 'حسابه';
+    const genderStatus = isFemale ? 'ومستمرة بالعمل' : 'ومستمر بالعمل';
+    const genderObj = isFemale ? 'لها' : 'له';
+    const genderRequest = isFemale ? 'طلبها' : 'طلبه';
+
+    const natRaw = (emp?.nationality || (lang === 'EN' ? 'Kuwaiti' : 'كويتي')).trim();
+    const natUpper = natRaw.toUpperCase();
+    const nationalityMap: Record<string, { male: string; female: string }> = {
+      'KWT': { male: 'كويتي', female: 'كويتية' },
+      'KUWAITI': { male: 'كويتي', female: 'كويتية' },
+      'الكويت': { male: 'كويتي', female: 'كويتية' },
+      'EGY': { male: 'مصري', female: 'مصرية' },
+      'EGYPTIAN': { male: 'مصري', female: 'مصرية' },
+      'مصر': { male: 'مصري', female: 'مصرية' },
+      'IND': { male: 'هندي', female: 'هندية' },
+      'INDIAN': { male: 'هندي', female: 'هندية' },
+      'الهند': { male: 'هندي', female: 'هندية' },
+      'IRN': { male: 'إيراني', female: 'إيرانية' },
+      'IRANIAN': { male: 'إيراني', female: 'إيرانية' },
+      'إيران': { male: 'إيراني', female: 'إيرانية' },
+      'PAK': { male: 'باكستاني', female: 'باكستانية' },
+      'PAKISTANI': { male: 'باكستاني', female: 'باكستانية' },
+      'باكستان': { male: 'باكستاني', female: 'باكستانية' },
+      'SYR': { male: 'سوري', female: 'سورية' },
+      'SYRIAN': { male: 'سوري', female: 'سورية' },
+      'سوريا': { male: 'سوري', female: 'سورية' },
+      'JOR': { male: 'أردني', female: 'أردنية' },
+      'JORDANIAN': { male: 'أردني', female: 'أردنية' },
+      'الأردن': { male: 'أردني', female: 'أردنية' },
+      'LBN': { male: 'لبناني', female: 'لبنانية' },
+      'LEBANESE': { male: 'لبناني', female: 'لبنانية' },
+      'لبنان': { male: 'لبناني', female: 'لبنانية' },
+      'PHL': { male: 'فلبيني', female: 'فلبينية' },
+      'FILIPINO': { male: 'فلبيني', female: 'فلبينية' },
+      'الفلبين': { male: 'فلبيني', female: 'فلبينية' },
+      'BHR': { male: 'بحريني', female: 'بحرينية' },
+      'SAU': { male: 'سعودي', female: 'سعودية' },
+      'ARE': { male: 'إماراتي', female: 'إماراتية' },
+      'QAT': { male: 'قطري', female: 'قطرية' },
+      'OMN': { male: 'عماني', female: 'عمانية' },
+      'SDN': { male: 'سوداني', female: 'سودانية' },
+      'YEM': { male: 'يمني', female: 'يمنية' },
+    };
+
+    const pamData = formatContractData(emp, cnt);
+
     const jobTitle = emp ? emp.jobTitle : (lang === 'EN' ? 'Senior Accountant' : 'محاسب عام أول');
     const dept = emp ? emp.department : (lang === 'EN' ? 'Finance' : 'الإدارة المالية');
-    const joinDate = emp ? emp.joinDate : '2022-01-15';
+    const joinDate = cnt?.startDate || emp?.joinDate || '2022-01-15';
     const today = new Date().toISOString().split('T')[0];
-    const bankName = emp?.bankName || activeCompany?.bankName || (lang === 'EN' ? 'National Bank of Kuwait' : 'بنك بيت التمويل الكويتي');
+    const bankName = emp?.bankName || activeCompany?.bankName || (lang === 'EN' ? 'National Bank of Kuwait' : 'البنك التجاري الكويتي');
+    const bankNameEnMap: Record<string, string> = {
+      'البنك التجاري الكويتي': 'Commercial Bank of Kuwait',
+      'بنك بيت التمويل الكويتي': 'Kuwait Finance House',
+      'بنك الكويتي الوطني': 'National Bank of Kuwait',
+      'الوطني': 'National Bank of Kuwait',
+      'التجاري': 'Commercial Bank of Kuwait',
+      'بيتك': 'Kuwait Finance House',
+      'بنك الخليج': 'Gulf Bank',
+      'بنك برقان': 'Burgan Bank',
+      'بنك بوبيان': 'Boubyan Bank',
+      'بنك وربة': 'Warba Bank',
+      'البنك الأهلي الكويتي': 'Al Ahli Bank of Kuwait',
+    };
+    const bankNameEn = bankNameEnMap[bankName] || ((emp as any)?.bankNameEn || (/^[A-Za-z\s]+$/.test(bankName) ? bankName : 'Commercial Bank of Kuwait'));
     const iban = emp?.iban || activeCompany?.iban || 'KW19 KFHO 0000000000071050546531';
     const contractDuration = cnt?.contractType === 'FIXED_TERM' 
       ? (lang === 'EN' ? 'One Year' : 'سنة واحدة') 
       : (lang === 'EN' ? 'Indefinite' : 'غير محدد المدة');
-
-    const contractDateObj = new Date(joinDate);
-    const daysAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    const daysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const dayIdx = contractDateObj.getDay();
-    const currentDayAr = daysAr[dayIdx];
-    const currentDayEn = daysEn[dayIdx];
 
     let contractEndDate = '---';
     if (cnt?.contractType === 'FIXED_TERM') {
@@ -397,25 +1376,45 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
     
     const valuesMap: Record<string, string> = {
       '{{emp_name}}': empName,
+      '{{employee_name_ar}}': emp ? emp.fullNameAr : empName,
+      '{{employee_name_en}}': emp?.fullNameEn || pamData.employee_name_en,
       '{{full_name}}': empName,
       '{{civil_id}}': civilId,
       '{{passport_no}}': emp ? emp.passportNo : 'P01234567',
       '{{job_title}}': jobTitle,
+      '{{job_title_ar}}': pamData.job_title_ar,
+      '{{job_title_en}}': pamData.job_title_en,
       '{{department}}': dept,
       '{{basic_salary}}': basicSalary.toFixed(3),
       '{{allowances}}': allowances.toFixed(3),
       '{{total_salary}}': totalSalary.toFixed(3),
       '{{salary_total}}': totalSalary.toFixed(3),
+      '{{salary_amount}}': totalSalary.toFixed(3),
       '{{joining_date}}': joinDate,
       '{{join_date}}': joinDate,
-      '{{nationality}}': nationality,
+      '{{contract_start_date}}': joinDate,
+      '{{nationality}}': pamData.nationality_ar,
+      '{{nationality_ar}}': pamData.nationality_ar,
+      '{{nationality_en}}': pamData.nationality_en,
+      '{{residence_type}}': emp?.residencyType || 'إقامة صالحة - المادة 18',
+      '{{residence_type_ar}}': emp?.residencyType || 'إقامة صالحة - المادة 18',
+      '{{residence_type_en}}': emp?.residencyType || 'Article 18 - Private Sector',
+      '{{gender_verb}}': genderVerb,
+      '{{gender_pronoun}}': genderPronoun,
+      '{{gender_status}}': genderStatus,
+      '{{gender_obj}}': genderObj,
+      '{{gender_request}}': genderRequest,
       '{{current_date}}': today,
       '{{date_today}}': today,
       '{{bank_name}}': bankName,
+      '{{bank_name_ar}}': bankName,
+      '{{bank_name_en}}': bankNameEn,
       '{{iban}}': iban,
+      '{{iban_number}}': iban,
       '{{moh_license}}': emp?.mohLicenseNo || 'MOH-8842',
       '{{company_name}}': companyName,
-      '{{company_name_ar}}': activeCompany?.nameAr || '',
+      '{{company_name_ar}}': activeCompany?.nameAr || 'مستوصف المنار كلينك',
+      '{{company_name_en}}': activeCompany?.nameEn ? activeCompany.nameEn.toUpperCase() : 'AL MANAR CLINIC',
       '{{commercial_reg_no}}': activeCompany?.commercialRegNo || '',
       '{{wsi_code}}': activeCompany?.wsiCode || '',
       '{{contract_duration}}': contractDuration,
@@ -432,17 +1431,32 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
       '{{end_date}}': contractEndDate,
       '{{labor_department}}': 'العاصمة',
       '{{labor_department_en}}': 'Capital',
-      '{{contract_day_ar}}': currentDayAr,
-      '{{contract_day_en}}': currentDayEn,
-      '{{contract_date}}': joinDate,
+      '{{contract_day_ar}}': pamData.contract_day_ar,
+      '{{contract_day_en}}': pamData.contract_day_en,
+      '{{contract_date}}': pamData.contract_date,
       '{{today_date}}': today,
       '{{salary_in_words}}': tafqeet(totalSalary),
-      '{{manager_name}}': (activeCompany as any).managerName || 'Sayed',
+      '{{manager_name}}': (activeCompany as any).managerName || 'د. عبدالله المنار',
+      '{{manager_name_ar}}': (activeCompany as any).managerNameAr || (activeCompany as any).managerName || 'د. عبدالله المنار',
+      '{{manager_name_en}}': (activeCompany as any).managerNameEn || 'Dr. Abdullah Al-Manar',
       '{{manager_civil_id}}': (activeCompany as any).managerCivilId || '288051200526',
-      '{{business_activity}}': (activeCompany as any).businessActivity || 'الرعاية الصحية والخدمات الطبية والمساندة',
+      '{{business_activity}}': (activeCompany as any).businessActivity || 'الطب والرعاية الصحية',
+      '{{business_activity_en}}': (activeCompany as any).businessActivityEn || 'Medical and Healthcare',
       '{{contract_type_ar}}': cnt?.contractType === 'FIXED_TERM' ? 'محدد المدة' : 'غير محدد المدة',
+      '{{contract_term_ar}}': cnt?.contractType === 'FIXED_TERM' ? 'عقد محدد المدة' : 'عقد غير محدد المدة',
+      '{{contract_term_en}}': cnt?.contractType === 'FIXED_TERM' ? 'definite term contract' : 'indefinite term contract',
       '{{annual_leave_days}}': '30',
       '{{special_conditions}}': specialConditions || 'يلتزم الطرف الثاني بالسرية التامة لجميع البيانات واللوائح الداخلية ومستندات المنشأة.',
+      '{{issue_date}}': today,
+      '{{hire_date}}': joinDate,
+      '{{work_status_verb_ar}}': isFemale ? 'تعمل' : 'يعمل',
+      '{{salary_in_words_ar}}': tafqeet(totalSalary),
+      '{{salary_in_words_en}}': `${totalSalary.toFixed(3)} Kuwaiti Dinars Only`,
+
+      '{{pronoun_prep_ar}}': isFemale ? 'ها' : 'ه',
+      '{{title_en}}': isFemale ? 'Ms.' : 'Mr.',
+      '{{pronoun_subject_en}}': isFemale ? 'She' : 'He',
+      '{{pronoun_possessive_en}}': isFemale ? 'her' : 'his',
     };
 
     Object.entries(valuesMap).forEach(([tag, val]) => {
@@ -785,20 +1799,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
                   }}
                 />
 
-                {/* Official Signatures & Seal */}
-                <div className="grid grid-cols-2 gap-8 pt-10 border-t border-slate-200 text-center text-xs">
-                  <div className="space-y-10">
-                    <p className="font-bold text-slate-800">توقيع مسؤول الموارد البشرية</p>
-                    <p className="border-b border-dashed border-slate-400 w-36 mx-auto"></p>
-                  </div>
 
-                  <div className="space-y-10">
-                    <p className="font-bold text-slate-800">ختم الشركة واعتماد الإدارة</p>
-                    <div className="w-20 h-20 border-2 border-dashed border-purple-800/40 rounded-full mx-auto flex items-center justify-center text-[10px] text-purple-900 font-bold rotate-12 bg-purple-50/50">
-                      ختم رسمى
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -1130,36 +2131,38 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
               </div>
             </div>
 
-            <div id="print-area" className="space-y-8 dir-rtl text-right print:p-8">
-              {/* Company Official Header */}
-              <div className="flex items-center justify-between pb-4 border-b-2 border-slate-900">
-                <div>
-                  <h1 className="text-lg font-black text-[#714B67]">{activeCompany?.nameAr || ''}</h1>
-                  <p className="text-xs text-slate-600 font-mono">سجل تجاري: {activeCompany?.commercialRegNo || ''} | ملف حماية الأجور: {activeCompany?.wsiCode || ''}</p>
+            <div id="print-area" className={selectedTemplate?.templateCode === 'EMPLOYMENT_CONTRACT_PAM' ? "dir-rtl text-right print:p-0" : "space-y-8 dir-rtl text-right print:p-8"}>
+              {selectedTemplate?.templateCode !== 'EMPLOYMENT_CONTRACT_PAM' && (
+                <div className="flex items-center justify-between pb-4 border-b-2 border-slate-900">
+                  <div>
+                    <h1 className="text-lg font-black text-[#714B67]">{activeCompany?.nameAr || ''}</h1>
+                    <p className="text-xs text-slate-600 font-mono">سجل تجاري: {activeCompany?.commercialRegNo || ''} | ملف حماية الأجور: {activeCompany?.wsiCode || ''}</p>
+                  </div>
+                  <div className="text-left font-mono text-xs">
+                    <p className="font-bold">الرقم المرجعي: {activeGenDoc.documentNumber}</p>
+                    <p className="text-slate-500">تاريخ الإصدار: {activeGenDoc.issueDate}</p>
+                  </div>
                 </div>
-                <div className="text-left font-mono text-xs">
-                  <p className="font-bold">الرقم المرجعي: {activeGenDoc.documentNumber}</p>
-                  <p className="text-slate-500">تاريخ الإصدار: {activeGenDoc.issueDate}</p>
-                </div>
-              </div>
+              )}
 
               {/* Rendered Document Body */}
               <div 
-                className="prose max-w-none text-slate-800"
+                className={selectedTemplate?.templateCode === 'EMPLOYMENT_CONTRACT_PAM' ? "max-w-none" : "prose max-w-none text-slate-800"}
                 dangerouslySetInnerHTML={{ __html: activeGenDoc.contentHtml }}
               />
 
-              {/* Signatures */}
-              <div className="grid grid-cols-2 gap-8 pt-10 border-t border-slate-200 text-center text-xs">
-                <div className="space-y-8">
-                  <p className="font-bold">توقيع مسؤول الموارد البشرية</p>
-                  <p className="border-b border-dashed border-slate-400 w-32 mx-auto"></p>
+              {selectedTemplate?.templateCode !== 'EMPLOYMENT_CONTRACT_PAM' && (
+                <div className="grid grid-cols-2 gap-8 pt-10 border-t border-slate-200 text-center text-xs">
+                  <div className="space-y-8">
+                    <p className="font-bold">توقيع مسؤول الموارد البشرية</p>
+                    <p className="border-b border-dashed border-slate-400 w-32 mx-auto"></p>
+                  </div>
+                  <div className="space-y-8">
+                    <p className="font-bold">ختم واعتماد الشركة</p>
+                    <p className="border-b border-dashed border-slate-400 w-32 mx-auto"></p>
+                  </div>
                 </div>
-                <div className="space-y-8">
-                  <p className="font-bold">ختم واعتماد الشركة</p>
-                  <p className="border-b border-dashed border-slate-400 w-32 mx-auto"></p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>)}

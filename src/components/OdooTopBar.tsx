@@ -6,6 +6,7 @@ import {
 import { Company, ActiveApp, ViewMode } from '../types';
 import { SystemNotification } from '../utils/notificationsEngine';
 import { OdooDebugMenu } from './OdooDebugMenu';
+import { PrintActionsMenu } from './PrintActionsMenu';
 import { useLang } from '../lib/i18n';
 
 interface OdooTopBarProps {
@@ -39,6 +40,9 @@ interface OdooTopBarProps {
   onExport?: () => void;
   onLoadDemoData?: () => void;
   onPurgeSystemData?: () => void;
+  onOpenIntegrityModal?: () => void;
+  onSelectPrintTemplate?: (moduleType: string, templateId: string) => void;
+  onOpenUIAudit?: () => void;
 }
 
 const APP_MODELS: Record<ActiveApp, string> = {
@@ -133,6 +137,9 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
   onExport,
   onLoadDemoData,
   onPurgeSystemData,
+  onOpenIntegrityModal,
+  onSelectPrintTemplate,
+  onOpenUIAudit,
 }) => {
   const [showCompanyMenu, setShowCompanyMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -266,6 +273,18 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               <span>لوحة السوبر أدمن 👑</span>
             </button>
           )}
+
+          {/* UI & Permissions Audit Modal Trigger */}
+          {onOpenUIAudit && (
+            <button
+              type="button"
+              onClick={onOpenUIAudit}
+              className="hidden lg:flex text-[11px] px-2.5 py-1 rounded-md font-bold transition items-center gap-1 bg-white/15 hover:bg-white/25 text-white shadow-xs border border-white/20 cursor-pointer active:scale-95 whitespace-nowrap shrink-0 mr-1"
+              title="مراجعة الواجهات والصلاحيات (UI Audit & Permissions)"
+            >
+              <span>🔍 مراجعة الواجهات</span>
+            </button>
+          )}
         </div>
 
         {/* Middle: Search Bar */}
@@ -285,6 +304,27 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
 
         {/* Left Side: Actions, Switcher, Tools & Profile */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {(() => {
+            const app = currentApp || activeApp;
+            const mType: 'employees' | 'leaves' | 'payroll' | 'attendance' =
+              app === 'LEAVES' ? 'leaves' :
+              app === 'PAYROLL' || app === 'EOS' ? 'payroll' :
+              app === 'ATTENDANCE' || app === 'SHIFTS' ? 'attendance' : 'employees';
+
+            return (
+              <PrintActionsMenu
+                moduleType={mType}
+                onSelectTemplate={(tId) => {
+                  if (onSelectPrintTemplate) {
+                    onSelectPrintTemplate(mType, tId);
+                  } else {
+                    console.log('Selected print template:', mType, tId);
+                  }
+                }}
+              />
+            );
+          })()}
+
           {/* Ask AI Copilot Button */}
           {onOpenAICopilot && (
             <button
@@ -422,6 +462,19 @@ export const OdooTopBar: React.FC<OdooTopBarProps> = ({
               isInspectorActive={isInspectorActive}
               onToggleFieldInspector={onToggleFieldInspector}
             />
+          )}
+
+          {/* Global Integrity Guard / System Health Button */}
+          {onOpenIntegrityModal && (
+            <button
+              type="button"
+              onClick={onOpenIntegrityModal}
+              className="p-1.5 rounded bg-white/10 hover:bg-emerald-700/80 text-white transition flex items-center gap-1.5 cursor-pointer text-xs font-bold shadow-xs border border-white/20"
+              title="فحص النزاهة والحماية البرمجية الشاملة لكافة الوحدات (Global Integrity Guard)"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="hidden xl:inline text-[11px]">حارس النزاهة</span>
+            </button>
           )}
 
           {/* Notifications Dropdown Trigger (Containing Smart Risks & Alerts) */}

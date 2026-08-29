@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Payslip, Employee, Company, Contract, LoanAdvance, AttendanceRecord, ActiveApp } from '../types';
 import { printDocument } from '../utils/printUtils';
 import { formatKWD, tafqitKWD } from '../utils/kuwaitLaw';
+import { validateContractIntegrity, validatePayslipIntegrity } from '../services/globalIntegrityService';
 import { 
   Banknote, Download, FileSpreadsheet, CheckCircle2, ShieldCheck, Printer, 
   Edit, Plus, Search, Sparkles, Building2, User, FileText, ArrowLeft, 
-  Layers, Calculator, AlertCircle, X, Check, FileCheck, Landmark, MessageSquare, Send, Smartphone
+  Layers, Calculator, AlertCircle, X, Check, FileCheck, Landmark, MessageSquare, Send, Smartphone, ShieldAlert
 } from 'lucide-react';
 
 interface PayrollAppProps {
@@ -138,6 +139,13 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
       noticePeriodDays: existingContract ? existingContract.noticePeriodDays : 90,
       status: 'RUNNING',
     };
+
+    // Strict Global Integrity Guard
+    const validation = validateContractIntegrity(updatedContract, contracts);
+    if (!validation.isValid) {
+      alert(`خطأ في التحقق البرمجي للعقد: ${validation.errors[0]}`);
+      return;
+    }
 
     onSaveContract(updatedContract);
     setEditingStructureEmp(null);
@@ -402,7 +410,8 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                   </tr>) : (
                   filteredPayslips.map((p, index) => {
                     const emp = employees.find(e => e.id === p.employeeId);
-                    const totalDeductionsEmp = p.latenessDeduction + (p.loanDeduction || 0) + (p.unpaidLeaveDeduction || 0);
+                    const totalDeductionsEmp = p.latenessDeduction + (p.loanDeduction || 0) + (p.unpaidLeaveDeduction || 0) + (p.otherDeductions || 0);
+                    const validation = validatePayslipIntegrity(p, payslips);
                     
                     return (
                       <tr key={p.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
@@ -425,10 +434,17 @@ export const PayrollApp: React.FC<PayrollAppProps> = ({
                           {formatKWD(p.netSalary)}
                         </td>
                         <td className="p-3">
-                          <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>معتمد للتحويل</span>
-                          </span>
+                          {validation.isValid ? (
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 border border-emerald-200" title="المعادلة الرياضية سليمة ومطابقة 100%">
+                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                              <span>معتمد (سليم رياضياً)</span>
+                            </span>
+                          ) : (
+                            <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 border border-rose-200" title={validation.errors.join(' | ')}>
+                              <ShieldAlert className="w-3 h-3 text-rose-600" />
+                              <span>خطأ حسابي</span>
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">

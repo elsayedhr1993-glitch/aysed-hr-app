@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import crypto from "crypto";
+import zlib from "zlib";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -8,7 +9,25 @@ import nodemailer from "nodemailer";
 import { initializeApp, cert, getApps, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { sendWelcomeEmail, sendAdminNewSubscriptionNotification } from "./src/services/emailService";
+import { 
+  sendWelcomeEmail, 
+  sendAdminNewSubscriptionNotification,
+  sendDailyBackupSuccessEmail,
+  sendDailyBackupFailureAlert,
+  getSystemDefaultEmail,
+  BackupMetadata
+} from "./src/services/emailService";
+import { 
+  validateLeaveSettlement,
+  cleanDuplicatePunches,
+  runNightlyAudit
+} from "./src/services/guards";
+import { 
+  calculateServerFifoBalance, 
+  calculateServerSettlement, 
+  calculateServerWorkingDays,
+  validateSettlementConstraints
+} from "./server/leaveCalculatorServer";
 
 dotenv.config();
 
@@ -134,6 +153,180 @@ function getGeminiClient() {
 // API Routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", system: "Aysed S HR 2026", odooVersion: "17.0-Enterprise" });
+});
+
+// ---------------------------------------------------------------------------
+// ODOO ENTERPRISE CENTRAL LEAVE SSOT API (Backend Server-Side Calculations)
+// ---------------------------------------------------------------------------
+
+// 1. Calculate Single Employee FIFO Leave Balance & Accruals
+app.post("/api/leave/calculate-balance", (req, res) => {
+  try {
+    const { employee, allocations = [], leaves = [], contract = null, asOfDate } = req.body;
+    if (!employee || !employee.id) {
+      return res.status(400).json({ success: false, error: "بيانات الموظف مطلوبة للحساب" });
+    }
+
+    const result = calculateServerFifoBalance(employee, allocations, leaves, contract, asOfDate);
+    return res.json({
+      success: true,
+      data: result,
+      source: "odoo-backend-ssot"
+    });
+  } catch (err: any) {
+    console.error("[Leave Balance Backend Error]:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Batch Calculate All Employees FIFO Leave Balances for Reports & Tables
+app.post("/api/leave/batch-balances", (req, res) => {
+  try {
+    const { employees = [], allocations = [], leaves = [], contracts = [], asOfDate } = req.body;
+    if (!Array.isArray(employees)) {
+      return res.status(400).json({ success: false, error: "قائمة الموظفين غير صالحة" });
+    }
+
+    const contractMap = new Map<string, any>();
+    contracts.forEach((c: any) => {
+      if (c && c.employeeId) contractMap.set(c.employeeId, c);
+    });
+
+    const results: Record<string, any> = {};
+    for (const emp of employees) {
+      if (!emp || !emp.id) continue;
+      const empContract = contractMap.get(emp.id) || null;
+      results[emp.id] = calculateServerFifoBalance(emp, allocations, leaves, empContract, asOfDate);
+    }
+
+    return res.json({
+      success: true,
+      data: results,
+      totalCount: Object.keys(results).length,
+      source: "odoo-backend-ssot"
+    });
+  } catch (err: any) {
+    console.error("[Batch Leave Balances Backend Error]:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Central Comprehensive Settlement Calculation (Voucher & Encashment Engine)
+app.post("/api/leave/calculate-settlement", (req, res) => {
+  try {
+    const params = req.body;
+    if (!params.employee || !params.employee.id) {
+      return res.status(400).json({ success: false, error: "بيانات الموظف مطلوبة لحساب التصفية" });
+    }
+
+    const result = calculateServerSettlement(params);
+    const validation = validateSettlementConstraints({
+      ...result,
+      carriedOverBalance: result.carriedOverDays,
+      accruedBalance: result.accrued2026Days,
+      consumedLeaveDays: result.paidLeaveDays,
+      remainingBalanceAfter: result.balanceAfter,
+      basicSalary: result.basicSalary,
+      dailyWage: result.dailyWage
+    });
+
+    return res.json({
+      success: true,
+      data: result,
+      validation,
+      source: "odoo-backend-ssot"
+    });
+  } catch (err: any) {
+    console.error("[Leave Settlement Backend Error]:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Odoo-style Constraint Validation Middleware for Settlement Vouchers & Approvals
+app.post("/api/leave/validate-settlement", (req, res) => {
+  try {
+    const voucherOrInput = req.body;
+    if (!voucherOrInput) {
+      return res.status(400).json({ success: false, error: "بيانات التسوية مطلوبة للتحقق" });
+    }
+
+    const validation = validateSettlementConstraints(voucherOrInput);
+    return res.json({
+      success: true,
+      data: validation,
+      source: "odoo-backend-ssot"
+    });
+  } catch (err: any) {
+    console.error("[Settlement Validation Backend Error]:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Calculate Rest Day Exclusions (Fridays & Working Days)
+app.post("/api/leave/working-days", (req, res) => {
+  try {
+    const { startDate, endDate } = req.body;
+    const result = calculateServerWorkingDays(startDate, endDate);
+    return res.json({
+      success: true,
+      data: result,
+      source: "odoo-backend-ssot"
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// [1] الحارس اللحظي لتدقيق العمليات المالية والإجازات (Backend Guard)
+app.post("/api/guards/validate-leave-settlement", (req, res) => {
+  try {
+    const data = req.body;
+    const result = validateLeaveSettlement(data);
+    return res.json({
+      success: true,
+      remaining: result.remaining,
+      message: "تم التدقيق المالي والحسابي بنجاح"
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      success: false,
+      error: err.message || "فشل التحقق من التسوية المالية"
+    });
+  }
+});
+
+// [2] محرك تنظيف البصمات المكررة والسجلات الزائدة (Punches De-duplication Guard)
+app.post("/api/guards/clean-duplicate-punches", (req, res) => {
+  try {
+    const { punches } = req.body;
+    if (!Array.isArray(punches)) {
+      return res.status(400).json({ success: false, error: "يجب إرسال مصفوفة من البصمات punches" });
+    }
+    const cleaned = cleanDuplicatePunches(punches);
+    return res.json({
+      success: true,
+      originalCount: punches.length,
+      cleanedCount: cleaned.length,
+      removedDuplicates: punches.length - cleaned.length,
+      data: cleaned
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// [3] الحارس الدوري الليلي (Cron Job Health Check & Residency Audit)
+app.all("/api/guards/nightly-audit", async (req, res) => {
+  try {
+    const db = adminApp ? getFirestore(adminApp) : null;
+    const report = await runNightlyAudit(db);
+    return res.json({
+      success: true,
+      report
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // OCR Document Scanner via OpenAI Vision or Gemini Vision API
@@ -832,6 +1025,345 @@ app.post("/api/send-email", express.json(), async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// ---------------------------------------------------------------------------
+// AUTOMATED SYSTEM DATABASE BACKUP & SMTP DISPATCH ENGINE
+// ---------------------------------------------------------------------------
+interface BackupHistoryRecord {
+  backupId: string;
+  timestamp: string;
+  status: 'SUCCESS' | 'FAILED';
+  recordsCount: number;
+  sizeFormatted: string;
+  filename: string;
+  durationMs: number;
+  error?: string;
+}
+
+let latestBackupBuffer: Buffer | null = null;
+let latestBackupFilename = "aysed_hr_latest_db_dump.json.gz";
+let latestBackupMetadata: BackupMetadata | null = null;
+const backupHistory: BackupHistoryRecord[] = [];
+
+async function executeSystemBackupCore(clientSnapshot?: any, triggerSource = 'MANUAL'): Promise<{
+  success: boolean;
+  metadata?: BackupMetadata;
+  filename?: string;
+  error?: string;
+  alertSent?: boolean;
+  durationMs: number;
+}> {
+  const startTime = Date.now();
+  const backupId = `bkp_${new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14)}_${Math.random().toString(36).slice(2, 6)}`;
+  const dateStr = new Date().toLocaleDateString('ar-KW', { timeZone: 'Asia/Kuwait' });
+  const timestampStr = new Date().toLocaleString('ar-KW', { timeZone: 'Asia/Kuwait' });
+  const systemEmail = getSystemDefaultEmail();
+
+  try {
+    let dumpCollections: Record<string, any[]> = {};
+    let collectionStats: Record<string, number> = {};
+    let totalRecords = 0;
+
+    // 1. If Firestore Admin is initialized on server, dump directly from Firestore
+    if (adminApp) {
+      try {
+        const db = getFirestore(adminApp);
+        const colNames = [
+          'companies', 'employees', 'contracts', 'leaves', 'leave_allocations',
+          'leave_settlements', 'attendance', 'payslips', 'payroll_runs',
+          'custody_loans', 'daily_movements', 'commencements', 'documents',
+          'res_config_settings', 'subscription_requests', 'audit_logs', 'system_integrations'
+        ];
+        for (const col of colNames) {
+          const snap = await db.collection(col).get();
+          const items: any[] = [];
+          snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
+          dumpCollections[col] = items;
+          collectionStats[col] = items.length;
+          totalRecords += items.length;
+        }
+      } catch (adminDbErr) {
+        console.warn("[Backup Server Firestore Warning]:", adminDbErr);
+      }
+    }
+
+    // 2. If client snapshot was supplied and has more data, merge/prefer it
+    if (clientSnapshot && clientSnapshot.collections) {
+      for (const [colName, items] of Object.entries(clientSnapshot.collections)) {
+        if (Array.isArray(items) && (items.length > 0 || !dumpCollections[colName])) {
+          dumpCollections[colName] = items;
+          collectionStats[colName] = items.length;
+        }
+      }
+      totalRecords = Object.values(collectionStats).reduce((acc, curr) => acc + curr, 0);
+    }
+
+    // Include system live cache & memory metadata
+    dumpCollections['system_live_punches'] = livePunchesCache;
+    collectionStats['system_live_punches'] = livePunchesCache.length;
+    totalRecords += livePunchesCache.length;
+
+    const fullDumpPayload = {
+      _meta: {
+        system: "Aysed S HR 2026",
+        version: "17.0-Enterprise-Kuwait",
+        backupId,
+        createdAt: new Date().toISOString(),
+        timeZone: "Asia/Kuwait",
+        triggerSource,
+        totalCollections: Object.keys(dumpCollections).length,
+        totalRecords,
+      },
+      collections: dumpCollections,
+    };
+
+    const jsonString = JSON.stringify(fullDumpPayload, null, 2);
+    const uncompressedSizeBytes = Buffer.byteLength(jsonString, 'utf8');
+
+    // Compress using GZIP
+    const compressedBuffer = zlib.gzipSync(Buffer.from(jsonString, 'utf8'));
+    const compressedSizeBytes = compressedBuffer.length;
+
+    // Cryptographic Checksum SHA-256
+    const sha256Checksum = crypto.createHash('sha256').update(compressedBuffer).digest('hex');
+
+    const durationMs = Date.now() - startTime;
+
+    const metadata: BackupMetadata = {
+      backupId,
+      timestamp: timestampStr,
+      dateStr,
+      durationMs,
+      environment: process.env.NODE_ENV || 'production',
+      totalCollections: Object.keys(dumpCollections).length,
+      totalRecords,
+      uncompressedSizeBytes,
+      compressedSizeBytes,
+      sha256Checksum,
+      collectionStats,
+      databaseName: 'ai-studio-remixaysedshr202-98c882d5-9491-4f4b-a838-c6b0b10a0472'
+    };
+
+    const filename = `aysed_hr_db_dump_${new Date().toISOString().split('T')[0]}_${backupId}.json.gz`;
+
+    // Cache latest buffer
+    latestBackupBuffer = compressedBuffer;
+    latestBackupFilename = filename;
+    latestBackupMetadata = metadata;
+
+    // Send Daily Backup Success Email with attached compressed DB Dump file
+    const emailResult = await sendDailyBackupSuccessEmail({
+      metadata,
+      dumpPayloadJson: fullDumpPayload,
+      compressedBuffer,
+      recipientEmail: systemEmail,
+    });
+
+    const formatBytes = (bytes: number) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    if (emailResult.success) {
+      backupHistory.unshift({
+        backupId,
+        timestamp: timestampStr,
+        status: 'SUCCESS',
+        recordsCount: totalRecords,
+        sizeFormatted: formatBytes(compressedSizeBytes),
+        filename,
+        durationMs,
+      });
+      if (backupHistory.length > 50) backupHistory.pop();
+
+      return {
+        success: true,
+        metadata,
+        filename,
+        durationMs,
+      };
+    } else {
+      throw new Error(`تعذر تسليم الإيميل: ${emailResult.error || 'SMTP Error'}`);
+    }
+  } catch (err: any) {
+    console.error("[Backup Core Failure]:", err);
+    const durationMs = Date.now() - startTime;
+
+    // Record failure in history
+    backupHistory.unshift({
+      backupId,
+      timestamp: timestampStr,
+      status: 'FAILED',
+      recordsCount: 0,
+      sizeFormatted: '0 KB',
+      filename: 'N/A',
+      durationMs,
+      error: err.message,
+    });
+    if (backupHistory.length > 50) backupHistory.pop();
+
+    // Trigger Immediate Urgent Failure Alert Email
+    let alertSent = false;
+    try {
+      const alertResult = await sendDailyBackupFailureAlert({
+        error: err.message || 'Unknown technical backup failure',
+        errorStack: err.stack,
+        failedStep: 'محرك تفريغ البيانات والضغط والإرسال البريدي',
+        timestamp: timestampStr,
+        recipientEmail: systemEmail,
+      });
+      alertSent = alertResult.success;
+    } catch (alertErr) {
+      console.error("[Backup Alert Dispatch Failure]:", alertErr);
+    }
+
+    return {
+      success: false,
+      error: err.message,
+      alertSent,
+      durationMs,
+    };
+  }
+}
+
+// 1. Manual or Client-triggered Backup Run
+app.post("/api/backup/run", express.json({ limit: "50mb" }), async (req, res) => {
+  try {
+    const { snapshot } = req.body || {};
+    const result = await executeSystemBackupCore(snapshot, 'MANUAL_TRIGGER');
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: "تم أخذ النسخة الاحتياطية المضغوطة وإرسال التقرير والملف المرفق بنجاح إلى إيميل النظام المعتمد",
+        metadata: result.metadata,
+        filename: result.filename,
+        durationMs: result.durationMs,
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: result.error || "فشل أخذ النسخة الاحتياطية",
+        alertSent: result.alertSent,
+        durationMs: result.durationMs,
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Test Failure Alert Simulation Route
+app.post("/api/backup/test-failure-alert", express.json(), async (req, res) => {
+  try {
+    const { error, failedStep, errorStack } = req.body || {};
+    const systemEmail = getSystemDefaultEmail();
+    const result = await sendDailyBackupFailureAlert({
+      error: error || 'محاكاة اختبارية: تعذر الاتصال بقرص تخزين النسخ الاحتياطية (Simulated Backup Storage Failure)',
+      failedStep: failedStep || 'فحص واختبار التنبيهات العاجلة للأعطال',
+      errorStack: errorStack || 'Error: Simulated failure alert triggered from Admin Dashboard to test immediate SMTP delivery\n    at backupController (server.ts:1050)',
+      recipientEmail: systemEmail,
+    });
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: `تم إرسال تنبيه العطل الفوري بنجاح إلى إيميل النظام المعتمد (${systemEmail})`,
+        messageId: result.messageId,
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: result.error || "فشل إرسال تنبيه العطل",
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Backup Engine Status & History API
+app.get("/api/backup/status", (req, res) => {
+  const systemEmail = getSystemDefaultEmail();
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const lastSuccessful = backupHistory.find(h => h.status === 'SUCCESS');
+  const lastItem = backupHistory[0];
+
+  return res.json({
+    isEnabled: true,
+    systemDefaultEmail: systemEmail,
+    schedule: 'Daily at 00:00 (Asia/Kuwait)',
+    lastRun: lastItem ? {
+      backupId: lastItem.backupId,
+      timestamp: lastItem.timestamp,
+      status: lastItem.status,
+      recordsCount: lastItem.recordsCount,
+      compressedSize: lastItem.sizeFormatted,
+      filename: lastItem.filename,
+      error: lastItem.error,
+    } : (latestBackupMetadata ? {
+      backupId: latestBackupMetadata.backupId,
+      timestamp: latestBackupMetadata.timestamp,
+      status: 'SUCCESS',
+      recordsCount: latestBackupMetadata.totalRecords,
+      compressedSize: formatBytes(latestBackupMetadata.compressedSizeBytes),
+      filename: latestBackupFilename,
+    } : null),
+    totalBackupsRun: backupHistory.length,
+    history: backupHistory,
+    hasCachedDump: latestBackupBuffer !== null,
+    latestFilename: latestBackupFilename,
+  });
+});
+
+// 4. Download Latest Backup Dump File API
+app.get("/api/backup/download-latest", (req, res) => {
+  if (!latestBackupBuffer) {
+    return res.status(404).json({ success: false, error: "لا توجد نسخة احتياطية محفوظة حالياً في الذاكرة. يرجى تشغيل النسخ أولاً." });
+  }
+
+  res.setHeader("Content-Disposition", `attachment; filename="${latestBackupFilename}"`);
+  res.setHeader("Content-Type", "application/gzip");
+  res.setHeader("Content-Length", latestBackupBuffer.length);
+  return res.send(latestBackupBuffer);
+});
+
+// Schedule Automated Silent Daily Backup in Server Background
+// Runs every 24 hours (86,400,000 ms), with an initial background trigger after 45 seconds of uptime
+const DAILY_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+setTimeout(() => {
+  console.log("[Auto-Backup Scheduler] Executing initial automated daily backup run...");
+  executeSystemBackupCore(undefined, 'AUTOMATED_DAILY_CRON')
+    .then(res => {
+      if (res.success) {
+        console.log(`[Auto-Backup Scheduler] Initial daily backup completed successfully. ID: ${res.metadata?.backupId}`);
+      } else {
+        console.warn(`[Auto-Backup Scheduler] Initial backup warning: ${res.error}`);
+      }
+    })
+    .catch(err => {
+      console.error("[Auto-Backup Scheduler] Exception during initial backup:", err);
+    });
+}, 45000);
+
+setInterval(() => {
+  console.log("[Auto-Backup Scheduler] Running daily automatic backup and email dispatch...");
+  executeSystemBackupCore(undefined, 'AUTOMATED_DAILY_CRON')
+    .then(res => {
+      if (res.success) {
+        console.log(`[Auto-Backup Scheduler] Daily backup email dispatched successfully.`);
+      }
+    })
+    .catch(err => {
+      console.error("[Auto-Backup Scheduler] Failed automated daily backup:", err);
+    });
+}, DAILY_BACKUP_INTERVAL_MS);
 
 // Welcome Email Route for Subscription
 app.post("/api/send-welcome-email", express.json(), async (req, res) => {

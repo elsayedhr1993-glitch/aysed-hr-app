@@ -8,6 +8,8 @@ export interface Department {
 export interface JobTitle {
   id: string;
   titleName: string; // اسم المسمى الوظيفي (مثلاً: محاسب أول)
+  titleNameEn?: string; // المسمى الوظيفي بالإنجليزية
+  nameEn?: string; // alias
   departmentId?: string; // تابع لأي قسم (UUID REFERENCES departments)
   departmentName?: string; // اسم القسم التابع له
   description?: string; // وصف المسمى الوظيفي
@@ -65,7 +67,7 @@ export interface Employee {
   passportExpiry: string;
   nationality: string;
   isKuwaiti: boolean;
-  residencyType: 'كويتي' | 'مادة 18 - قطاع أهلي' | 'مادة 19 - شريك/كفيل' | 'مادة 17 - حكومي' | 'خليجي' | 'بطاقة مراجعة' | 'معاملة كويتي';
+  residencyType: 'كويتي' | 'مواطن' | 'مادة 18 - قطاع أهلي' | 'مادة 19 - شريك/كفيل' | 'مادة 17 - حكومي' | 'خليجي' | 'بطاقة مراجعة' | 'معاملة كويتي' | string;
   gender: 'MALE' | 'FEMALE';
   dob: string;
   department: string;

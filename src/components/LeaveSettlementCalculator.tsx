@@ -6,7 +6,7 @@ import {
   Archive, ChevronRight, CheckCircle2, History, AlertCircle,
   Building, Briefcase, Hash, CreditCard, Sparkles, X,
   Trash2, Eye, RefreshCw, Layers, Check, Coins, ArrowRight,
-  TrendingUp, Clock, FileCheck, ArrowDownRight, Tag
+  TrendingUp, Clock, FileCheck, ArrowDownRight, Tag, Lock, AlertTriangle
 } from 'lucide-react';
 import { printDocument, exportElementToPdf } from '../utils/printUtils';
 import { 
@@ -21,7 +21,11 @@ import {
   getSavedSettlementVouchers,
   saveSettlementVoucher,
   deleteSettlementVoucher,
-  liquidateLeaveBalanceInAllocations
+  liquidateLeaveBalanceInAllocations,
+  calculateWorkingLeaveDays,
+  cleanDayDecimals,
+  cleanKwdAmount,
+  validateSettlementConstraints
 } from '../services/leaveSettlementService';
 import { LeaveClearanceDocument } from './LeaveClearanceDocument';
 import { calculateUnifiedLeaveBalance, buildLeaveRecordsFromEmployee } from '../utils/leaveEngine';
@@ -147,13 +151,13 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   const totalTaken = empFifo?.totalConsumed || 0;
   const netAvailable = Number((empFifo?.netAvailable || 0).toFixed(2));
 
-  // Wages calculation (Kuwait Labor Law 26-day basis)
+  // Wages calculation (Kuwait Labor Law 26-day basis on Basic Salary only)
   const basicSalary = selectedContract?.basicSalary || (selectedEmp as any)?.basicSalary || 0;
   const allowances = selectedContract 
     ? (selectedContract.housingAllowance || 0) + (selectedContract.transportAllowance || 0) + (selectedContract.otherAllowance || 0)
     : 0;
   const grossSalary = basicSalary + allowances;
-  const dailyWage = grossSalary > 0 ? calculateKuwaitDailyRate(grossSalary) : 0;
+  const dailyWage = basicSalary > 0 ? calculateKuwaitDailyRate(basicSalary) : 0;
   const hourlyWage = dailyWage > 0 ? calculateKuwaitHourlyRate(dailyWage, 8) : 0;
 
   // Form State: Settlement Mode & Basic parameters
@@ -168,7 +172,13 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   const [selectedLeaveId, setSelectedLeaveId] = useState<string>('custom');
 
   // Dynamic Financial Items Form Inputs
-  const [consumedLeaveDays, setConsumedLeaveDays] = useState<number>(0);
+  const [consumedLeaveDays, setConsumedLeaveDays] = useState<number>(() => {
+    const d = new Date();
+    const ret = new Date();
+    ret.setDate(ret.getDate() + 30);
+    const working = calculateWorkingLeaveDays(d.toISOString().split('T')[0], ret.toISOString().split('T')[0]);
+    return working.workingDays > 0 ? working.workingDays : 0;
+  });
   const [statutoryLeaveDays, setStatutoryLeaveDays] = useState<number>(0);
   const [unpaidLeaveDays, setUnpaidLeaveDays] = useState<number>(0);
 
@@ -191,6 +201,11 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
       setConsumedLeaveDays(0);
       setStatutoryLeaveDays(0);
       setUnpaidLeaveDays(0);
+    } else if (settlementMode === 'LEAVE_WITH_TRAVEL' && selectedLeaveId === 'custom' && departureDate && returnDate) {
+      const working = calculateWorkingLeaveDays(departureDate, returnDate);
+      if (working.workingDays > 0) {
+        setConsumedLeaveDays(working.workingDays);
+      }
     }
   }, [selectedEmpId, netAvailable, settlementMode]);
 
@@ -201,13 +216,46 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     }
   }, [netAvailable, settlementMode]);
 
-  // Auto-sync worked days when departure date changes
+  // Auto-sync requested/approved leave days when employee changes
+  useEffect(() => {
+    if (selectedEmp && settlementMode === 'LEAVE_WITH_TRAVEL') {
+      const activeLeaves = leaves.filter(l => l.employeeId === selectedEmp.id && ['APPROVED', 'SUBMITTED', 'PENDING_MANAGER', 'PENDING_HR'].includes(l.status));
+      if (activeLeaves.length > 0) {
+        const target = activeLeaves.find(l => l.status === 'APPROVED') || activeLeaves[0];
+        handleSelectLeave(target.id);
+      } else {
+        setSelectedLeaveId('custom');
+        const working = calculateWorkingLeaveDays(departureDate, returnDate);
+        if (working.workingDays > 0) {
+          setConsumedLeaveDays(working.workingDays);
+        }
+      }
+    }
+  }, [selectedEmpId]);
+
+  // Auto-sync worked days and consumed leave days when departure date changes
   const handleDepartureDateChange = (newDateStr: string) => {
     setDepartureDate(newDateStr);
     if (includeProratedSalary && settlementMode !== 'ENCASHMENT_LIQUIDATION') {
       const phys = calculatePhysicalWorkedDays(newDateStr);
       if (phys.workingDays >= 0) {
         setWorkedDaysInMonth(phys.workingDays);
+      }
+    }
+    if (settlementMode !== 'ENCASHMENT_LIQUIDATION' && selectedLeaveId === 'custom' && returnDate) {
+      const working = calculateWorkingLeaveDays(newDateStr, returnDate);
+      if (working.workingDays > 0) {
+        setConsumedLeaveDays(working.workingDays);
+      }
+    }
+  };
+
+  const handleReturnDateChange = (newDateStr: string) => {
+    setReturnDate(newDateStr);
+    if (settlementMode !== 'ENCASHMENT_LIQUIDATION' && selectedLeaveId === 'custom' && departureDate) {
+      const working = calculateWorkingLeaveDays(departureDate, newDateStr);
+      if (working.workingDays > 0) {
+        setConsumedLeaveDays(working.workingDays);
       }
     }
   };
@@ -241,7 +289,8 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     } else if (mode === 'LEAVE_WITH_TRAVEL') {
       setIncludeEncashment(false);
       setEncashmentDays(0);
-      setConsumedLeaveDays(0);
+      const working = calculateWorkingLeaveDays(departureDate, returnDate);
+      setConsumedLeaveDays(working.workingDays > 0 ? working.workingDays : 0);
       setIncludeProratedSalary(true);
       const phys = calculatePhysicalWorkedDays(departureDate);
       setWorkedDaysInMonth(phys.workingDays > 0 ? phys.workingDays : 1);
@@ -349,7 +398,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
       hourlyWage,
       carriedOverBalance: carriedOverBal,
       accruedBalance: accruedBalance,
-      totalAvailableBalance: netAvailable,
+      totalAvailableBalance: carriedOverBal + accruedBalance,
       requestedLeaveDays: consumedLeaveDays + statutoryLeaveDays + unpaidLeaveDays,
       statutoryLeaveDays,
       consumedLeaveDays,
@@ -386,6 +435,28 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
     ticketAllowance, housingAllowance, loanDeduction, salaryAdvanceDeduction, adminDeduction,
     customItems, paymentMethod, voucherNotes, currentVoucherNumber
   ]);
+
+  // 🔒 Odoo-style Mathematical Integrity & Constraint Validation Hook
+  const validation = useMemo(() => {
+    if (!settlementResult) {
+      return {
+        isValid: true,
+        canApprove: true,
+        canPrint: true,
+        errors: [],
+        warnings: [],
+        computedFields: {
+          totalAvailable: 0,
+          paidLeaveDays: 0,
+          encashedDays: 0,
+          dailyWage: 0,
+          expectedRemaining: 0,
+          expectedLeavePayAmount: 0
+        }
+      };
+    }
+    return validateSettlementConstraints(settlementResult);
+  }, [settlementResult]);
 
   // Add custom item
   const handleAddCustomItem = (e: React.FormEvent) => {
@@ -427,6 +498,13 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
   // Save Voucher Handler
   const handleSaveVoucher = () => {
     if (!settlementResult || !selectedEmp || isSavingVoucher) return;
+
+    // 🔒 Odoo-style Constraint Check
+    if (!validation.isValid) {
+      toast.error(validation.errors[0] || 'يُمنع حفظ واعتماد السند لوجود خطأ في التحقق البرمجي الصارم');
+      return;
+    }
+
     setIsSavingVoucher(true);
 
     try {
@@ -475,7 +553,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
         hourlyWage,
         carriedOverBalance: carriedOverBal,
         accruedBalance: accruedBalance,
-        totalAvailableBefore: netAvailable,
+        totalAvailableBefore: cleanDayDecimals(carriedOverBal + accruedBalance),
         consumedLeaveDays,
         statutoryLeaveDays,
         encashedLeaveDays: includeEncashment ? encashmentDays : 0,
@@ -556,10 +634,18 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
   // Print & PDF Export handlers
   const handlePrint = () => {
+    if (!validation.canPrint) {
+      toast.error(validation.errors[0] || 'يُمنع طباعة سند التسوية قبل تصحيح الأخطاء الحسابية وتجنب الرصيد السالب');
+      return;
+    }
     printDocument('leave-clearance-print-area', `سند_تسوية_${selectedEmp?.fullNameAr || 'موظف'}`);
   };
 
   const handlePdfExport = async () => {
+    if (!validation.canPrint) {
+      toast.error(validation.errors[0] || 'يُمنع تصدير مستند التسوية لوجود أخطاء في التحقق الحسابي');
+      return;
+    }
     try {
       setIsExporting(true);
       await exportElementToPdf('leave-clearance-print-area', `سند_تسوية_${selectedEmp?.fullNameAr || 'موظف'}.pdf`);
@@ -612,9 +698,19 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
             <button
               type="button"
               onClick={handleSaveVoucher}
-              className="bg-[#714B67] hover:bg-[#5a3b52] text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+              disabled={!validation.isValid}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs ${
+                validation.isValid 
+                  ? 'bg-[#714B67] hover:bg-[#5a3b52] text-white cursor-pointer' 
+                  : 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300 opacity-80'
+              }`}
+              title={!validation.isValid ? (validation.errors[0] || 'يُمنع الحفظ لوجود أخطاء في التحقق البرمجي') : 'حفظ واعتماد السند وقفل القيود'}
             >
-              <FileCheck size={16} className="text-amber-300" />
+              {!validation.isValid ? (
+                <Lock size={15} className="text-rose-500" />
+              ) : (
+                <FileCheck size={16} className="text-amber-300" />
+              )}
               <span>حفظ واعتماد السند الرسمي</span>
             </button>
 
@@ -622,7 +718,12 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
               <button
                 type="button"
                 onClick={handleExecuteEncashment}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                disabled={!validation.isValid}
+                className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs ${
+                  validation.isValid 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer' 
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+                }`}
                 title="تصفية وصرف البدل النقدي وخصم الأيام من رصيد الموظف الفعلي"
               >
                 <Coins size={16} className="text-amber-300" />
@@ -633,12 +734,21 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
             <button
               type="button"
               onClick={() => {
+                if (!validation.canPrint) {
+                  toast.error(validation.errors[0] || 'يُمنع طباعة السند قبل تصحيح الأخطاء الحسابية وتجنب الرصيد السالب');
+                  return;
+                }
                 setViewingVoucher(null);
                 setShowPrintModal(true);
               }}
-              className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-2xs border ${
+                validation.canPrint
+                  ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-800 cursor-pointer'
+                  : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+              title={!validation.canPrint ? 'يُمنع الطباعة في حالة عدم انطباق شروط التحقق الرياضي الصارم' : 'معاينة وطباعة المستند'}
             >
-              <Printer size={15} className="text-[#714B67]" />
+              <Printer size={15} className={validation.canPrint ? "text-[#714B67]" : "text-slate-400"} />
               <span>معاينة وطباعة المستند</span>
             </button>
 
@@ -728,30 +838,42 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
             {/* Quick KPI Cards Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full lg:w-auto">
               <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3 text-right">
-                <span className="block text-[11px] font-bold text-[#714B67]">صافي الرصيد المتاح</span>
+                <span className="block text-[11px] font-bold text-[#714B67]">إجمالي الرصيد المتاح</span>
                 <span className="block text-base font-black font-mono text-purple-950 mt-0.5">
-                  {netAvailable.toFixed(2)} يوم
+                  {(carriedOverBal + accruedBalance).toFixed(2)} يوم
+                </span>
+                <span className="block text-[9px] text-purple-700 font-medium mt-0.5">
+                  (مرحل {carriedOverBal.toFixed(1)} + مكتسب {accruedBalance.toFixed(1)})
                 </span>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right">
-                <span className="block text-[11px] font-bold text-slate-500">الراتب الأساسي</span>
-                <span className="block text-base font-black font-mono text-slate-800 mt-0.5">
-                  {basicSalary.toFixed(3)} د.ك
+              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-blue-800">أيام الإجازة المصروفة مقدماً</span>
+                <span className="block text-base font-black font-mono text-blue-950 mt-0.5">
+                  {consumedLeaveDays.toFixed(2)} يوم
+                </span>
+                <span className="block text-[9px] text-blue-700 font-medium mt-0.5">
+                  (المطلوبة بعد استبعاد العطلات)
                 </span>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right">
-                <span className="block text-[11px] font-bold text-slate-500">أجر اليوم (÷ 26)</span>
-                <span className="block text-base font-black font-mono text-teal-800 mt-0.5">
-                  {dailyWage.toFixed(3)} د.ك
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-emerald-800">المستحق للصرف مقدماً</span>
+                <span className="block text-base font-black font-mono text-emerald-900 mt-0.5">
+                  {(consumedLeaveDays * dailyWage).toFixed(3)} د.ك
+                </span>
+                <span className="block text-[9px] text-emerald-700 font-medium mt-0.5">
+                  (الأساسي ÷ 26 × الأيام)
                 </span>
               </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-right">
-                <span className="block text-[11px] font-bold text-slate-500">أجر الساعة (÷ 8)</span>
-                <span className="block text-base font-black font-mono text-slate-700 mt-0.5">
-                  {hourlyWage.toFixed(3)} د.ك
+              <div className="bg-teal-50/70 border border-teal-200 rounded-xl p-3 text-right">
+                <span className="block text-[11px] font-bold text-teal-800">الأيام المتبقية بعد الصرف</span>
+                <span className="block text-base font-black font-mono text-teal-950 mt-0.5">
+                  {((carriedOverBal + accruedBalance) - consumedLeaveDays - (includeEncashment ? encashmentDays : 0)).toFixed(2)} يوم
+                </span>
+                <span className="block text-[9px] text-teal-700 font-medium mt-0.5">
+                  (الرصيد المتاح - المصروف)
                 </span>
               </div>
             </div>
@@ -803,6 +925,36 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
           {activeTab === 'settlement_calculator' && (
             <div className="space-y-6">
               
+              {/* 🔒 Odoo Mathematical Integrity & Negative Balance Constraint Warning Banner */}
+              {!validation.isValid && (
+                <div className="bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-2xl p-4 flex items-start gap-3 shadow-xs animate-shake">
+                  <div className="p-2 bg-rose-100 rounded-xl shrink-0 text-rose-700">
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div className="space-y-1.5 text-right flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h4 className="text-xs sm:text-sm font-black text-rose-900 flex items-center gap-1.5">
+                        <span>حظر برمجيات الحساب (Odoo Constraint Violation)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-rose-200 text-rose-800 text-[10px] font-bold">
+                          تم قفل الحفظ والطباعة تلقائياً
+                        </span>
+                      </h4>
+                      <span className="text-[11px] font-mono text-rose-700 bg-white/70 px-2 py-0.5 rounded border border-rose-200">
+                        الرصيد المتاح: {(carriedOverBal + accruedBalance).toFixed(2)} | المطلوب: {(consumedLeaveDays + (includeEncashment ? encashmentDays : 0)).toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-800 leading-relaxed font-medium">
+                      تم اكتشاف خرق لقواعد النزاهة الرياضية أو محاولة صرف أيام تتجاوز إجمالي الرصيد المتاح (رصيد سالب):
+                    </p>
+                    <ul className="list-disc list-inside text-xs text-rose-700 font-bold space-y-1 pt-1 bg-white/60 p-2.5 rounded-xl border border-rose-200/80">
+                      {validation.errors.map((err, idx) => (
+                        <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               {/* Mode Selection Card */}
               <div className="bg-gradient-to-r from-purple-50/70 via-slate-50 to-teal-50/70 border border-slate-200 rounded-2xl p-4 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
@@ -950,7 +1102,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         <input
                           type="date"
                           value={returnDate}
-                          onChange={(e) => setReturnDate(e.target.value)}
+                          onChange={(e) => handleReturnDateChange(e.target.value)}
                           className="w-full bg-white border border-slate-300 rounded-xl p-2 font-mono font-bold text-slate-800 outline-none focus:border-[#714B67]"
                         />
                       </div>
@@ -960,7 +1112,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     {settlementMode !== 'ENCASHMENT_LIQUIDATION' ? (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-200">
                         <div>
-                          <label className="block font-bold text-slate-700 mb-1">أيام الإجازة السنوية (المستهلكة):</label>
+                          <label className="block font-bold text-slate-700 mb-1">أيام الإجازة المصروفة مقدماً / Paid Leave Days:</label>
                           <DecimalInput
                             min={0}
                             value={consumedLeaveDays}
@@ -1034,7 +1186,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                           </span>
                         )}
                         <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                          +{includeProratedSalary ? ((workedDaysInMonth * (grossSalary / 26)).toFixed(3)) : '0.000'} د.ك
+                          +{includeProratedSalary ? ((workedDaysInMonth * (basicSalary / 26)).toFixed(3)) : '0.000'} د.ك
                         </span>
                       </div>
                     </div>
@@ -1359,11 +1511,11 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
 
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-slate-600">
-                        <span>الرصيد المتاح قبل التسوية:</span>
-                        <span className="font-mono font-bold text-slate-900">{netAvailable.toFixed(2)} يوم</span>
+                        <span>إجمالي الرصيد المتاح التراكمي (قبل الخصم):</span>
+                        <span className="font-mono font-bold text-slate-900">{(carriedOverBal + accruedBalance).toFixed(2)} يوم</span>
                       </div>
                       <div className="flex justify-between text-slate-600">
-                        <span>الأيام المستهلكة في السفر:</span>
+                        <span>أيام الإجازة المصروفة مقدماً (المطلوبة):</span>
                         <span className="font-mono font-bold text-blue-800">-{consumedLeaveDays.toFixed(2)} يوم</span>
                       </div>
                       {includeEncashment && encashmentDays > 0 && (
@@ -1373,7 +1525,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         </div>
                       )}
                       <div className="flex justify-between text-slate-800 font-black border-t border-purple-200 pt-1.5">
-                        <span>الرصيد المتبقي بعد التصفية:</span>
+                        <span>الأيام المتبقية بعد الصرف:</span>
                         <span className="font-mono text-teal-800 bg-white px-2 py-0.5 rounded border border-teal-300">
                           {(settlementResult?.remainingBalanceAfter || 0).toFixed(2)} يوم
                         </span>

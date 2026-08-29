@@ -45,9 +45,10 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
   const calcResult = useMemo(() => {
     if (!selectedEmp || !formData.startDate || !formData.endDate) return null;
     
-    // Create an extended employee object with grossSalary for the engine
-    const contractGross = selectedContract ? (Number(selectedContract.basicSalary || 0) + Number(selectedContract.housingAllowance || 0) + Number(selectedContract.transportAllowance || 0) + Number(selectedContract.otherAllowance || 0) + Number((selectedContract as any).grossSalary || 0)) : 0;
-    const grossSalary = contractGross > 0 ? contractGross : Number((selectedEmp as any).basicSalary || (selectedEmp as any).grossSalary || (selectedEmp as any).salary || 0);
+    // Use basic salary only for leave daily wage calculation (Basic Salary / 26)
+    const basicSalary = selectedContract 
+      ? Number(selectedContract.basicSalary || 0) 
+      : Number((selectedEmp as any).basicSalary || (selectedEmp as any).basic_salary || (selectedEmp as any).salary || 0);
     
     // Get opening balance
     const empFifo = computeFifoLeaveAllocations(selectedEmp, buildEmployeeBaselineAllocations(selectedEmp, allocations), allLeaves);
@@ -66,7 +67,7 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
       formData.startDate,
       formData.endDate,
       empFifo.netAvailable,
-      grossSalary,
+      basicSalary,
       selectedEmp.joinDate || '2026-01-01',
       previousApprovedLeaves,
       publicHolidaysStr,
@@ -331,7 +332,7 @@ export const OfficialLeaveModal: React.FC<OfficialLeaveModalProps> = ({
                   <h3 className="text-md font-bold text-gray-800 border-r-4 border-[#008784] pr-3">💰 التحليل المالي والمستحقات</h3>
                   <div className="bg-gray-50 rounded-xl p-5 space-y-3.5 border border-gray-200/70">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">أجر اليوم الواحد (أساس 26):</span>
+                      <span className="text-gray-500">أجر اليوم الواحد (الراتب الأساسي ÷ 26):</span>
                       <span className="font-bold text-gray-800 font-mono">{calcResult ? calcResult.dailyWage.toFixed(3) : '0.000'} د.ك</span>
                     </div>
 

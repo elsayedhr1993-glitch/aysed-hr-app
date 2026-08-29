@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { 
   Employee, Company, ViewMode, Contract, LeaveRequest, DocumentItem, JobTitle, Department
 } from '../types';
 import { validateKuwaitCivilId, parseKuwaitCivilId, formatKWD } from '../utils/kuwaitLaw';
+import { validateEmployeeIntegrity } from '../services/globalIntegrityService';
 import { processAnyDocument } from '../utils/ocrService';
 import { 
   User, Users, CheckCircle, AlertTriangle, FileText, Calendar, Briefcase,
@@ -47,6 +48,8 @@ interface EmployeesAppProps {
   onFilterTabChange?: (tab: string) => void;
   onSelectEmployeeForLeaves?: (empId: string) => void;
   onOpenNotificationModal?: (emp: Employee, trigger?: any) => void;
+  highlightField?: string | null;
+  onClearHighlightField?: () => void;
 }
 
 export const EmployeesApp: React.FC<EmployeesAppProps> = ({
@@ -75,6 +78,8 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
   onFilterTabChange,
   onSelectEmployeeForLeaves,
   onOpenNotificationModal,
+  highlightField,
+  onClearHighlightField,
 }) => {
   const companyBranches = React.useMemo(() => {
     if (activeCompany?.branches && activeCompany.branches.length > 0) {
@@ -222,13 +227,91 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const [activeHighlightField, setActiveHighlightField] = useState<string | null>(highlightField || null);
+
+  useEffect(() => {
+    if (highlightField) {
+      setActiveHighlightField(highlightField);
+    }
+  }, [highlightField]);
+
   useEffect(() => {
     if (selectedEmpForForm) {
       setEditingEmp(selectedEmpForForm);
-      setActiveTab('WORK');
       setCivilIdError(null);
+
+      const targetField = highlightField || activeHighlightField;
+      if (targetField) {
+        // Automatically switch to the appropriate tab based on field
+        if (['nationality', 'residencyType', 'dob', 'gender', 'phone', 'email'].includes(targetField)) {
+          setActiveTab('PRIVATE');
+        } else if (['biometricId', 'badgeId', 'pinCode', 'lastAccrualDate', 'defaultHolidayCompensationPreference'].includes(targetField)) {
+          setActiveTab('HR_SETTINGS');
+        } else if (['bankName', 'iban', 'accountNumber'].includes(targetField)) {
+          setActiveTab('BANK');
+        } else {
+          setActiveTab('WORK');
+        }
+
+        // Auto-focus and scroll smoothly to the target field
+        const timer = setTimeout(() => {
+          const el = document.getElementById(`field-${targetField}`) || document.getElementById(targetField);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus();
+          }
+        }, 220);
+
+        return () => clearTimeout(timer);
+      } else {
+        setActiveTab('WORK');
+      }
     }
-  }, [selectedEmpForForm]);
+  }, [selectedEmpForForm, highlightField]);
+
+  const getFieldNameArabic = (field: string) => {
+    switch (field) {
+      case 'residencyType': return 'نوع الإقامة / التوطين';
+      case 'nationality': return 'الجنسية';
+      case 'civilId': return 'الرقم المدني الكويتي';
+      case 'fullNameAr': return 'اسم الموظف (بالعربية)';
+      case 'fullNameEn': return 'اسم الموظف (بالإنجليزية)';
+      case 'employeeCode': return 'كود النظام الوظيفي';
+      case 'jobTitle': return 'المسمى الوظيفي';
+      case 'department': return 'القسم / الإدارة';
+      case 'joinDate': return 'تاريخ الالتحاق بالعمل';
+      case 'dob': return 'تاريخ الميلاد';
+      case 'gender': return 'الجنس';
+      case 'phone': return 'رقم الهاتف المحمول';
+      case 'email': return 'البريد الإلكتروني';
+      case 'biometricId': return 'معرف البصمة (Biometric ID)';
+      case 'badgeId': return 'معرف الشارة (Badge ID)';
+      case 'pinCode': return 'رقم سري البصمة (PIN)';
+      case 'lastAccrualDate': return 'تاريخ آخر استحقاق شهري';
+      case 'carriedOverLeave2025': return 'الرصيد المرحل للإجازات';
+      case 'bankName': return 'اسم البنك';
+      case 'iban': return 'رقم الآيبان (IBAN)';
+      case 'basicSalary': return 'الراتب الأساسي';
+      default: return field;
+    }
+  };
+
+  const getFieldHighlightClass = (fieldName: string) => {
+    if (activeHighlightField === fieldName) {
+      return 'ring-4 ring-purple-600/80 border-purple-600 bg-purple-50/80 shadow-md transition-all duration-300 animate-pulse';
+    }
+    return '';
+  };
+
+  const renderFieldHighlightIndicator = (fieldName: string, customMsg?: string) => {
+    if (activeHighlightField !== fieldName) return null;
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] font-bold text-purple-900 bg-purple-100 border border-purple-300 px-2.5 py-1 rounded-lg mt-1.5 shadow-xs animate-in fade-in slide-in-from-top-1">
+        <Sparkles className="w-3.5 h-3.5 text-purple-700 animate-spin" />
+        <span>⚠️ الحقل المطلوب تصحيحه وفق فحص النزاهة {customMsg ? `(${customMsg})` : ''}</span>
+      </div>
+    );
+  };
 
   const filteredEmps = companyEmps.filter(emp => {
     if (odooFilter === 'ARCHIVED') {
@@ -386,6 +469,11 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
     }
   };
 
+  const empValidation = useMemo(() => {
+    if (!editingEmp) return { isValid: true, errors: [], warnings: [], integrityScore: 100 };
+    return validateEmployeeIntegrity(editingEmp, employees);
+  }, [editingEmp, employees]);
+
   const handleSave = () => {
     if (!editingEmp?.fullNameAr || !editingEmp?.fullNameAr.trim()) {
       toast.error('يرجى إدخال اسم الموظف بالعربية');
@@ -396,14 +484,14 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
       return;
     }
 
-    const cleanCivilId = editingEmp.civilId.trim();
-    const duplicateEmp = employees.find(
-      emp => emp.id !== editingEmp.id && emp.civilId && emp.civilId.trim() === cleanCivilId
-    );
-    if (duplicateEmp) {
-      toast.error(`الرقم المدني مسجل مسبقاً للموظف [${duplicateEmp.fullNameAr}]`);
+    // Strict Global Integrity Guard
+    const validation = validateEmployeeIntegrity(editingEmp, employees);
+    if (!validation.isValid) {
+      toast.error(`خطأ في التحقق البرمجي: ${validation.errors[0]}`);
       return;
     }
+
+    const cleanCivilId = editingEmp.civilId?.trim() || '';
 
     const empToSave: Employee = {
       id: editingEmp.id || `emp-${Date.now()}`,
@@ -1168,6 +1256,35 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               })}
             </div>
 
+            {/* Deep-Link Focus & Audit Highlight Notification */}
+            {activeHighlightField && (
+              <div className="mx-6 mt-3 p-3 bg-gradient-to-r from-purple-50 via-amber-50 to-purple-50 border border-purple-300 rounded-xl flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-purple-700 text-white rounded-lg animate-bounce shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-purple-950">
+                      التوجيه المباشر لفحص النزاهة: تم التركيز وتحديد حقل <span className="underline decoration-purple-600 font-extrabold text-purple-900">({getFieldNameArabic(activeHighlightField)})</span>
+                    </p>
+                    <p className="text-[11px] text-purple-800">
+                      تم تمييز الحقل بإطار متوهج وتمرير الشاشة تلقائياً لإجراء التصحيح الفوري بدون بحث يدوي.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveHighlightField(null);
+                    if (onClearHighlightField) onClearHighlightField();
+                  }}
+                  className="text-xs font-bold text-purple-800 hover:text-purple-950 bg-white/90 hover:bg-white border border-purple-300 px-3 py-1.5 rounded-lg transition shadow-2xs cursor-pointer shrink-0"
+                >
+                  إغلاق التمييز
+                </button>
+              </div>
+            )}
+
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               {/* Employee Profile Picture Header Banner - Odoo Enterprise Standard */}
@@ -1397,59 +1514,68 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                 </div>
               )}
 
-              {activeTab === 'WORK' && (
+               {activeTab === 'WORK' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">اسم الموظف (بالعربية) *</label>
                     <input
+                      id="field-fullNameAr"
                       type="text"
                       value={editingEmp.fullNameAr || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, fullNameAr: e.target.value })}
                       placeholder="مثال: أحمد محمد عبد الله"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-[#714B67] transition"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-[#714B67] transition ${getFieldHighlightClass('fullNameAr')}`}
                     />
+                    {renderFieldHighlightIndicator('fullNameAr', 'اسم الموظف')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">اسم الموظف (بالإنجليزية)</label>
                     <input
+                      id="field-fullNameEn"
                       type="text"
                       value={editingEmp.fullNameEn || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, fullNameEn: e.target.value })}
                       placeholder="Ahmed Mohammed Abdullah"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-[#714B67] transition dir-ltr"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-[#714B67] transition dir-ltr ${getFieldHighlightClass('fullNameEn')}`}
                     />
+                    {renderFieldHighlightIndicator('fullNameEn')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">الرقم المدني الكويتي (12 رقماً) *</label>
                     <input
+                      id="field-civilId"
                       type="text"
                       maxLength={12}
                       value={editingEmp.civilId || ''}
                       onChange={(e) => handleCivilIdChange(e.target.value)}
                       placeholder="290123101234"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none focus:border-[#714B67] transition dir-ltr text-right"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none focus:border-[#714B67] transition dir-ltr text-right ${getFieldHighlightClass('civilId')}`}
                     />
+                    {renderFieldHighlightIndicator('civilId', 'الرقم المدني')}
                     {civilIdError && <p className="text-[11px] text-rose-600 mt-1 font-bold">{civilIdError}</p>}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">كود النظام الوظيفي</label>
                     <input
+                      id="field-employeeCode"
                       type="text"
                       value={editingEmp.employeeCode || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, employeeCode: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none ${getFieldHighlightClass('employeeCode')}`}
                     />
+                    {renderFieldHighlightIndicator('employeeCode', 'كود الوظيفة')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">المسمى الوظيفي</label>
                     <select
+                      id="field-jobTitle"
                       value={editingEmp.jobTitle || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, jobTitle: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none ${getFieldHighlightClass('jobTitle')}`}
                     >
                       <option value="">اختر المسمى الوظيفي...</option>
                       {jobTitles.map(jt => (
@@ -1460,14 +1586,16 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       <option value="ممرض">ممرض</option>
                       <option value="مدير مبيعات">مدير مبيعات</option>
                     </select>
+                    {renderFieldHighlightIndicator('jobTitle', 'المسمى الوظيفي')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">القسم / الإدارة</label>
                     <select
+                      id="field-department"
                       value={editingEmp.department || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, department: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none ${getFieldHighlightClass('department')}`}
                     >
                       <option value="الموارد البشرية والإدارة">الموارد البشرية والإدارة</option>
                       <option value="الشؤون المالية">الشؤون المالية</option>
@@ -1475,6 +1603,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       <option value="العيادات الطبية">العيادات الطبية</option>
                       <option value="تقنية المعلومات">تقنية المعلومات</option>
                     </select>
+                    {renderFieldHighlightIndicator('department', 'القسم')}
                   </div>
 
 
@@ -1482,16 +1611,19 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ الالتحاق بالعمل</label>
                     <input
+                      id="field-joinDate"
                       type="date"
                       value={editingEmp.joinDate || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, joinDate: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none ${getFieldHighlightClass('joinDate')}`}
                     />
+                    {renderFieldHighlightIndicator('joinDate', 'تاريخ الالتحاق')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">الرصيد المرحل / الافتتاحي للإجازات (أيام)</label>
                     <input
+                      id="field-carriedOverLeave2025"
                       type="number"
                       step="0.5"
                       min="0"
@@ -1507,23 +1639,26 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                         });
                       }}
                       placeholder="0"
-                      className="w-full bg-amber-50/60 border border-amber-300 rounded-xl px-3.5 py-2 text-xs text-amber-900 font-bold font-mono outline-none focus:border-[#714B67]"
+                      className={`w-full bg-amber-50/60 border border-amber-300 rounded-xl px-3.5 py-2 text-xs text-amber-900 font-bold font-mono outline-none focus:border-[#714B67] ${getFieldHighlightClass('carriedOverLeave2025')}`}
                     />
+                    {renderFieldHighlightIndicator('carriedOverLeave2025', 'رصيد الإجازات')}
                     <p className="text-[10px] text-amber-700 font-medium mt-0.5">رصيد الإجازات المعتمد المرحل من السنوات السابقة لعام 2025</p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">حالة الموظف</label>
                     <select
+                      id="field-status"
                       value={editingEmp.status || 'ACTIVE'}
                       onChange={(e) => setEditingEmp({ ...editingEmp, status: e.target.value as any })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none font-bold"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none font-bold ${getFieldHighlightClass('status')}`}
                     >
                       <option value="ACTIVE">نشط (Active)</option>
                       <option value="ON_LEAVE">في إجازة (On Leave)</option>
                       <option value="RESIGNED">مستقيل (Resigned)</option>
                       <option value="TERMINATED">منهي خدماته (Terminated)</option>
                     </select>
+                    {renderFieldHighlightIndicator('status', 'حالة الموظف')}
                   </div>
                 </div>)}
 
@@ -1532,19 +1667,22 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">الجنسية</label>
                     <input
+                      id="field-nationality"
                       type="text"
                       value={editingEmp.nationality || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, nationality: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none ${getFieldHighlightClass('nationality')}`}
                     />
+                    {renderFieldHighlightIndicator('nationality', 'الجنسية')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">نوع الإقامة / التوطين</label>
                     <select
+                      id="field-residencyType"
                       value={editingEmp.residencyType || (editingEmp.nationality?.includes('كويت') ? 'كويتي' : 'مادة 18 - قطاع أهلي')}
                       onChange={(e) => setEditingEmp({ ...editingEmp, residencyType: e.target.value as any })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none ${getFieldHighlightClass('residencyType')}`}
                     >
                       <option value="كويتي">كويتي</option>
                       <option value="مادة 18 - قطاع أهلي">مادة 18 - قطاع أهلي</option>
@@ -1552,48 +1690,57 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                       <option value="مادة 17 - حكومي">مادة 17 - حكومي</option>
                       <option value="خليجي">خليجي</option>
                     </select>
+                    {renderFieldHighlightIndicator('residencyType', 'نوع الإقامة')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ الميلاد</label>
                     <input
+                      id="field-dob"
                       type="date"
                       value={editingEmp.dob || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, dob: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none ${getFieldHighlightClass('dob')}`}
                     />
+                    {renderFieldHighlightIndicator('dob', 'تاريخ الميلاد')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">الجنس</label>
                     <select
+                      id="field-gender"
                       value={editingEmp.gender || 'MALE'}
                       onChange={(e) => setEditingEmp({ ...editingEmp, gender: e.target.value as any })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none ${getFieldHighlightClass('gender')}`}
                     >
                       <option value="MALE">ذكر</option>
                       <option value="FEMALE">أنثى</option>
                     </select>
+                    {renderFieldHighlightIndicator('gender', 'الجنس')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">رقم الهاتف المحمول</label>
                     <input
+                      id="field-phone"
                       type="text"
                       value={editingEmp.phone || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, phone: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none dir-ltr text-right"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none dir-ltr text-right ${getFieldHighlightClass('phone')}`}
                     />
+                    {renderFieldHighlightIndicator('phone', 'رقم الهاتف')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني</label>
                     <input
+                      id="field-email"
                       type="email"
                       value={editingEmp.email || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, email: e.target.value })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none dir-ltr text-right"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none dir-ltr text-right ${getFieldHighlightClass('email')}`}
                     />
+                    {renderFieldHighlightIndicator('email', 'البريد الإلكتروني')}
                   </div>
                 </div>)}
 
@@ -1602,35 +1749,41 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">معرف البصمة (Biometric ID / ZKTeco ID)</label>
                     <input
+                      id="field-biometricId"
                       type="text"
                       value={editingEmp.biometricId || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, biometricId: e.target.value })}
                       placeholder="مثال: 1002"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none ${getFieldHighlightClass('biometricId')}`}
                     />
+                    {renderFieldHighlightIndicator('biometricId', 'معرف البصمة')}
                     <p className="text-[10px] text-slate-400 mt-1">يستخدم لمطابقة سجلات أجهزة البصمة تلقائياً</p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">معرف الشارة (Odoo Badge ID)</label>
                     <input
+                      id="field-badgeId"
                       type="text"
                       value={editingEmp.badgeId || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, badgeId: e.target.value })}
                       placeholder="مثال: BADGE-55"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none ${getFieldHighlightClass('badgeId')}`}
                     />
+                    {renderFieldHighlightIndicator('badgeId', 'معرف الشارة')}
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">رقم سري البصمة (Attendance PIN)</label>
                     <input
+                      id="field-pinCode"
                       type="text"
                       value={editingEmp.pinCode || ''}
                       onChange={(e) => setEditingEmp({ ...editingEmp, pinCode: e.target.value })}
                       placeholder="1234"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none"
+                      className={`w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-mono outline-none ${getFieldHighlightClass('pinCode')}`}
                     />
+                    {renderFieldHighlightIndicator('pinCode', 'رقم البصمة السري')}
                   </div>
 
                   <div>
@@ -1691,20 +1844,46 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setEditingEmp(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#714B67] hover:bg-[#5a3a52] text-white shadow transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Save className="w-4 h-4" />
-                <span>حفظ الموظف</span>
-              </button>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {!empValidation.isValid ? (
+                  <span className="bg-rose-100 text-rose-800 border border-rose-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>{empValidation.errors[0]}</span>
+                  </span>
+                ) : empValidation.warnings.length > 0 ? (
+                  <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>{empValidation.warnings[0]}</span>
+                  </span>
+                ) : (
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>بيانات الموظف مطابقة لمعايير النزاهة 100%</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEditingEmp(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={!empValidation.isValid}
+                  className={`px-5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    !empValidation.isValid
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-[#714B67] hover:bg-[#5a3a52] text-white shadow'
+                  }`}
+                >
+                  <Save className="w-4 h-4" />
+                  <span>حفظ الموظف</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>)}

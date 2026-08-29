@@ -1,4 +1,6 @@
 import { Employee, Contract, LeaveRequest, HrLeaveAllocation } from '../types';
+import { getGlobalOpeningBalance, getGlobalAccrued2026, getGlobalCompensatoryDays } from './kuwaitLaw';
+import { computeFifoLeaveAllocations, buildEmployeeBaselineAllocations } from '../services/leaveService';
 
 export interface LeaveRecord {
   type: 'annual' | 'unpaid' | 'sick' | 'compensation_holiday' | 'manual_adjustment';
@@ -9,14 +11,16 @@ export interface LeaveRecord {
 }
 
 export interface EmployeeLeaveSummary {
+  carriedOverDays?: number;        // الرصيد المرحل من 2025
   accruedAnnualDays: number;       // الرصيد التراكمي المكتسب (2.5 شهرياً)
   holidayCompensationDays: number; // بدل العمل بالعطلات الرسمية
   manualAdjustments: number;       // أي تسويات أو إضافات يدوية
   usedLeaveDays: number;           // الإجازات المستهلكة المعتمدة
   totalAvailableDays: number;      // الرصيد الإجمالي القابل للاستخدام والصرف
   cashSettlementAmount: number;    // القيمة المالية المستحقة في حال الصرف
-  dailyWageRate?: number;          // أجر اليوم (الراتب الشامل / 26)
-  comprehensiveSalary?: number;    // الراتب الشامل
+  dailyWageRate?: number;          // أجر اليوم (الراتب الأساسي / 26)
+  basicSalary?: number;            // الراتب الأساسي
+  comprehensiveSalary?: number;    // الراتب الأساسي (أو الشامل)
 }
 
 /**
@@ -50,9 +54,9 @@ export function calculateUnifiedLeaveBalance(
     (Number(accruedAnnual || 0) + holidayCompensationDays + manualAdjustments - usedLeaveDays).toFixed(2)
   );
 
-  // 5. الحسبة المالية وفق قانون العمل الكويتي (الراتب الشامل / 26)
-  const totalComprehensiveSalary = Number(basicSalary || 0) + Number(allowances || 0);
-  const dailyWageRate = totalComprehensiveSalary > 0 ? (totalComprehensiveSalary / 26) : 0;
+  // 5. الحسبة المالية: أجر اليوم = (الراتب الأساسي فقط / Basic Salary) ÷ 26 (استبعاد جميع البدلات)
+  const basicSalaryOnly = Number(basicSalary || 0);
+  const dailyWageRate = basicSalaryOnly > 0 ? (basicSalaryOnly / 26) : 0;
   const cashSettlementAmount = Number((totalAvailableDays * dailyWageRate).toFixed(3));
 
   return {
@@ -63,7 +67,8 @@ export function calculateUnifiedLeaveBalance(
     totalAvailableDays,
     cashSettlementAmount,
     dailyWageRate: Number(dailyWageRate.toFixed(3)),
-    comprehensiveSalary: totalComprehensiveSalary
+    basicSalary: basicSalaryOnly,
+    comprehensiveSalary: basicSalaryOnly
   };
 }
 
@@ -74,7 +79,15 @@ export function buildLeaveRecordsFromEmployee(
   employee: Employee,
   allocations: HrLeaveAllocation[] = [],
   leaves: LeaveRequest[] = []
-): { accruedAnnual: number; records: LeaveRecord[]; basicSalary: number; allowances: number } {
+): { 
+  carriedOver: number;
+  accrued2026: number;
+  accruedAnnual: number; 
+  records: LeaveRecord[]; 
+  basicSalary: number; 
+  allowances: number;
+  compensatoryDays: number;
+} {
   const empId = employee.id;
   const empCode = employee.employeeCode;
 
@@ -86,20 +99,11 @@ export function buildLeaveRecordsFromEmployee(
     Number((employee as any).otherAllowances || (employee as any).otherAllowance || (employee as any).other_allowances || 0)
   );
 
-  // 2. الرصيد السنوي المكتسب أو المرحل
-  let carried = Number(employee.carriedOverLeave2025 ?? employee.carriedOverBalance ?? (employee as any).aysed_carried_over ?? 0);
-  
-  if (employee?.fullNameAr?.includes('كريم بخش') || (employee as any)?.name?.includes('كريم بخش')) {
-    carried = 30.5;
-  }
-
-  // حساب المكتسب لعام 2026: 2.5 يوم شهرياً من تاريخ التعيين أو بداية 2026
-  const joinDate = new Date(employee.joinDate || '2026-01-01');
-  const now = new Date();
-  const monthsDiff = Math.max(0, (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth()) + 1);
-  const isKareem = Boolean(employee?.fullNameAr?.includes('كريم بخش') || (employee as any)?.name?.includes('كريم بخش'));
-  const calculatedAccrued = isKareem ? 0 : Math.min(30, monthsDiff * 2.5);
-  const accruedAnnual = isKareem ? 30.5 : Number((carried + calculatedAccrued).toFixed(2));
+  // 2. استخدام المصدر الرسمي الموحد لحساب الرصيد المرحل والمكتسب الفعلي لعام 2026 (بدون افتراض 30 يوم كاملة)
+  const carried = getGlobalOpeningBalance(employee);
+  const accrued2026 = getGlobalAccrued2026(employee);
+  const compensatoryDays = getGlobalCompensatoryDays(employee);
+  const accruedAnnual = Number((carried + accrued2026).toFixed(2));
 
   // 3. بناء مصفوفة السجلات
   const records: LeaveRecord[] = [];
@@ -132,7 +136,7 @@ export function buildLeaveRecordsFromEmployee(
 
   // الإجازات المستهلكة
   leaves
-    .filter(l => (l.employeeId === empId || l.employeeId === empCode) && (l.status === 'APPROVED' || (l as any).state === 'validate' || (l as any).state === 'approved' || (l as any).status === 'approved'))
+    .filter(l => !l.isHistorical && (l.employeeId === empId || l.employeeId === empCode) && (l.status === 'APPROVED' || (l as any).state === 'validate' || (l as any).state === 'approved' || (l as any).status === 'approved'))
     .forEach(l => {
       records.push({
         type: l.leaveType === 'UNPAID' ? 'unpaid' : l.leaveType === 'SICK' ? 'sick' : 'annual',
@@ -144,10 +148,13 @@ export function buildLeaveRecordsFromEmployee(
     });
 
   return {
+    carriedOver: carried,
+    accrued2026,
     accruedAnnual,
     records,
     basicSalary,
-    allowances
+    allowances,
+    compensatoryDays
   };
 }
 
@@ -164,12 +171,28 @@ export function getEmployeeUnifiedSummary(
   const basicSalary = contract ? Number(contract.basicSalary || 0) : data.basicSalary;
   const allowances = contract ? (Number(contract.housingAllowance || 0) + Number(contract.transportAllowance || 0) + Number(contract.otherAllowance || 0)) : data.allowances;
 
-  return calculateUnifiedLeaveBalance(
-    data.accruedAnnual,
-    data.records,
-    basicSalary,
-    allowances
-  );
+  // الربط المباشر مع محرك وسجل FIFO المركزي لضمان التطابق 100%
+  const baselineAllocations = buildEmployeeBaselineAllocations(employee, allocations);
+  const fifo = computeFifoLeaveAllocations(employee, baselineAllocations, leaves);
+  const compDays = data.compensatoryDays || getGlobalCompensatoryDays(employee);
+
+  const basicSalaryOnly = Number(basicSalary || 0);
+  const dailyWageRate = basicSalaryOnly > 0 ? (basicSalaryOnly / 26) : 0;
+  const netAvailable = fifo.netAvailable;
+  const cashSettlementAmount = Number((netAvailable * dailyWageRate).toFixed(3));
+
+  return {
+    carriedOverDays: data.carriedOver,
+    accruedAnnualDays: data.accrued2026,
+    holidayCompensationDays: compDays,
+    manualAdjustments: 0,
+    usedLeaveDays: fifo.totalConsumed,
+    totalAvailableDays: netAvailable,
+    cashSettlementAmount,
+    dailyWageRate: Number(dailyWageRate.toFixed(3)),
+    basicSalary: basicSalaryOnly,
+    comprehensiveSalary: basicSalaryOnly
+  };
 }
 
 /**
@@ -226,10 +249,9 @@ export function computeLeaveRequest(
   const unpaidDays = Number((Math.max(0, totalNetDays - totalAvailable)).toFixed(2));
   const balanceAfter = Number((Math.max(0, totalAvailable - totalNetDays)).toFixed(2));
   
-  // Kuwait Law: daily wage = gross / 26
-  // Fallback to basic + allowances if grossSalary is missing or 0
-  const grossSalary = Number((employee as any).grossSalary || (employee as any).totalSalary || (employee as any).salary || (employee as any).basicSalary || 0);
-  const dailyWage = grossSalary > 0 ? (grossSalary / 26) : 0;
+  // Kuwait Law: daily wage = Basic Salary / 26 (Allowances excluded)
+  const basicSalary = Number((employee as any).basicSalary || (employee as any).basic_salary || (employee as any).salary || 0);
+  const dailyWage = basicSalary > 0 ? (basicSalary / 26) : 0;
   
   const paidLeavePay = Math.round(paidDays * dailyWage * 1000) / 1000;
   const netPayable = paidLeavePay + (ticketAllowance || 0);
@@ -354,3 +376,75 @@ export const calculateAysedLeaveMetrics = (
     explanation
   };
 };
+
+export interface SettlementConstraintViolation {
+  field: string;
+  message: string;
+  severity: 'error' | 'warning';
+}
+
+export interface SettlementConstraintResult {
+  isValid: boolean;
+  violations: SettlementConstraintViolation[];
+}
+
+/**
+ * Validates mathematical integrity and constraints for leave settlements:
+ * - Negative balance protection: spent days cannot exceed (carried + accrued).
+ * - Exact mathematical identity: remaining === (carried + accrued) - spent.
+ * - Non-negative operands.
+ */
+export function validateSettlementConstraints(params: {
+  carriedOverBalance: number;
+  accruedBalance: number;
+  consumedLeaveDays: number;
+  remainingBalanceAfter: number;
+  basicSalary: number;
+  dailyWage?: number;
+}): SettlementConstraintResult {
+  const violations: SettlementConstraintViolation[] = [];
+
+  const carried = Number(params.carriedOverBalance) || 0;
+  const accrued = Number(params.accruedBalance) || 0;
+  const spent = Number(params.consumedLeaveDays) || 0;
+  const remaining = Number(params.remainingBalanceAfter) || 0;
+  const totalAvailable = carried + accrued;
+
+  if (spent < 0) {
+    violations.push({
+      field: 'consumedLeaveDays',
+      message: 'أيام الإجازة المصروفة لا يمكن أن تكون قيمة سالبة.',
+      severity: 'error'
+    });
+  }
+
+  if (spent > totalAvailable + 0.001) {
+    violations.push({
+      field: 'consumedLeaveDays',
+      message: `أيام الإجازة المصروفة (${spent} يوم) تتجاوز إجمالي الرصيد المتاح (${totalAvailable.toFixed(2)} يوم).`,
+      severity: 'error'
+    });
+  }
+
+  const expectedRemaining = Number((totalAvailable - spent).toFixed(2));
+  if (Math.abs(remaining - expectedRemaining) > 0.01) {
+    violations.push({
+      field: 'remainingBalanceAfter',
+      message: `تضارب رياضي: الرصيد المتبقي (${remaining}) لا يطابق المعادلة: (${carried} مرحل + ${accrued} مكتسب) - ${spent} مصروف = ${expectedRemaining}.`,
+      severity: 'error'
+    });
+  }
+
+  if (params.basicSalary < 0) {
+    violations.push({
+      field: 'basicSalary',
+      message: 'الراتب الأساسي لا يمكن أن يكون سالباً.',
+      severity: 'error'
+    });
+  }
+
+  return {
+    isValid: violations.filter(v => v.severity === 'error').length === 0,
+    violations
+  };
+}

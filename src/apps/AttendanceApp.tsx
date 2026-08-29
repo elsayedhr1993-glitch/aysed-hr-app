@@ -20,6 +20,7 @@ import {
   RawBiometricLog,
   timeToMinutes
 } from '../utils/attendanceParser';
+import { validateAttendanceIntegrity } from '../services/globalIntegrityService';
 import { formatKWD } from '../utils/kuwaitLaw';
 import { DynamicQrKioskModal } from '../components/DynamicQrKioskModal';
 import { MobileQrAttendanceScannerModal } from '../components/MobileQrAttendanceScannerModal';
@@ -1164,6 +1165,13 @@ pause
       status: 'PRESENT',
       latenessMinutes: 0,
     };
+
+    // Global Integrity Guard
+    const validation = validateAttendanceIntegrity(rec, attendance);
+    if (!validation.isValid) {
+      alert(`تنبيه الحماية البرمجية: ${validation.errors[0]}`);
+      return;
+    }
 
     onSaveAttendance(rec);
     setShowManualModal(false);

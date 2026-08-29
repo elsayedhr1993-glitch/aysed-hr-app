@@ -29,6 +29,7 @@ import { LeaveSettlementModal } from '../components/LeaveSettlementModal';
 import { liquidateLeaveBalanceInAllocations, saveSettlementVoucher } from '../services/leaveSettlementService';
 import { useLeaveWorkflow } from '../hooks/useLeaveWorkflow';
 import { OfficialLeaveModal } from '../components/OfficialLeaveModal';
+import { validateLeaveIntegrity } from '../services/globalIntegrityService';
 import { 
   Calendar, Plus, CheckCircle2, Clock, 
   Calculator, FileText, Search, 
@@ -150,7 +151,15 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
       isSplitBereavement: req.isSplitBereavement,
       annualDeductedDays: req.annualDeductedDays
     };
+
+    const integrityResult = validateLeaveIntegrity(newLeave, employees, leaves);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (الإجازات): ${integrityResult.errors[0]}`);
+      return;
+    }
+
     onSaveLeave(newLeave);
+    toast.success(`تم حفظ الإجازة بنجاح (${newLeave.status === 'APPROVED' ? 'معتمدة' : 'مسجلة'})`);
     setEditingLeave(null);
   };
 
@@ -472,6 +481,12 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
         ? 'تم الاعتماد المباشر وتجاوز الرصيد بصلاحية الإدارة' 
         : (editingLeave.managerOverrideNote || (editingLeave.managerOverride ? 'معتمد بصلاحية الإدارة' : undefined)),
     };
+
+    const integrityResult = validateLeaveIntegrity(newLeave, employees, leaves);
+    if (!integrityResult.isValid) {
+      toast.error(`حارس النزاهة (الإجازات): ${integrityResult.errors[0]}`);
+      return;
+    }
 
     onSaveLeave(newLeave);
     toast.success(`تم حفظ الإجازة بنجاح (${newLeave.status === 'APPROVED' ? 'معتمدة' : 'مسجلة'})`);

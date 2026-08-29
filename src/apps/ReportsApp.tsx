@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { getSavedSettlementVouchers } from '../services/leaveSettlementService';
 import { get_aysed_official_balance, calculate2026AccruedDays, getGlobalOpeningBalance, getGlobalAccrued2026, getGlobalCompensatoryDays, isEmployeeHiredIn2026OrLater, isKuwaitiEmployee } from '../utils/kuwaitLaw';
+import { calculateServerFifoBalance } from '../../server/leaveCalculatorServer';
 import { OdooSearchBar, FilterOption, GroupByOption, MeasureOption } from '../components/reports/OdooSearchBar';
 import { OdooPivotView, PivotRowData } from '../components/reports/OdooPivotView';
 import { OdooGraphView } from '../components/reports/OdooGraphView';
@@ -465,34 +466,26 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
     return { list, pivotRows, grandTotal };
   }, [companyEmployees, companyContracts, searchTerm, activeFilters, effectiveGroupBy, selectedEmployeeId, selectedDepartment]);
 
-  // 2. LEAVE BALANCE DATA (Complete Employee Balance Ledger & Movements)
+  // 2. LEAVE BALANCE DATA (Central Backend SSOT Ledger & Movements)
   const leavesAggregated = useMemo(() => {
     let list = companyEmployees.map(emp => {
-      const isJoinedIn2026OrLater = isEmployeeHiredIn2026OrLater(emp);
-      const opening = getGlobalOpeningBalance(emp);
-      const accrued = getGlobalAccrued2026(emp);
-      const compensatory = getGlobalCompensatoryDays(emp);
-      const totalAvailable = opening + accrued + compensatory;
-      
+      const empContract = companyContracts.find(c => c.employeeId === emp.id && (c.status === 'RUNNING' || (c.status as string) === 'ACTIVE')) || null;
+      const serverBalance = calculateServerFifoBalance(emp, [], companyLeaves, empContract);
+
+      const opening = serverBalance.carriedOverDays;
+      const accrued = serverBalance.accruedAnnualDays;
+      const compensatory = serverBalance.holidayCompensationDays;
+      const totalAvailable = serverBalance.totalAvailableDays;
+      const totalTakenDays = serverBalance.usedLeaveDays;
+      const paidConsumed = Math.min(totalAvailable, totalTakenDays);
+      const remaining = serverBalance.remainingBalanceDays;
+      const excessUnpaid = serverBalance.unpaidExcessDays;
+
+      const leaveStatus = remaining >= 15 ? 'رصيد كافٍ' : remaining > 0 ? 'رصيد منخفض' : 'رصيد مصفّر وتجاوز (إجازة بدون راتب)';
+
       const empLeaves = companyLeaves.filter(
         l => !l.isHistorical && (l.employeeId === emp.id || l.employeeId === emp.employeeCode) && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED')
       );
-      const actualLeaveDays = empLeaves.filter(l => !l.reason?.includes('تصفية نقدية') && !l.reason?.includes('Encashment')).reduce((sum, l) => sum + (l.totalDays || 0), 0);
-      
-      const empVouchers = getSavedSettlementVouchers(activeCompany?.id).filter(
-        v => v.employeeId === emp.id && (v.status === 'settled_locked' || v.status === 'paid')
-      );
-      const settlementEncashDays = empVouchers.reduce((sum, v) => sum + (v.encashedLeaveDays || 0), 0);
-      const leaveEncashDays = empLeaves.filter(l => l.reason?.includes('تصفية نقدية') || l.reason?.includes('Encashment')).reduce((sum, l) => sum + (l.totalDays || 0), 0);
-      const totalEncashmentDays = Math.max(leaveEncashDays, settlementEncashDays);
-
-      const totalDeducted = actualLeaveDays + totalEncashmentDays;
-      const totalTakenDays = totalDeducted;
-      const paidConsumed = Math.min(totalAvailable, totalDeducted);
-      const remaining = Math.max(0, totalAvailable - totalDeducted);
-      const excessUnpaid = Math.max(0, totalDeducted - totalAvailable);
-
-      const leaveStatus = remaining >= 15 ? 'رصيد كافٍ' : remaining > 0 ? 'رصيد منخفض' : 'رصيد مصفّر وتجاوز (إجازة بدون راتب)';
 
       return {
         id: `emp-leave-balance-${emp.id}`,

@@ -106,7 +106,7 @@ export const SettlementView: React.FC = () => {
           </div>
 
           <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-600">أجر اليوم الواحد (أساسي ÷ 26):</span>
+            <span className="text-gray-600">أجر اليوم الواحد (الراتب الأساسي ÷ 26):</span>
             <span className="font-bold text-gray-700">{formatKWD(dailyWage)}</span>
           </div>
         </div>

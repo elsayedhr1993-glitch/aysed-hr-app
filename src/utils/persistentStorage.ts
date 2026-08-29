@@ -20,6 +20,7 @@ export const MANARA_STORAGE_KEYS = {
   WARNINGS: 'manara_warnings_data',
   EMPLOYEE_NOTES: 'manara_employee_notes_data',
   DOCUMENTS: 'manara_documents_data',
+  COMPANY_DOCUMENTS: 'manara_company_documents_data',
   DOCUMENT_TEMPLATES: 'manara_document_templates_data',
   GENERATED_DOCS: 'manara_generated_docs_data',
   AUDIT_LOGS: 'manara_audit_logs_data',

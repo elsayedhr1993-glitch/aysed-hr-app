@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { SystemSettingsPage } from '../components/SystemSettingsPage';
 import { SystemIntegrationsPage } from '../components/SystemIntegrationsPage';
+import { AutomatedBackupCenter } from '../components/AutomatedBackupCenter';
 import { db, cleanFirestoreData, auth } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
@@ -26,7 +27,7 @@ interface SettingsAppProps {
   setBgTheme?: (theme: 'FOREST_VIDEO' | 'DIGITAL_NETWORK' | 'FLOWING_GRADIENT' | 'GEOMETRIC_WAVES' | 'STATIC') => void;
   motionEnabled?: boolean;
   setMotionEnabled?: (enabled: boolean) => void;
-  initialSubTab?: 'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS';
+  initialSubTab?: 'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'BACKUP_CENTER' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS';
   currentUserRole?: string;
   currentUserEmail?: string;
   onNavigateHome?: () => void;
@@ -58,7 +59,7 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
     ? (initialSubTab || 'AYSED_CONFIG') 
     : (initialSubTab === 'DEVELOPER_TOOLS' || initialSubTab === 'AYSED_CONFIG' ? 'COMPANY' : (initialSubTab || 'COMPANY'));
 
-  const [activeTab, setActiveTab] = useState<'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'AYSED_CONFIG' | 'COMPANY' | 'INTEGRATIONS' | 'BACKUP_CENTER' | 'SYSTEM_SECURITY' | 'APPEARANCE' | 'DEVELOPER_TOOLS'>(defaultTab);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>(activeCompany?.id || companies?.[0]?.id || '');
   const [isSeeding, setIsSeeding] = useState(false);
 
@@ -828,6 +829,18 @@ class ResConfigSettings(models.TransientModel):
         >
           <Sliders className="w-4 h-4" />
           <span>الربط والخدمات الخارجية</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('BACKUP_CENTER')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+            activeTab === 'BACKUP_CENTER'
+              ? 'bg-[#714B67] text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+          }`}
+        >
+          <Database className="w-4 h-4 text-emerald-400" />
+          <span>النسخ الاحتياطي والأتمتة</span>
         </button>
 
         <button
@@ -1676,7 +1689,8 @@ class ResConfigSettings(models.TransientModel):
             </div>)}
 
         </div>) : activeTab === 'INTEGRATIONS' ? (
-        <SystemIntegrationsPage activeCompany={activeCompany} />) : activeTab === 'SYSTEM_SECURITY' ? (
+        <SystemIntegrationsPage activeCompany={activeCompany} />) : activeTab === 'BACKUP_CENTER' ? (
+        <AutomatedBackupCenter />) : activeTab === 'SYSTEM_SECURITY' ? (
         <SystemSettingsPage />) : activeTab === 'APPEARANCE' ? (
         <div className="bg-white/80 backdrop-blur-md rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
           <div>

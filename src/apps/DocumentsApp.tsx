@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { DocumentItem, Employee, Company } from '../types';
+import { CompanyDocument } from '../types/companyDocuments';
+import { CompanyDocumentsKanban } from '../components/CompanyDocumentsKanban';
+import { getPersistentData, setPersistentData, MANARA_STORAGE_KEYS } from '../utils/persistentStorage';
 import { processAnyDocument } from '../utils/ocrService';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { 
   FolderOpen, FileText, Image as ImageIcon, FileArchive, Upload, 
   Trash2, Edit2, Search, X, CheckCircle2, Scan, AlertTriangle, 
-  Download, Calendar, BellRing
+  Download, Calendar, BellRing, Shield
 } from 'lucide-react';
 
 interface DocumentsAppProps {
@@ -34,8 +37,51 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
   onNavigateToApp,
   onSelectEmpForForm,
 }) => {
-  const [activeFolder, setActiveFolder] = useState<string>('ALL');
+  const [activeFolder, setActiveFolder] = useState<string>('COMPANY_LICENSES');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [companyDocuments, setCompanyDocuments] = useState<CompanyDocument[]>(() => 
+    getPersistentData<CompanyDocument[]>(MANARA_STORAGE_KEYS.COMPANY_DOCUMENTS, [
+      {
+        id: 'demo-1',
+        name: 'رخصة تجارية رئيسية (المنار كلينك)',
+        documentType: 'commercial_license',
+        documentNumber: 'CN-2024-99821',
+        issuingAuthority: 'وزارة التجارة والصناعة (MCI)',
+        issueDate: '2025-01-10',
+        expiryDate: '2026-10-15',
+        responsiblePerson: 'أحمد المندوب',
+        fileUrl: '#',
+        notes: 'تتضمن أنشطة العيادات الطبية والتجميلية'
+      },
+      {
+        id: 'demo-2',
+        name: 'اعتماد توقيع رسمي',
+        documentType: 'signature_auth',
+        documentNumber: 'SIG-88219-KWD',
+        issuingAuthority: 'غرفة تجارة وصناعة الكويت',
+        issueDate: '2024-05-01',
+        expiryDate: '2026-09-01',
+        responsiblePerson: 'د. عبدالله المدير',
+        fileUrl: '#',
+        notes: 'معتمد لدى البنوك الرسمية'
+      }
+    ])
+  );
+
+  const handleSaveCompanyDoc = (doc: CompanyDocument) => {
+    const updated = companyDocuments.some(d => d.id === doc.id)
+      ? companyDocuments.map(d => d.id === doc.id ? doc : d)
+      : [doc, ...companyDocuments];
+    setCompanyDocuments(updated);
+    setPersistentData(MANARA_STORAGE_KEYS.COMPANY_DOCUMENTS, updated);
+  };
+
+  const handleDeleteCompanyDoc = (docId: string) => {
+    const updated = companyDocuments.filter(d => d.id !== docId);
+    setCompanyDocuments(updated);
+    setPersistentData(MANARA_STORAGE_KEYS.COMPANY_DOCUMENTS, updated);
+  };
   
   // OCR Modal
   const [showOCRModal, setShowOCRModal] = useState(isOCRModalOpenInitially);
@@ -157,6 +203,10 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
               <FolderOpen className="w-5 h-5 text-[#714B67]"/> المجلدات (Folders)
             </header>
             <ul className="space-y-1 text-sm font-medium">
+              <li onClick={() => setActiveFolder('COMPANY_LICENSES')} className={`p-2 rounded cursor-pointer transition flex items-center gap-2 ${activeFolder === 'COMPANY_LICENSES' ? 'bg-[#714B67] text-white shadow' : 'hover:bg-slate-200 text-slate-700'}`}>
+                <Shield className="w-4 h-4" />
+                <span>تراخيص المنشأة (Kanban)</span>
+              </li>
               <li onClick={() => setActiveFolder('ALL')} className={`p-2 rounded cursor-pointer transition ${activeFolder === 'ALL' ? 'bg-[#714B67] text-white' : 'hover:bg-slate-200 text-slate-700'}`}>الكل (All)</li>
               <li onClick={() => setActiveFolder('IDS')} className={`p-2 rounded cursor-pointer transition ${activeFolder === 'IDS' ? 'bg-[#714B67] text-white' : 'hover:bg-slate-200 text-slate-700'}`}>وثائق الهوية (IDs)</li>
               <li onClick={() => setActiveFolder('RESIDENCY')} className={`p-2 rounded cursor-pointer transition ${activeFolder === 'RESIDENCY' ? 'bg-[#714B67] text-white' : 'hover:bg-slate-200 text-slate-700'}`}>الإقامات (Residency)</li>
@@ -197,67 +247,77 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {activeFolder === 'ACTIVITIES' && (
-             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
-                <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-2">
-                   <BellRing className="w-5 h-5" />
-                   أنشطة التجديد المطلوبة (Odoo Activities)
-                </h3>
-                <p className="text-sm text-amber-800">
-                  يجب اتخاذ إجراء فوري لتجديد الوثائق التالية بناءً على قانون العمل (60 يوماً قبل الانتهاء).
-                </p>
-             </div>)}
+          {activeFolder === 'COMPANY_LICENSES' ? (
+            <CompanyDocumentsKanban 
+              documents={companyDocuments} 
+              onSaveDocument={handleSaveCompanyDoc} 
+              onDeleteDocument={handleDeleteCompanyDoc} 
+            />
+          ) : (
+            <>
+              {activeFolder === 'ACTIVITIES' && (
+                 <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm">
+                    <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-2">
+                       <BellRing className="w-5 h-5" />
+                       أنشطة التجديد المطلوبة (Odoo Activities)
+                    </h3>
+                    <p className="text-sm text-amber-800">
+                      يجب اتخاذ إجراء فوري لتجديد الوثائق التالية بناءً على قانون العمل (60 يوماً قبل الانتهاء).
+                    </p>
+                 </div>)}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {enrichedDocs.map(doc => {
-              const emp = employees.find(e => e.id === doc.employeeId);
-              
-              let borderClass = 'border-slate-200';
-              let badgeClass = 'bg-slate-100 text-slate-700';
-              
-              if (doc.currentStatus === 'expired') {
-                 borderClass = 'border-r-4 border-r-rose-600 border-l border-t border-b border-slate-200';
-                 badgeClass = 'bg-rose-100 text-rose-800 font-bold';
-              } else if (doc.currentStatus === 'near_expiry') {
-                 borderClass = 'border-r-4 border-r-amber-500 border-l border-t border-b border-slate-200';
-                 badgeClass = 'bg-amber-100 text-amber-800 font-bold';
-              }
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {enrichedDocs.map(doc => {
+                  const emp = employees.find(e => e.id === doc.employeeId);
+                  
+                  let borderClass = 'border-slate-200';
+                  let badgeClass = 'bg-slate-100 text-slate-700';
+                  
+                  if (doc.currentStatus === 'expired') {
+                     borderClass = 'border-r-4 border-r-rose-600 border-l border-t border-b border-slate-200';
+                     badgeClass = 'bg-rose-100 text-rose-800 font-bold';
+                  } else if (doc.currentStatus === 'near_expiry') {
+                     borderClass = 'border-r-4 border-r-amber-500 border-l border-t border-b border-slate-200';
+                     badgeClass = 'bg-amber-100 text-amber-800 font-bold';
+                  }
 
-              return (
-                <div key={doc.id} className={`bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition flex gap-3 ${borderClass}`}>
-                  <div className="shrink-0 pt-1">
-                      {getFileIcon(doc.category)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-800 text-sm truncate">{doc.title}</h4>
-                    <div className="text-xs text-slate-500 mt-1 truncate">{emp ? emp.fullNameAr : 'مستند عام'}</div>
-                    
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {doc.expiryDate && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded ${badgeClass}`}>
-                          ينتهي: {doc.expiryDate}
-                          {doc.daysToExpiry !== null && (
-                             <span> ({doc.daysToExpiry > 0 ? `بعد ${doc.daysToExpiry} يوم` : 'منتهي'})</span>)}
-                        </span>)}
-                    </div>
-                  </div>
-                  <div className="shrink-0 flex flex-col justify-between">
-                     <button className="text-slate-400 hover:text-[#714B67] transition" onClick={() => window.open(doc.fileUrl, '_blank')}>
-                       <Download className="w-4 h-4" />
-                     </button>
-                     <button className="text-slate-400 hover:text-rose-600 transition" onClick={() => onDeleteDocument(doc.id)}>
-                       <Trash2 className="w-4 h-4" />
-                     </button>
-                  </div>
-                </div>);
-            })}
-          </div>
+                  return (
+                    <div key={doc.id} className={`bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition flex gap-3 ${borderClass}`}>
+                      <div className="shrink-0 pt-1">
+                          {getFileIcon(doc.category)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-slate-800 text-sm truncate">{doc.title}</h4>
+                        <div className="text-xs text-slate-500 mt-1 truncate">{emp ? emp.fullNameAr : 'مستند عام'}</div>
+                        
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {doc.expiryDate && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded ${badgeClass}`}>
+                              ينتهي: {doc.expiryDate}
+                              {doc.daysToExpiry !== null && (
+                                 <span> ({doc.daysToExpiry > 0 ? `بعد ${doc.daysToExpiry} يوم` : 'منتهي'})</span>)}
+                            </span>)}
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex flex-col justify-between">
+                         <button className="text-slate-400 hover:text-[#714B67] transition" onClick={() => window.open(doc.fileUrl, '_blank')}>
+                           <Download className="w-4 h-4" />
+                         </button>
+                         <button className="text-slate-400 hover:text-rose-600 transition" onClick={() => onDeleteDocument(doc.id)}>
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                      </div>
+                    </div>);
+                })}
+              </div>
 
-          {enrichedDocs.length === 0 && (
-             <div className="text-center py-20 text-slate-400">
-                <FolderOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p>لا توجد وثائق في هذا المجلد.</p>
-             </div>)}
+              {enrichedDocs.length === 0 && (
+                 <div className="text-center py-20 text-slate-400">
+                    <FolderOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>لا توجد وثائق في هذا المجلد.</p>
+                 </div>)}
+            </>
+          )}
         </div>
       </div>
 

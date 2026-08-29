@@ -69,6 +69,8 @@ export interface AppRouterProps {
   setFilterTab: (tab: string) => void;
   selectedEmpForForm: any;
   setSelectedEmpForForm: (emp: any) => void;
+  highlightField?: string | null;
+  onClearHighlightField?: () => void;
   selectedEmployeeForLeavesFilter: string | null;
   setSelectedEmployeeForLeavesFilter: (empId: string | null) => void;
   isOCRModalOpen: boolean;

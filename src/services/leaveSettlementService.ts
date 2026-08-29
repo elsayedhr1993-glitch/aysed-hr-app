@@ -309,8 +309,7 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
 
   const carriedOver = cleanDayDecimals(input.carriedOverBalance || 0);
   const accrued = cleanDayDecimals(input.accruedBalance || 0);
-  const computedAvailable = cleanDayDecimals(carriedOver + accrued);
-  const totalAvailableBefore = cleanDayDecimals(input.totalAvailableBalance > 0 ? input.totalAvailableBalance : computedAvailable);
+  const totalAvailableBefore = cleanDayDecimals(carriedOver + accrued);
 
   // Statutory Days (e.g. Bereavement Art. 77 - 3 days paid, 0 deducted from annual balance)
   const statutoryDays = cleanDayDecimals(Math.max(0, input.statutoryLeaveDays));
@@ -322,23 +321,23 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
   if (mode === 'ENCASHMENT_LIQUIDATION') {
     // وضع تسييل وتصفية الرصيد الموحد: تُدمج كافة الأيام المصفاة في بند موحد غير مجزأ
     const targetEncash = cleanDayDecimals(input.encashmentDays > 0 ? input.encashmentDays : totalAvailableBefore);
-    encashedDays = cleanDayDecimals(Math.min(totalAvailableBefore, Math.max(0, targetEncash)));
+    encashedDays = cleanDayDecimals(Math.max(0, targetEncash));
     consumedDays = 0; // منع توليد بند مستهلك مكرر
     balanceAfterConsumption = cleanDayDecimals(Math.max(0, totalAvailableBefore - encashedDays));
   } else {
     // وضع تسوية الإجازة الفعلية مع السفر:
-    // 1. أيام الإجازة السنوية الفعلية المستهلكة
-    consumedDays = cleanDayDecimals(Math.min(totalAvailableBefore, Math.max(0, input.consumedLeaveDays)));
+    // 1. أيام الإجازة السنوية الفعلية المصروفة مقدماً من الطلب
+    consumedDays = cleanDayDecimals(Math.max(0, input.consumedLeaveDays));
     balanceAfterConsumption = cleanDayDecimals(Math.max(0, totalAvailableBefore - consumedDays));
 
     // 2. أيام التسييل الإضافية غير المتداخلة إن وجدت
     if (input.includeEncashment && input.encashmentDays > 0) {
-      encashedDays = cleanDayDecimals(Math.min(balanceAfterConsumption, Math.max(0, input.encashmentDays)));
+      encashedDays = cleanDayDecimals(Math.max(0, input.encashmentDays));
     }
   }
 
   const remainingBalanceAfter = cleanDayDecimals(
-    Math.max(0, balanceAfterConsumption - (mode === 'ENCASHMENT_LIQUIDATION' ? 0 : encashedDays))
+    Math.max(0, totalAvailableBefore - (mode === 'ENCASHMENT_LIQUIDATION' ? encashedDays : (consumedDays + encashedDays)))
   );
   const unpaidDays = cleanDayDecimals(Math.max(0, input.unpaidLeaveDays));
 
@@ -413,7 +412,7 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
     items.push({
       id: 'item-leave-encashment',
       category: 'LEAVE_ENCASHMENT',
-      name: `البدل النقدي الموحد لتصفية وتسييل رصيد الإجازات (${encashedDays.toFixed(2)} يوم)`,
+      name: `بدل رصيد الإجازات السنوية المستحقة / Leave Balance Cash-out (${encashedDays.toFixed(2)} يوم)`,
       type: 'EARNING',
       quantity: encashedDays,
       unit: 'days',
@@ -424,19 +423,19 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
       isEditable: true,
     });
   } else {
-    // بدل أيام الإجازة السنوية المستهلكة
+    // بدل رصيد الإجازات السنوية المصروفة مقدماً (أيام الإجازة الفعلية المطلوبة في الحركة بعد استبعاد الجمع)
     if (consumedDays > 0) {
       const leaveCashAmount = cleanKwdAmount(consumedDays * dailyWage);
       items.push({
         id: 'item-consumed-leave',
         category: 'CONSUMED_LEAVE',
-        name: `بدل أيام الإجازة السنوية المستهلكة (${consumedDays.toFixed(2)} يوم)`,
+        name: `بدل رصيد الإجازات السنوية المصروفة مقدماً / Paid Leave Days (${consumedDays.toFixed(2)} يوم)`,
         type: 'EARNING',
         quantity: consumedDays,
         unit: 'days',
         rate: dailyWage,
         amount: leaveCashAmount,
-        notes: `مخصومة من رصيد الإجازات السنوي (${consumedDays.toFixed(2)} يوم × ${dailyWage.toFixed(3)} د.ك)`,
+        notes: `أيام الإجازة الفعلية المطلوبة (${consumedDays.toFixed(2)} يوم) × ${dailyWage.toFixed(3)} د.ك (الراتب الأساسي ÷ 26)`,
         isEditable: true,
       });
     }
@@ -447,7 +446,7 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
       items.push({
         id: 'item-leave-encashment',
         category: 'LEAVE_ENCASHMENT',
-        name: `البدل النقدي لتسييل رصيد إجازات إضافي متبقي (${encashedDays.toFixed(2)} يوم)`,
+        name: `بدل رصيد الإجازات السنوية المستحقة / Leave Balance Cash-out (${encashedDays.toFixed(2)} يوم)`,
         type: 'EARNING',
         quantity: encashedDays,
         unit: 'days',
@@ -657,6 +656,130 @@ export function calculateAysedLeaveSettlement(input: AysedLeaveEngineInput): Ays
 }
 
 /**
+ * 🔒 Odoo-style Mathematical Integrity & Constraint Validation Engine
+ * @api.constrains('carriedOverBalance', 'accruedBalance', 'consumedLeaveDays', 'remainingBalanceAfter')
+ */
+export interface SettlementValidationResult {
+  isValid: boolean;
+  canApprove: boolean;
+  canPrint: boolean;
+  errors: string[];
+  warnings: string[];
+  computedFields: {
+    totalAvailable: number;
+    paidLeaveDays: number;
+    encashedDays: number;
+    dailyWage: number;
+    expectedRemaining: number;
+    expectedLeavePayAmount: number;
+  };
+}
+
+export function validateSettlementConstraints(voucherOrInput: any): SettlementValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // 1. استخراج الأرصدة (Variable Binding)
+  const carriedOver = cleanDayDecimals(
+    voucherOrInput.carriedOverBalance ?? 
+    voucherOrInput.carriedOverDays ?? 
+    voucherOrInput.aysed_carried_over ?? 
+    voucherOrInput.openingBalance ?? 
+    0
+  );
+  const accrued = cleanDayDecimals(
+    voucherOrInput.accruedBalance ?? 
+    voucherOrInput.accrued2026Days ?? 
+    voucherOrInput.accruedDays ?? 
+    voucherOrInput.aysed_accrued_2026 ?? 
+    0
+  );
+  const totalAvailable = cleanDayDecimals(
+    voucherOrInput.totalAvailableBalance ?? 
+    voucherOrInput.totalBalanceBefore ?? 
+    voucherOrInput.aysed_total_available ?? 
+    (carriedOver + accrued)
+  );
+
+  // 2. ربط متغير أيام الإجازة المصروفة مقدماً (Paid Leave Days)
+  // يستقبل افتراضياً قيمة (أيام الإجازة المطلوبة والمعتمدة في الطلب)، وليس قيمة الرصيد الصافي المتبقي
+  const paidLeaveDays = cleanDayDecimals(
+    voucherOrInput.consumedLeaveDays ?? 
+    voucherOrInput.paidLeaveDays ?? 
+    voucherOrInput.requestedLeaveDays ?? 
+    voucherOrInput.daysToEncash ?? 
+    voucherOrInput.aysed_paid_days ?? 
+    0
+  );
+  const encashedDays = cleanDayDecimals(
+    voucherOrInput.encashedLeaveDays ?? 
+    voucherOrInput.encashmentDays ?? 
+    0
+  );
+  const totalDeductedDays = cleanDayDecimals(paidLeaveDays + encashedDays);
+
+  // 3. معادلة التحقق البرمجي (Validation Rule):
+  // الرصيد المتبقي = (الرصيد المرحل + الرصيد المكتسب) - أيام الإجازة المصروفة مقدماً
+  const expectedRemaining = cleanDayDecimals(Math.max(0, totalAvailable - totalDeductedDays));
+  const recordedRemaining = cleanDayDecimals(
+    voucherOrInput.remainingBalanceAfter ?? 
+    voucherOrInput.balanceAfter ?? 
+    expectedRemaining
+  );
+
+  const basicSalary = Number(voucherOrInput.basicSalary ?? voucherOrInput.salary ?? 0);
+  const dailyWage = basicSalary > 0 
+    ? cleanKwdAmount(basicSalary / 26) 
+    : cleanKwdAmount(voucherOrInput.dailyWage ?? voucherOrInput.aysed_daily_wage ?? 0);
+  const expectedLeavePayAmount = cleanKwdAmount(totalDeductedDays * dailyWage);
+
+  // 4. سلوك الحارس البرمجي:
+  // أ. الحماية من الرصيد السالب (Negative Balance Protection)
+  if (totalDeductedDays > totalAvailable + 0.001) {
+    const excess = cleanDayDecimals(totalDeductedDays - totalAvailable);
+    errors.push(
+      `حظر الرصيد السالب (Negative Balance Constraint): أيام الإجازة والتسييل المصروفة (${totalDeductedDays} يوم) تتجاوز إجمالي الرصيد التراكمي المتاح (${totalAvailable} يوم = مرحل ${carriedOver} + مكتسب ${accrued}) بمقدار ${excess} يوم. يُمنع اعتماد التسوية أو طباعة السند برصيد سالب.`
+    );
+  }
+
+  // ب. التحقق الرياضي الصارم (Mathematical Integrity Check)
+  // المعادلة: الرصيد المتبقي = (الرصيد المرحل + الرصيد المكتسب) - أيام الإجازة المصروفة مقدماً
+  if (Math.abs(recordedRemaining - expectedRemaining) > 0.05) {
+    errors.push(
+      `خطأ التحقق الرياضي (Mathematical Integrity Failure): الرصيد المتبقي المسجل (${recordedRemaining} يوم) لا يطابق المعادلة: (المرحل ${carriedOver} + المكتسب ${accrued}) - المصرف ${totalDeductedDays} = ${expectedRemaining} يوم.`
+    );
+  }
+
+  // ج. التحقق من أجر اليوم بقاعدة الراتب الأساسي ÷ 26 (تحذير إرشادي لا يمنع الحفظ)
+  if (basicSalary > 0 && voucherOrInput.dailyWage) {
+    const recordedDailyWage = cleanKwdAmount(Number(voucherOrInput.dailyWage));
+    if (Math.abs(recordedDailyWage - dailyWage) > 0.01) {
+      warnings.push(
+        `تنبيه تدقيق الأجر اليومي: أجر اليوم المسجل (${recordedDailyWage} د.ك) يختلف عن قاعدة (الراتب الأساسي ${basicSalary} ÷ 26 = ${dailyWage} د.ك). تم اعتماد القيمة المحسوبة آلياً.`
+      );
+    }
+  }
+
+  const isValid = errors.length === 0;
+
+  return {
+    isValid,
+    canApprove: isValid,
+    canPrint: isValid,
+    errors,
+    warnings,
+    computedFields: {
+      totalAvailable,
+      paidLeaveDays,
+      encashedDays,
+      dailyWage,
+      expectedRemaining,
+      expectedLeavePayAmount
+    }
+  };
+}
+
+/**
  * 8. إدارة وحفظ سندات التسوية في التخزين الدائم (Vouchers Persistence Engine)
  */
 export function getSavedSettlementVouchers(companyId?: string): LeaveSettlementVoucher[] {
@@ -687,6 +810,13 @@ export function getSavedSettlementVouchers(companyId?: string): LeaveSettlementV
 }
 
 export function saveSettlementVoucher(voucher: LeaveSettlementVoucher): LeaveSettlementVoucher[] {
+  // 🔒 Odoo-style Constraint Validation before saving
+  const validation = validateSettlementConstraints(voucher);
+  if (!validation.isValid) {
+    console.error('[Settlement Save Blocked by Odoo Constraints]:', validation.errors);
+    throw new Error(validation.errors.join(' | '));
+  }
+
   const existing = getPersistentData<LeaveSettlementVoucher[]>(
     MANARA_STORAGE_KEYS.LEAVE_SETTLEMENT_VOUCHERS, 
     []
