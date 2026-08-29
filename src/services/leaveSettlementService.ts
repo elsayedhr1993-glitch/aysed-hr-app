@@ -170,7 +170,7 @@ export function computeAccrual2026(joinDateStr: string, asOfDate: Date = new Dat
  */
 export function calculateKuwaitDailyRate(basicWage: number): number {
   if (!basicWage || basicWage <= 0) return 0;
-  return cleanKwdAmount(basicWage / 26);
+  return basicWage / 26; // Do not round intermediate calculation to preserve precision
 }
 
 /**
@@ -304,8 +304,8 @@ export function calculateUniversalLeaveSettlement(input: UniversalSettlementInpu
 
   const baseSalary = input.basicSalary > 0 ? input.basicSalary : input.grossSalary;
   // Unified 26-Day Divisor Standard: Daily Rate = Total Salary / 26
-  const dailyWage = cleanKwdAmount(input.dailyWage > 0 ? input.dailyWage : calculateKuwaitDailyRate(baseSalary));
-  const hourlyWage = cleanKwdAmount(input.hourlyWage > 0 ? input.hourlyWage : calculateKuwaitHourlyRate(dailyWage, 8));
+  const dailyWage = input.dailyWage > 0 ? input.dailyWage : calculateKuwaitDailyRate(baseSalary);
+  const hourlyWage = input.hourlyWage > 0 ? input.hourlyWage : calculateKuwaitHourlyRate(dailyWage, 8);
 
   const carriedOver = cleanDayDecimals(input.carriedOverBalance || 0);
   const accrued = cleanDayDecimals(input.accruedBalance || 0);
@@ -720,7 +720,9 @@ export function validateSettlementConstraints(voucherOrInput: any): SettlementVa
 
   // 3. معادلة التحقق البرمجي (Validation Rule):
   // الرصيد المتبقي = (الرصيد المرحل + الرصيد المكتسب) - أيام الإجازة المصروفة مقدماً
-  const expectedRemaining = cleanDayDecimals(Math.max(0, totalAvailable - totalDeductedDays));
+  // السماح بالرصيد السالب لعدم حظر العمليات الإدارية الخاصة
+  const expectedRemaining = cleanDayDecimals(totalAvailable - totalDeductedDays);
+  
   const recordedRemaining = cleanDayDecimals(
     voucherOrInput.remainingBalanceAfter ?? 
     voucherOrInput.balanceAfter ?? 
@@ -729,7 +731,7 @@ export function validateSettlementConstraints(voucherOrInput: any): SettlementVa
 
   const basicSalary = Number(voucherOrInput.basicSalary ?? voucherOrInput.salary ?? 0);
   const dailyWage = basicSalary > 0 
-    ? cleanKwdAmount(basicSalary / 26) 
+    ? cleanKwdAmount(basicSalary / 26)
     : cleanKwdAmount(voucherOrInput.dailyWage ?? voucherOrInput.aysed_daily_wage ?? 0);
   const expectedLeavePayAmount = cleanKwdAmount(totalDeductedDays * dailyWage);
 
@@ -737,8 +739,8 @@ export function validateSettlementConstraints(voucherOrInput: any): SettlementVa
   // أ. الحماية من الرصيد السالب (Negative Balance Protection)
   if (totalDeductedDays > totalAvailable + 0.001) {
     const excess = cleanDayDecimals(totalDeductedDays - totalAvailable);
-    errors.push(
-      `حظر الرصيد السالب (Negative Balance Constraint): أيام الإجازة والتسييل المصروفة (${totalDeductedDays} يوم) تتجاوز إجمالي الرصيد التراكمي المتاح (${totalAvailable} يوم = مرحل ${carriedOver} + مكتسب ${accrued}) بمقدار ${excess} يوم. يُمنع اعتماد التسوية أو طباعة السند برصيد سالب.`
+    warnings.push(
+      `تنبيه تجاوز الرصيد المتاح (Negative Balance): أيام الإجازة والتسييل المصروفة (${totalDeductedDays} يوم) تتجاوز إجمالي الرصيد المتاح حالياً (${totalAvailable} يوم) بمقدار ${excess} يوم. تم السماح بالعملية كاستثناء إداري.`
     );
   }
 

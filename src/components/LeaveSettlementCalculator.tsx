@@ -398,7 +398,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
       hourlyWage,
       carriedOverBalance: carriedOverBal,
       accruedBalance: accruedBalance,
-      totalAvailableBalance: carriedOverBal + accruedBalance,
+      totalAvailableBalance: netAvailable,
       requestedLeaveDays: consumedLeaveDays + statutoryLeaveDays + unpaidLeaveDays,
       statutoryLeaveDays,
       consumedLeaveDays,
@@ -553,7 +553,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
         hourlyWage,
         carriedOverBalance: carriedOverBal,
         accruedBalance: accruedBalance,
-        totalAvailableBefore: cleanDayDecimals(carriedOverBal + accruedBalance),
+        totalAvailableBefore: cleanDayDecimals(netAvailable),
         consumedLeaveDays,
         statutoryLeaveDays,
         encashedLeaveDays: includeEncashment ? encashmentDays : 0,
@@ -840,7 +840,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
               <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-3 text-right">
                 <span className="block text-[11px] font-bold text-[#714B67]">إجمالي الرصيد المتاح</span>
                 <span className="block text-base font-black font-mono text-purple-950 mt-0.5">
-                  {(carriedOverBal + accruedBalance).toFixed(2)} يوم
+                  {(netAvailable).toFixed(2)} يوم
                 </span>
                 <span className="block text-[9px] text-purple-700 font-medium mt-0.5">
                   (مرحل {carriedOverBal.toFixed(1)} + مكتسب {accruedBalance.toFixed(1)})
@@ -870,7 +870,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
               <div className="bg-teal-50/70 border border-teal-200 rounded-xl p-3 text-right">
                 <span className="block text-[11px] font-bold text-teal-800">الأيام المتبقية بعد الصرف</span>
                 <span className="block text-base font-black font-mono text-teal-950 mt-0.5">
-                  {((carriedOverBal + accruedBalance) - consumedLeaveDays - (includeEncashment ? encashmentDays : 0)).toFixed(2)} يوم
+                  {((netAvailable) - consumedLeaveDays - (includeEncashment ? encashmentDays : 0)).toFixed(2)} يوم
                 </span>
                 <span className="block text-[9px] text-teal-700 font-medium mt-0.5">
                   (الرصيد المتاح - المصروف)
@@ -940,7 +940,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                         </span>
                       </h4>
                       <span className="text-[11px] font-mono text-rose-700 bg-white/70 px-2 py-0.5 rounded border border-rose-200">
-                        الرصيد المتاح: {(carriedOverBal + accruedBalance).toFixed(2)} | المطلوب: {(consumedLeaveDays + (includeEncashment ? encashmentDays : 0)).toFixed(2)}
+                        الرصيد المتاح: {(netAvailable).toFixed(2)} | المطلوب: {(consumedLeaveDays + (includeEncashment ? encashmentDays : 0)).toFixed(2)}
                       </span>
                     </div>
                     <p className="text-xs text-rose-800 leading-relaxed font-medium">
@@ -949,6 +949,28 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     <ul className="list-disc list-inside text-xs text-rose-700 font-bold space-y-1 pt-1 bg-white/60 p-2.5 rounded-xl border border-rose-200/80">
                       {validation.errors.map((err, idx) => (
                         <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Administrative Allowance / Warnings Banner */}
+              {validation.isValid && validation.warnings && validation.warnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
+                  <div className="p-2 bg-amber-100 rounded-xl shrink-0 text-amber-600">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div className="space-y-1 text-right flex-1">
+                    <h4 className="text-xs sm:text-sm font-black text-amber-900 flex items-center gap-1.5">
+                      <span>إشعار إداري (استثناء رصيد سالب)</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold">
+                        العملية مسموحة
+                      </span>
+                    </h4>
+                    <ul className="list-disc list-inside text-xs text-amber-800 font-bold space-y-1 pt-1">
+                      {validation.warnings.map((warn, idx) => (
+                        <li key={idx}>{warn}</li>
                       ))}
                     </ul>
                   </div>
@@ -1512,7 +1534,7 @@ export const LeaveSettlementCalculator: React.FC<LeaveSettlementCalculatorProps>
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-slate-600">
                         <span>إجمالي الرصيد المتاح التراكمي (قبل الخصم):</span>
-                        <span className="font-mono font-bold text-slate-900">{(carriedOverBal + accruedBalance).toFixed(2)} يوم</span>
+                        <span className="font-mono font-bold text-slate-900">{(netAvailable).toFixed(2)} يوم</span>
                       </div>
                       <div className="flex justify-between text-slate-600">
                         <span>أيام الإجازة المصروفة مقدماً (المطلوبة):</span>

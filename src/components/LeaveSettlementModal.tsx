@@ -74,7 +74,7 @@ export const LeaveSettlementModal: React.FC<LeaveSettlementModalProps> = ({
 
   const carriedOver = Number(employeeData?.carriedOver !== undefined ? employeeData.carriedOver : (summary.carriedOverDays || 0));
   const accrued = Number(employeeData?.accrued !== undefined ? employeeData.accrued : (summary.accruedAnnualDays || 0));
-  const totalAvailable = Number((carriedOver + accrued).toFixed(2));
+  const totalAvailable = Number((summary.totalAvailableDays || (carriedOver + accrued)).toFixed(2));
 
   // Determine initial requested days (defaulting to approved leave days or request days)
   const initialApprovedDays = useMemo(() => {
@@ -135,6 +135,7 @@ export const LeaveSettlementModal: React.FC<LeaveSettlementModalProps> = ({
       validateLeaveSettlement({
         carriedOver,
         accrued,
+        totalAvailable,
         requestedDays: numReq,
         balanceRemaining: calculatedRemaining
       });
@@ -247,8 +248,8 @@ export const LeaveSettlementModal: React.FC<LeaveSettlementModalProps> = ({
               <DollarSign className="w-3.5 h-3.5" />
               القيمة المالية المستحقة للصرف:
             </span>
-            <span className="text-base font-black text-emerald-700 tabular-nums">
-              {calculatedCashAmount.toFixed(3)} <span className="text-xs font-bold">د.ك</span>
+            <span className="text-base font-black text-emerald-700 tabular-nums flex items-center gap-1" dir="ltr">
+              <span>{calculatedCashAmount.toFixed(3)}</span> <span className="text-xs font-bold">د.ك</span>
             </span>
           </div>
         )}

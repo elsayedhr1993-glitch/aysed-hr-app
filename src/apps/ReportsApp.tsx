@@ -87,7 +87,7 @@ export const ReportsApp: React.FC<ReportsAppProps> = ({
   }, [contracts, activeCompany]);
 
   const companyLeaves = useMemo(() => {
-    return leaves.filter(l => !activeCompany || activeCompany.id === 'comp-1' || l.companyId === activeCompany.id || !l.companyId || l.companyId === 'comp-1');
+    return leaves.filter(l => !activeCompany || l.companyId === activeCompany.id || !l.companyId);
   }, [leaves, activeCompany]);
 
   const companyAttendance = useMemo(() => {

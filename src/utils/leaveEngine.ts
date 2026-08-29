@@ -189,7 +189,7 @@ export function getEmployeeUnifiedSummary(
     usedLeaveDays: fifo.totalConsumed,
     totalAvailableDays: netAvailable,
     cashSettlementAmount,
-    dailyWageRate: Number(dailyWageRate.toFixed(3)),
+    dailyWageRate: dailyWageRate, // Do not round to preserve precision for future multiplications
     basicSalary: basicSalaryOnly,
     comprehensiveSalary: basicSalaryOnly
   };

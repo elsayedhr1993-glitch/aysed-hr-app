@@ -182,9 +182,9 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
     }
   }, [initialEmployeeId]);
 
-  const rawCompanyEmployees = (employees || []).filter(e => !e.isDeleted && (!activeCompany || activeCompany.id === 'comp-1' || e.companyId === activeCompany.id || !e.companyId));
+  const rawCompanyEmployees = (employees || []).filter(e => !e.isDeleted && (!activeCompany || e.companyId === activeCompany.id || !e.companyId));
   const companyEmployees = rawCompanyEmployees.length > 0 ? rawCompanyEmployees : (employees || []).filter(e => !e.isDeleted);
-  const companyLeaves = (leaves || []).filter(l => !activeCompany || activeCompany.id === 'comp-1' || l.companyId === activeCompany.id || !l.companyId || l.companyId === 'comp-1');
+  const companyLeaves = (leaves || []).filter(l => !activeCompany || l.companyId === activeCompany.id || !l.companyId);
   const activeSearchTerm = localSearch || searchTerm;
 
   // Ensure baseline allocations exist for all active employees and clean up any duplicates
@@ -534,11 +534,13 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
     const isUpdating = Boolean(existingId);
     const allocType = editingAllocation.allocationType || 'regular';
 
+    const selectedEmp = employees.find(e => e.id === editingAllocation.employeeId);
+    
     const newAlloc: HrLeaveAllocation = {
       id: existingId || `alloc-${Date.now()}`,
       name: editingAllocation.name || (allocType === 'regular' ? `رصيد إجازات مرحل من 2025 (${totalDays} يوم)` : `تخصيص رصيد إجازة (${totalDays} يوم)`),
       employeeId: editingAllocation.employeeId,
-      companyId: activeCompany?.id || 'comp-1',
+      companyId: selectedEmp?.companyId || activeCompany?.id || 'comp-1',
       leaveType: 'ANNUAL',
       allocationType: allocType,
       numberOfDays: totalDays,

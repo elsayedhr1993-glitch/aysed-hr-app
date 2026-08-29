@@ -13,7 +13,7 @@ export interface PayslipLeaveCalculation {
  */
 export function calculateKuwaitDailyRate(basicWage: number): number {
   if (!basicWage || basicWage <= 0) return 0;
-  return Number((basicWage / 26).toFixed(3)); // 3 خانات عشرية لدقة الدينار الكويتي
+  return basicWage / 26; // Do not round intermediate calculation to preserve precision
 }
 
 /**
