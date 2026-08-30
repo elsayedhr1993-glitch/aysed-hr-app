@@ -13,6 +13,7 @@ export interface SystemNotification {
   daysRemaining?: number;
   category: 'EXPIRATION' | 'ATTENDANCE' | 'PROBATION' | 'OTHER';
   actionApp: ActiveApp;
+  isRead?: boolean;
 }
 
 export function generateSmartNotifications(

@@ -440,7 +440,7 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
   }
 }`;
 
-  const modelsToTry = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.6-flash"];
+  const modelsToTry = ["gemini-3.7-flash", "gemini-3.1-pro-preview"];
   let lastError: any = null;
 
   for (const modelName of modelsToTry) {
@@ -451,7 +451,7 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
           parts: [
             {
               inlineData: {
-                data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
+                data: imageBase64.replace(/^data:.*?;base64,/, "").replace(/\s/g, ""),
                 mimeType: resolvedMimeType,
               },
             },
@@ -531,7 +531,7 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
           parts: [
             {
               inlineData: {
-                data: imageBase64.replace(/^data:[^;]+;base64,/, ""),
+                data: imageBase64.replace(/^data:.*?;base64,/, "").replace(/\s/g, ""),
                 mimeType: resolvedMimeType,
               },
             },
@@ -573,8 +573,16 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
     }
   }
 
+
+  const errorMessage = lastError?.message || "";
+  let friendlyError = "فشل نظام القراءة الضوئية (OCR) في تحليل المستند. يرجى التأكد من وضوح الملف أو إدخال البيانات يدوياً.";
+  if (errorMessage.includes("INVALID_ARGUMENT")) {
+    friendlyError = "الملف المرفق غير صالح أو معطوب. الرجاء التأكد من رفع صورة صحيحة أو ملف PDF صالح.";
+  }
+  
   return res.status(500).json({
-    error: "فشل نظام القراءة الضوئية (OCR) في تحليل المستند. يرجى التأكد من وضوح الملف أو إدخال البيانات يدوياً."
+    error: friendlyError,
+    details: lastError?.message || lastError
   });
 });
 
@@ -674,7 +682,7 @@ ${contextSummary || 'شركة الكويت الطبية والأعمال - 12 م
 
     contents.push({ text: `سؤال المستخدم الحالي: ${prompt}` });
 
-    const modelsForChat = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.6-flash"];
+    const modelsForChat = ["gemini-3.7-flash", "gemini-3.1-pro-preview"];
     let replyText = "";
     let usedModel = "";
 

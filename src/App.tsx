@@ -599,21 +599,60 @@ function MainActionManager() {
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.DAILY_MOVEMENTS, dailyMovements); }, [dailyMovements]);
   useEffect(() => { setPersistentData(MANARA_STORAGE_KEYS.CANDIDATES, candidates); }, [candidates]);
 
-  // ضمان جلب البيانات وعدم فراغها أبداً (Fallback Seeding)
+  // تم تعطيل جلب البيانات الوهمية (Fallback Seeding) لضمان عدم مسح البيانات الحقيقية.
+  // تنظيف تلقائي للبيانات الوهمية
   useEffect(() => {
-    if (!employees || employees.length < 19) {
-      setEmployees(initialEmployees);
+    const isDemoId = (id: string | undefined) => {
+      if (!id) return false;
+      return id.startsWith('emp-10') || id.startsWith('emp-20') || id.startsWith('cnt-10') || id.startsWith('cnt-20') || id === 'comp-1';
+    };
+
+    setEmployees(prev => {
+      const filtered = prev.filter(e => !isDemoId(e.id));
+      if (filtered.length !== prev.length) return filtered;
+      return prev;
+    });
+
+    setContracts(prev => {
+      const filtered = prev.filter(c => !isDemoId(c.id) && !isDemoId(c.employeeId));
+      if (filtered.length !== prev.length) return filtered;
+      return prev;
+    });
+
+    setLeaves(prev => {
+      const filtered = prev.filter(l => !isDemoId(l.employeeId));
+      if (filtered.length !== prev.length) return filtered;
+      return prev;
+    });
+
+    
+    // تنظيف البصمة المحلية في شاشة البصمة
+    const cleanDbRaw = localStorage.getItem('clean_attendances_db');
+    if (cleanDbRaw) {
+      try {
+        const arr = JSON.parse(cleanDbRaw);
+        if (Array.isArray(arr)) {
+           const cleanArr = arr.filter(a => !isDemoId(a.empId));
+           if (cleanArr.length !== arr.length) {
+              localStorage.setItem('clean_attendances_db', JSON.stringify(cleanArr));
+           }
+        }
+      } catch(e) {}
     }
-    if (!contracts || contracts.length < 19) {
-      setContracts(initialContracts);
-    }
-    if (!departments || departments.length === 0) {
-      setDepartments(initialDepartments);
-    }
-    if (!jobTitles || jobTitles.length === 0) {
-      setJobTitles(initialJobTitles);
-    }
+
+    setAttendance(prev => {
+      const filtered = prev.filter(a => !isDemoId(a.employeeId));
+      if (filtered.length !== prev.length) return filtered;
+      return prev;
+    });
+
+    setPayslips(prev => {
+      const filtered = prev.filter(p => !isDemoId(p.employeeId));
+      if (filtered.length !== prev.length) return filtered;
+      return prev;
+    });
   }, []);
+
 
   // Automated Monthly Leave Accrual Engine (محرك الاستحقاق والترحيل الآلي لرصيد الإجازات)
   // Adds 2.5 days to each active employee's leave balance and prevents duplicate runs via lastAccrualDate check
@@ -2426,7 +2465,7 @@ function MainActionManager() {
 
   // 2. Standard Odoo Workspace (HR Apps)
   return (
-    <div className="aysed-main-layout flex flex-col h-screen w-full max-w-full min-h-screen overflow-hidden font-['Tajawal'] bg-[#F8F9FA] text-gray-800 odoo-scrollbar relative aysed-standard-odoo-view px-6" dir="rtl">
+    <div className="aysed-main-layout flex flex-col min-h-screen w-full overflow-x-hidden font-['Tajawal'] bg-[#F8F9FA] text-gray-800 odoo-scrollbar relative aysed-standard-odoo-view px-6" dir="rtl">
       <BackgroundRenderer theme={bgTheme as any} motionEnabled={motionEnabled} />
       <Toaster position="top-right" toastOptions={{ duration: 1200 }} />
 

@@ -129,7 +129,7 @@ export async function processAnyDocument(file: File, apiKey?: string, docType?: 
 
   if (!response.ok) {
     const errJson = await response.json().catch(() => ({}));
-    throw new Error(errJson.error || 'فشل نظام القراءة الضوئية (OCR) في تحليل المستند. يرجى التأكد من وضوح الملف أو إدخال البيانات يدوياً.');
+    throw new Error((errJson.error || 'فشل نظام القراءة الضوئية (OCR) في تحليل المستند.') + (errJson.details ? '\nالسبب: ' + errJson.details : ''));
   }
 
   const text = await response.text();

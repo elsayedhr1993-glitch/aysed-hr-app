@@ -74,7 +74,7 @@ export const CompanyDocumentsKanban: React.FC<CompanyDocumentsKanbanProps> = ({
       issueDate: formData.issueDate || new Date().toISOString().split('T')[0],
       expiryDate: formData.expiryDate,
       responsiblePerson: formData.responsiblePerson || 'المسؤول الإداري',
-      fileUrl: formData.fileUrl || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      fileUrl: formData.fileUrl || '',
       notes: formData.notes || ''
     };
 
@@ -292,14 +292,14 @@ export const CompanyDocumentsKanban: React.FC<CompanyDocumentsKanbanProps> = ({
                     👁️ عرض
                   </button>
 
-                  {doc.fileUrl ? (
+                  {doc.fileUrl && doc.fileUrl !== '#' ? (
                     <a 
                       href={doc.fileUrl} 
                       download={`${doc.name}.pdf`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium px-2.5 py-1 rounded-md transition-colors"
-                      title="تحميل PDF"
+                      title="تحميل المرفق"
                     >
                       ⬇️ تحميل
                     </a>
@@ -413,6 +413,24 @@ export const CompanyDocumentsKanban: React.FC<CompanyDocumentsKanbanProps> = ({
                 </div>
 
                 <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">إرفاق نسخة الترخيص / المستند (PDF أو صورة)</label>
+                  <input 
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setFormData({...formData, fileUrl: URL.createObjectURL(e.target.files[0])});
+                        toast.success('تم إرفاق الملف بنجاح');
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#714B67]/10 file:text-[#714B67] hover:file:bg-[#714B67]/20 cursor-pointer border border-slate-200 rounded-lg p-1"
+                  />
+                  {formData.fileUrl && formData.fileUrl !== '#' && formData.fileUrl !== 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' && (
+                     <p className="text-emerald-600 text-[10px] mt-1 font-bold">✓ تم إرفاق ملف جاهز للحفظ</p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 mb-1">الموظف / المندوب المسؤول عن التجديد</label>
                   <input 
                     type="text"
@@ -523,15 +541,25 @@ export const CompanyDocumentsKanban: React.FC<CompanyDocumentsKanbanProps> = ({
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                <a
-                  href={selectedDoc.fileUrl || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition"
-                >
-                  <Download className="w-4 h-4" />
-                  تحميل المستند المرفق (PDF)
-                </a>
+                {selectedDoc.fileUrl && selectedDoc.fileUrl !== '#' ? (
+                  <a
+                    href={selectedDoc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    تحميل المستند المرفق
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => toast.error('لا يوجد ملف مرفق مع هذا الترخيص')}
+                    className="bg-slate-100 text-slate-400 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 cursor-not-allowed"
+                  >
+                    <Download className="w-4 h-4 opacity-50" />
+                    لا يوجد مرفق
+                  </button>
+                )}
                 <button
                   onClick={() => setIsDetailModalOpen(false)}
                   className="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded-lg transition"

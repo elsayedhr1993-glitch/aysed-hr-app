@@ -1579,7 +1579,7 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     >
                       <option value="">اختر المسمى الوظيفي...</option>
                       {jobTitles.map(jt => (
-                        <option key={jt.id} value={jt.titleName}>{jt.titleName}</option>))}
+                        <option key={jt.id} value={jt.titleName}>{jt.titleName} {jt.titleNameEn ? `(${jt.titleNameEn})` : ''}</option>))}
                       <option value="محاسب أول">محاسب أول</option>
                       <option value="موظف موارد بشرية">موظف موارد بشرية</option>
                       <option value="طبيب عام">طبيب عام</option>
@@ -1625,24 +1625,11 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                     <input
                       id="field-carriedOverLeave2025"
                       type="number"
-                      step="0.5"
-                      min="0"
-                      value={editingEmp.carriedOverLeave2025 ?? editingEmp.carriedOverBalance ?? ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setEditingEmp({
-                          ...editingEmp,
-                          carriedOverLeave2025: val,
-                          carriedOverBalance: val,
-                          openingBalance: val,
-                          openingLeaveBalance: val
-                        });
-                      }}
-                      placeholder="0"
-                      className={`w-full bg-amber-50/60 border border-amber-300 rounded-xl px-3.5 py-2 text-xs text-amber-900 font-bold font-mono outline-none focus:border-[#714B67] ${getFieldHighlightClass('carriedOverLeave2025')}`}
+                      readOnly
+                      value={editingEmp.carriedOverLeave2025 ?? editingEmp.carriedOverBalance ?? 0}
+                      className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2 text-xs text-slate-500 font-bold font-mono outline-none cursor-not-allowed"
                     />
-                    {renderFieldHighlightIndicator('carriedOverLeave2025', 'رصيد الإجازات')}
-                    <p className="text-[10px] text-amber-700 font-medium mt-0.5">رصيد الإجازات المعتمد المرحل من السنوات السابقة لعام 2025</p>
+                    <p className="text-[10px] text-amber-700 font-medium mt-0.5">حقل عرض فقط. يتم إدارة الرصيد المرحل وبدل العطلات من خلال (تخصيص رصيد) في تطبيق الإجازات.</p>
                   </div>
 
                   <div>
@@ -1935,31 +1922,41 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
               </button>
             </div>
             <div className="p-6 overflow-y-auto flex-1 space-y-3">
-              <div className="flex gap-2 mb-4">
+              <div className="space-y-2 mb-4">
                 <input
                   type="text"
-                  placeholder="اسم المسمى الوظيفي الجديد..."
+                  placeholder="المسمى الوظيفي بالعربية (مثل: محاسب عام)"
                   value={editingJobTitleObj?.titleName || ''}
                   onChange={(e) => setEditingJobTitleObj({ ...editingJobTitleObj, titleName: e.target.value })}
-                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs outline-none"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs outline-none"
                 />
-                <button
-                  onClick={() => {
-                    if (!editingJobTitleObj?.titleName) return;
-                    if (onSaveJobTitle) {
-                      onSaveJobTitle({
-                        id: editingJobTitleObj.id || `jt-${Date.now()}`,
-                        titleName: editingJobTitleObj.titleName.trim(),
-                        description: editingJobTitleObj.description || '',
-                      });
-                      setEditingJobTitleObj({ titleName: '', description: '' });
-                      toast.success('تم حفظ المسمى الوظيفي');
-                    }
-                  }}
-                  className="bg-[#714B67] text-white px-4 py-2 rounded-xl text-xs font-bold transition"
-                >
-                  إضافة
-                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Job Title in English (e.g. General Accountant)"
+                    value={editingJobTitleObj?.titleNameEn || ''}
+                    onChange={(e) => setEditingJobTitleObj({ ...editingJobTitleObj, titleNameEn: e.target.value })}
+                    className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs outline-none font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!editingJobTitleObj?.titleName) return;
+                      if (onSaveJobTitle) {
+                        onSaveJobTitle({
+                          id: editingJobTitleObj.id || `jt-${Date.now()}`,
+                          titleName: editingJobTitleObj.titleName.trim(),
+                          titleNameEn: editingJobTitleObj.titleNameEn?.trim() || '',
+                          description: editingJobTitleObj.description || '',
+                        });
+                        setEditingJobTitleObj({ titleName: '', titleNameEn: '', description: '' });
+                        toast.success('تم حفظ المسمى الوظيفي بالعربية والإنجليزية');
+                      }
+                    }}
+                    className="bg-[#714B67] hover:bg-[#5e3e55] text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+                  >
+                    حفظ / إضافة
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -1969,9 +1966,12 @@ export const EmployeesApp: React.FC<EmployeesAppProps> = ({
                 {effectiveJobTitles.map(jt => (
                   <div key={jt.id} className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 transition">
                     <div>
-                      <span className="font-bold text-xs text-slate-800">{jt.titleName}</span>
+                      <div className="font-bold text-xs text-slate-800 flex items-center gap-2">
+                        <span>{jt.titleName}</span>
+                        {jt.titleNameEn && <span className="text-[11px] text-teal-700 font-mono font-medium">({jt.titleNameEn})</span>}
+                      </div>
                       {jt.departmentName && (
-                        <span className="text-[10px] text-slate-500 mr-2">({jt.departmentName})</span>)}
+                        <div className="text-[10px] text-slate-500 mt-0.5">{jt.departmentName}</div>)}
                     </div>
                     {onDeleteJobTitle && (
                       <button 

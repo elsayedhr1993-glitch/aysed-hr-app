@@ -1392,33 +1392,99 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
           </div>
         </div>)}
 
+      
       {/* Sub-Tab 6: Holidays */}
       {activeSubTab === 'HOLIDAYS' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
-            <table className="w-full text-right text-xs table-auto">
-              <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
-                <tr>
-                  <th className="p-3 w-16 text-center whitespace-nowrap">#</th>
-                  <th className="p-3 w-36 whitespace-nowrap">تاريخ العطلة</th>
-                  <th className="p-3 min-w-[200px] whitespace-nowrap">المناسبة</th>
-                  <th className="p-3 w-44 text-center whitespace-nowrap">النوع</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {getCompensatedHolidays2026().map((h, i) => (
-                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
-                    <td className="p-3 font-mono text-slate-400 text-center">{i + 1}</td>
-                    <td className="p-3 font-mono font-bold text-slate-800">{h.date}</td>
-                    <td className="p-3 font-bold text-[#714B67]">{h.name}</td>
-                    <td className="p-3 text-center">
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-200">
-                        عطلة رسمية مدفوعة الأجر
-                      </span>
-                    </td>
-                  </tr>))}
-              </tbody>
-            </table>
+        <div className="space-y-4">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 shadow-sm flex items-start gap-4">
+            <div className="p-3 bg-emerald-100 text-emerald-700 rounded-full shrink-0">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-emerald-900 mb-1">تقرير وكشف متابعة بدل العطلات الرسمية</h3>
+              <p className="text-xs text-emerald-700 leading-relaxed">
+                يعرض هذا الكشف أرصدة بدل العطلات الرسمية المخصصة للموظفين، وحالة استهلاكها (إما كأيام بديلة أو بتحويلها إلى بدل نقدي). يتم إنشاء حركات التخصيص من خلال تبويب <strong>"التهيئة وتخصيصات الأرصدة"</strong>.
+              </p>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto max-h-[68vh] odoo-scrollbar">
+              <table className="w-full text-right text-xs table-auto min-w-[1000px]">
+                <thead className="bg-[#714B67] text-white font-bold sticky top-0 z-10 shadow-xs">
+                  <tr>
+                    <th className="p-3 w-16 text-center whitespace-nowrap">#</th>
+                    <th className="p-3 min-w-[200px] whitespace-nowrap">اسم الموظف</th>
+                    <th className="p-3 w-48 whitespace-nowrap">العطلة (المناسبة)</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">أيام مستحقة</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">مستهلك (إجازة)</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">منصرف (نقدي)</th>
+                    <th className="p-3 w-32 text-center whitespace-nowrap">الرصيد المتبقي</th>
+                    <th className="p-3 w-44 text-center whitespace-nowrap">حالة الصرف</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {allocations
+                    .filter(a => a.allocationType === 'compensatory_off' || (a.allocationType as any) === 'compensatory' || a.name?.includes('عطلة') || a.name?.includes('تعويضي'))
+                    .map((alloc, i) => {
+                      const emp = employees.find(e => e.id === alloc.employeeId || e.employeeCode === alloc.employeeId);
+                      const totalDays = alloc.numberOfDays || 0;
+                      
+                      const empFifo = emp ? computeFifoLeaveAllocations(emp, buildEmployeeBaselineAllocations(emp, allocations), leaves) : null;
+                      const liveAlloc = empFifo?.allocations.find(a => a.id === alloc.id) || alloc;
+                      
+                      const consumedDays = liveAlloc.consumedDays || 0;
+                      const encashedDays = liveAlloc.encashedDays || 0;
+                      const remaining = Math.max(0, totalDays - consumedDays - encashedDays);
+                      
+                      let statusText = 'مستمر بالرصيد';
+                      let statusClass = 'bg-blue-100 text-blue-800 border-blue-200';
+                      
+                      if (remaining === 0) {
+                        if (encashedDays > 0 && consumedDays > 0) {
+                          statusText = 'تعويض مختلط';
+                          statusClass = 'bg-purple-100 text-purple-800 border-purple-200';
+                        } else if (encashedDays > 0) {
+                          statusText = 'تم تحويله لبدل نقدي';
+                          statusClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                        } else {
+                          statusText = 'تم تعويضه بإجازة بديلة';
+                          statusClass = 'bg-amber-100 text-amber-800 border-amber-200';
+                        }
+                      } else if (consumedDays > 0 || encashedDays > 0) {
+                        statusText = 'تعويض جزئي';
+                        statusClass = 'bg-sky-100 text-sky-800 border-sky-200';
+                      }
+
+                      return (
+                        <tr key={alloc.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/70 hover:bg-slate-100/60 transition'}>
+                          <td className="p-3 font-mono text-slate-400 text-center">{i + 1}</td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900">{emp?.fullNameAr || alloc.employeeId}</div>
+                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">{emp?.employeeCode}</div>
+                          </td>
+                          <td className="p-3 font-bold text-slate-800">{alloc.name || 'بدل عطلة رسمية'} <span className="text-[10px] text-slate-400 block font-mono font-normal">{alloc.dateFrom}</span></td>
+                          <td className="p-3 text-center font-mono font-bold text-[#714B67]">{totalDays}</td>
+                          <td className="p-3 text-center font-mono text-amber-700">{consumedDays}</td>
+                          <td className="p-3 text-center font-mono text-emerald-700">{encashedDays}</td>
+                          <td className="p-3 text-center font-mono font-black text-slate-900">{remaining}</td>
+                          <td className="p-3 text-center">
+                            <span className={`text-[10px] px-2 py-1 rounded-md font-bold border ${statusClass}`}>
+                              {statusText}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                  })}
+                  {allocations.filter(a => a.allocationType === 'compensatory_off' || (a.allocationType as any) === 'compensatory' || a.name?.includes('عطلة') || a.name?.includes('تعويضي')).length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-500 font-bold">
+                        لا توجد سجلات تعويض عن العمل في العطلات الرسمية
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>)}
 
@@ -1526,6 +1592,28 @@ export const LeavesApp: React.FC<LeavesAppProps> = ({  autoOpenNewLeaveForEmpId,
                   >
                     <div className="text-[11px] font-bold">⚡ استحقاق شهري</div>
                     <div className="text-[9px] text-slate-500 mt-0.5">2.5 يوم/شهر</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingAllocation({
+                        ...editingAllocation,
+                        allocationType: 'compensatory_off',
+                        name: 'بدل عطلة رسمية',
+                        dateFrom: new Date().toISOString().split('T')[0],
+                        numberOfDays: 1,
+                        notes: 'تعويض عن العمل في عطلة رسمية'
+                      });
+                    }}
+                    className={`p-2 rounded-xl border text-center transition cursor-pointer ${
+                      editingAllocation.allocationType === 'compensatory_off'
+                        ? 'bg-amber-100/80 border-amber-400 text-amber-950 font-bold shadow-2xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-amber-50'
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">🎁 بدل عطلة رسمية</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Compensatory</div>
                   </button>
                 </div>
               </div>

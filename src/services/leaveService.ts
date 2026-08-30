@@ -127,7 +127,8 @@ export function computeFifoLeaveAllocations(
     .map(a => ({
       ...a,
       consumedDays: a.consumedDays || 0,
-      remainingDays: a.remainingDays !== undefined ? a.remainingDays : a.numberOfDays
+      encashedDays: a.encashedDays || 0,
+      remainingDays: a.numberOfDays - (a.consumedDays || 0) - (a.encashedDays || 0)
     }));
 
   // Sort allocations chronologically by dateFrom ASC (FIFO: earliest date first)
@@ -144,7 +145,7 @@ export function computeFifoLeaveAllocations(
   // Filter approved leaves that consume annual leave balance (chronological order)
   const approvedDeductibleLeaves = leaves
     .filter(l => !l.isHistorical && (l.employeeId === employee.id || l.employeeId === employee.employeeCode) && (l.status === 'APPROVED' || (l.status as string) === 'VALIDATED') && 
-      (l.leaveType === 'ANNUAL' || ((l.leaveType === 'BEREAVEMENT' || l.leaveType === 'COMPASSIONATE') && l.isSplitBereavement))
+      (l.leaveType === 'ANNUAL' || l.leaveType === 'COMPENSATORY' || ((l.leaveType === 'BEREAVEMENT' || l.leaveType === 'COMPASSIONATE') && l.isSplitBereavement))
     )
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
@@ -172,12 +173,18 @@ export function computeFifoLeaveAllocations(
 
     for (const alloc of empAllocations) {
       if (daysToConsume <= 0) break;
-      const currentAvailable = (alloc.numberOfDays || 0) - (alloc.consumedDays || 0);
+      const currentAvailable = (alloc.numberOfDays || 0) - (alloc.consumedDays || 0) - (alloc.encashedDays || 0);
       if (currentAvailable <= 0) continue;
+
+      // Filter logic: COMPENSATORY leaves only consume compensatory allocations
+      // ANNUAL/BEREAVEMENT leaves only consume regular/accrual allocations
+      const isCompensatoryAlloc = alloc.allocationType === 'compensatory_off' || (alloc as any).allocationType === 'compensatory' || alloc.name?.includes('عطلة') || alloc.name?.includes('تعويضي') || alloc.notes?.includes('عطلة');
+      if (leave.leaveType === 'COMPENSATORY' && !isCompensatoryAlloc) continue;
+      if (leave.leaveType !== 'COMPENSATORY' && isCompensatoryAlloc) continue;
 
       const take = Math.min(daysToConsume, currentAvailable);
       alloc.consumedDays = Number(((alloc.consumedDays || 0) + take).toFixed(2));
-      alloc.remainingDays = Number(((alloc.numberOfDays || 0) - alloc.consumedDays).toFixed(2));
+      alloc.remainingDays = Number(((alloc.numberOfDays || 0) - alloc.consumedDays - (alloc.encashedDays || 0)).toFixed(2));
       daysToConsume -= take;
       leaveBreakdown.paidDays += take;
 

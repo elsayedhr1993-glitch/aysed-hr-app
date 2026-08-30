@@ -11,7 +11,7 @@ import { LeaveTypesConfigView } from '../components/LeaveTypesConfigView';
 
 // Additional Modules
 import { ContractsApp } from '../apps/ContractsApp';
-import { KuwaitHolidaysApp } from '../apps/KuwaitHolidaysApp';
+import { PublicHolidaysApp } from '../apps/PublicHolidaysApp';
 import { RecruitmentApp } from '../apps/RecruitmentApp';
 import { PayrollApp } from '../apps/PayrollApp';
 import { EOSApp } from '../apps/EOSApp';
@@ -534,6 +534,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           employees={scopedEmployees.filter(e => !e.isDeleted)}
           contracts={scopedContracts}
           activeCompany={activeCompany}
+          jobTitles={jobTitles}
           onSaveTemplate={handleSaveDocumentTemplate}
           onDeleteTemplate={handleDeleteDocumentTemplate}
           onIssueDocument={handleIssueDocument}
@@ -659,7 +660,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
 
     case 'HOLIDAYS':
       return (
-        <KuwaitHolidaysApp
+        <PublicHolidaysApp
           employees={scopedEmployees}
           leaves={scopedLeaves}
         />);

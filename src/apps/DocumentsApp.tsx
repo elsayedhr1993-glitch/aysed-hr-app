@@ -300,7 +300,13 @@ export const DocumentsApp: React.FC<DocumentsAppProps> = ({
                         </div>
                       </div>
                       <div className="shrink-0 flex flex-col justify-between">
-                         <button className="text-slate-400 hover:text-[#714B67] transition" onClick={() => window.open(doc.fileUrl, '_blank')}>
+                         <button className="text-slate-400 hover:text-[#714B67] transition" onClick={() => {
+                            if (doc.fileUrl && doc.fileUrl !== '#') {
+                               window.open(doc.fileUrl, '_blank');
+                            } else {
+                               toast.error('لا يوجد ملف مرفق');
+                            }
+                         }}>
                            <Download className="w-4 h-4" />
                          </button>
                          <button className="text-slate-400 hover:text-rose-600 transition" onClick={() => onDeleteDocument(doc.id)}>

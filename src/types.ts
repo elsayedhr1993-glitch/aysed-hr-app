@@ -232,7 +232,8 @@ export interface HrLeaveAllocation {
   allocationType: 'regular' | 'accrual' | 'compensatory_off' | 'compensatory'; // 'regular' for fixed opening balance, 'accrual' for monthly plan, 'compensatory_off' for holidays
   accrualMonthKey?: string; // e.g. '2026-08'
   numberOfDays: number; // إجمالي الأيام المخصصة
-  consumedDays?: number; // الأيام المستهلكة وفق مبدأ FIFO
+  consumedDays?: number;
+  encashedDays?: number; // الأيام المستهلكة وفق مبدأ FIFO
   remainingDays?: number; // الأيام المتبقية
   dateFrom: string; // YYYY-MM-DD
   dateTo?: string;

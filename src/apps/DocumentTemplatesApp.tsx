@@ -3,7 +3,7 @@ import { tafqeet } from '../utils/tafqeet';
 import { formatContractData } from '../utils/pam-dictionary';
 import React, { useState } from 'react';
 import { 
-  DocumentTemplate, GeneratedDocument, Employee, Company, DocumentItem, Contract, AuditLog 
+  DocumentTemplate, GeneratedDocument, Employee, Company, DocumentItem, Contract, AuditLog, JobTitle 
 } from '../types';
 import { 
   FileText, Plus, Printer, Download, Eye, Edit3, Trash2, CheckCircle2, 
@@ -18,6 +18,7 @@ interface DocumentTemplatesAppProps {
   employees: Employee[];
   contracts: Contract[];
   activeCompany: Company;
+  jobTitles?: JobTitle[];
   onSaveTemplate: (template: DocumentTemplate) => void;
   onDeleteTemplate: (id: string) => void;
   onIssueDocument: (genDoc: GeneratedDocument, docItem: DocumentItem) => void;
@@ -1232,6 +1233,7 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
   employees,
   contracts,
   activeCompany,
+  jobTitles,
   onSaveTemplate,
   onDeleteTemplate,
   onIssueDocument,
@@ -1342,6 +1344,12 @@ export const DocumentTemplatesApp: React.FC<DocumentTemplatesAppProps> = ({
     };
 
     const pamData = formatContractData(emp, cnt);
+    if (jobTitles && emp?.jobTitle) {
+      const matchedJob = jobTitles.find(jt => jt.titleName?.trim() === emp.jobTitle?.trim());
+      if (matchedJob && matchedJob.titleNameEn) {
+        pamData.job_title_en = matchedJob.titleNameEn;
+      }
+    }
 
     const jobTitle = emp ? emp.jobTitle : (lang === 'EN' ? 'Senior Accountant' : 'محاسب عام أول');
     const dept = emp ? emp.department : (lang === 'EN' ? 'Finance' : 'الإدارة المالية');
