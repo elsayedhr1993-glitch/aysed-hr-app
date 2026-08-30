@@ -411,10 +411,26 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
   }
 
   // Normalize BDF or unknown mime types
-  let resolvedMimeType = mimeType || "image/jpeg";
-  if (resolvedMimeType.includes('bdf') || resolvedMimeType === '' || !resolvedMimeType) {
-    resolvedMimeType = 'application/pdf';
+  
+  let rawBase64 = imageBase64.replace(/^data:.*?;base64,/, "").replace(/\s/g, "");
+  let resolvedMimeType = "image/jpeg";
+  
+  if (rawBase64.startsWith("JVBERi")) {
+    resolvedMimeType = "application/pdf";
+  } else if (rawBase64.startsWith("/9j/")) {
+    resolvedMimeType = "image/jpeg";
+  } else if (rawBase64.startsWith("iVBORw")) {
+    resolvedMimeType = "image/png";
+  } else if (rawBase64.startsWith("UklGR")) {
+    resolvedMimeType = "image/webp";
+  } else {
+    // Fallback to what the client sent if we don't recognize the magic number
+    resolvedMimeType = mimeType || "image/jpeg";
+    if (resolvedMimeType.includes('bdf') || resolvedMimeType === '' || !resolvedMimeType) {
+      resolvedMimeType = 'application/pdf';
+    }
   }
+
 
   const prompt = `أنت نظام خبير في القراءة الضوئية واستخراج بيانات البطاقة المدنية والمستندات الرسمية الكويتية بدقة مطلقة (OCR Vision Engine).
 مهمتك استخراج كافة حقول وبيانات المستند المرفق حصرياً بدقة 100% دون أي تخمين. تحذير شديد: إياك أن تؤلف بيانات وهمية (مثل أحمد محمد عبدالله أو أرقام عشوائية). إذا لم تستطع قراءة حقل، أرجعه فارغاً "".
@@ -451,7 +467,7 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
           parts: [
             {
               inlineData: {
-                data: imageBase64.replace(/^data:.*?;base64,/, "").replace(/\s/g, ""),
+                data: rawBase64,
                 mimeType: resolvedMimeType,
               },
             },
@@ -531,7 +547,7 @@ app.post("/api/ocr-scan", express.json({ limit: "50mb" }), async (req, res) => {
           parts: [
             {
               inlineData: {
-                data: imageBase64.replace(/^data:.*?;base64,/, "").replace(/\s/g, ""),
+                data: rawBase64,
                 mimeType: resolvedMimeType,
               },
             },

@@ -42,7 +42,7 @@ export interface ScannedData {
 async function convertPdfPageToImage(file: File): Promise<{ base64: string; mimeType: string }> {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdf = await loadingTask.promise;
     
     const page = await pdf.getPage(1);
